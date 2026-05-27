@@ -1,6 +1,8 @@
-# Supabase Placeholders
+# Supabase App Helpers
 
-Task 01 only creates the app foundation. Real Supabase clients, auth helpers, database migrations, RLS policies, and seed data belong to later tasks.
+This folder is reserved for future Supabase client helpers used by the app.
+
+Task 02 added database migrations, RLS policies, and seed data under the root `supabase/` folder. Browser/server clients and auth helpers are intentionally deferred to a later task.
 
 Expected environment variables are listed in `.env.example`:
 
