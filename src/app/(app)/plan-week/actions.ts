@@ -2,11 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { mealTypes, type MealType } from "@/lib/recipes/types";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 import { getWeekStartDate } from "@/lib/weekly-plans/week-dates";
 import {
   adultDayTypes,
+  type MealComponentType,
   weeklyGoalTypes,
   type AdultDayType,
   type WeeklyGoalType
@@ -119,6 +121,148 @@ export async function saveWeeklyPlanSetup(formData: FormData) {
   planWeekRedirect(weekStartDate, "Weekly planning setup saved.");
 }
 
+export async function addWeeklyPlanItem(formData: FormData) {
+  const weekStartDate =
+    textOrNull(formData.get("weekStartDate")) ?? getWeekStartDate(new Date());
+  const weeklyPlanId = textOrNull(formData.get("weeklyPlanId"));
+  const planDate = textOrNull(formData.get("planDate"));
+  const mealProfileId = textOrNull(formData.get("mealProfileId"));
+  const recipeId = textOrNull(formData.get("recipeId"));
+  const requestedMealType = textOrNull(formData.get("mealType"));
+  const mealType = isMealType(requestedMealType) ? requestedMealType : null;
+
+  if (!weeklyPlanId || !planDate || !mealProfileId || !recipeId || !mealType) {
+    planWeekRedirect(weekStartDate, "Choose a recipe, profile, and meal slot.");
+  }
+
+  const household = await requireHousehold(weekStartDate);
+  const supabase = await createClient();
+
+  const [weeklyPlan, profile, recipe] = await Promise.all([
+    getScopedWeeklyPlan(supabase, household.id, weeklyPlanId),
+    getScopedMealProfile(supabase, household.id, mealProfileId),
+    getScopedRecipe(supabase, household.id, recipeId)
+  ]);
+
+  if (!weeklyPlan || !profile || !recipe) {
+    planWeekRedirect(weekStartDate, "That recipe or plan is no longer available.");
+  }
+
+  const { error } = await supabase.from("weekly_plan_items").insert({
+    component_type: getComponentTypeForMeal(mealType),
+    display_name: recipe.name,
+    estimated_calories: recipe.estimated_calories_per_serving,
+    estimated_protein_grams: recipe.estimated_protein_grams_per_serving,
+    household_id: household.id,
+    meal_profile_id: profile.id,
+    meal_type: mealType,
+    plan_date: planDate,
+    recipe_id: recipe.id,
+    scale_factor: 1,
+    weekly_plan_id: weeklyPlan.id
+  });
+
+  if (error) {
+    planWeekRedirect(weekStartDate, error.message);
+  }
+
+  revalidatePath("/plan-week");
+  planWeekRedirect(weekStartDate, "Recipe added to the week.");
+}
+
+export async function approveWeeklyPlanItem(formData: FormData) {
+  const weekStartDate =
+    textOrNull(formData.get("weekStartDate")) ?? getWeekStartDate(new Date());
+  const itemId = textOrNull(formData.get("weeklyPlanItemId"));
+
+  if (!itemId) {
+    planWeekRedirect(weekStartDate, "Choose a plan item first.");
+  }
+
+  const household = await requireHousehold(weekStartDate);
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("weekly_plan_items")
+    .update({ is_approved: true })
+    .eq("household_id", household.id)
+    .eq("id", itemId);
+
+  if (error) {
+    planWeekRedirect(weekStartDate, error.message);
+  }
+
+  revalidatePath("/plan-week");
+  planWeekRedirect(weekStartDate, "Plan item approved.");
+}
+
+export async function toggleWeeklyPlanItemLock(formData: FormData) {
+  const weekStartDate =
+    textOrNull(formData.get("weekStartDate")) ?? getWeekStartDate(new Date());
+  const itemId = textOrNull(formData.get("weeklyPlanItemId"));
+
+  if (!itemId) {
+    planWeekRedirect(weekStartDate, "Choose a plan item first.");
+  }
+
+  const household = await requireHousehold(weekStartDate);
+  const supabase = await createClient();
+  const { data, error: readError } = await supabase
+    .from("weekly_plan_items")
+    .select("is_locked")
+    .eq("household_id", household.id)
+    .eq("id", itemId)
+    .maybeSingle();
+
+  if (readError) {
+    planWeekRedirect(weekStartDate, readError.message);
+  }
+
+  if (!data) {
+    planWeekRedirect(weekStartDate, "That plan item is no longer available.");
+  }
+
+  const { error } = await supabase
+    .from("weekly_plan_items")
+    .update({ is_locked: !data.is_locked })
+    .eq("household_id", household.id)
+    .eq("id", itemId);
+
+  if (error) {
+    planWeekRedirect(weekStartDate, error.message);
+  }
+
+  revalidatePath("/plan-week");
+  planWeekRedirect(
+    weekStartDate,
+    data.is_locked ? "Plan item unlocked." : "Plan item locked."
+  );
+}
+
+export async function removeWeeklyPlanItem(formData: FormData) {
+  const weekStartDate =
+    textOrNull(formData.get("weekStartDate")) ?? getWeekStartDate(new Date());
+  const itemId = textOrNull(formData.get("weeklyPlanItemId"));
+
+  if (!itemId) {
+    planWeekRedirect(weekStartDate, "Choose a plan item first.");
+  }
+
+  const household = await requireHousehold(weekStartDate);
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("weekly_plan_items")
+    .delete()
+    .eq("household_id", household.id)
+    .eq("id", itemId);
+
+  if (error) {
+    planWeekRedirect(weekStartDate, error.message);
+  }
+
+  revalidatePath("/plan-week");
+  planWeekRedirect(weekStartDate, "Plan item removed.");
+}
+
 function parseDayTypeInputs(
   formData: FormData,
   householdId: string,
@@ -159,4 +303,89 @@ function isAdultDayType(value: string | null): value is AdultDayType {
 
 function isWeeklyGoalType(value: string): value is WeeklyGoalType {
   return weeklyGoalTypes.includes(value as WeeklyGoalType);
+}
+
+function isMealType(value: string | null): value is MealType {
+  return value !== null && mealTypes.includes(value as MealType);
+}
+
+function getComponentTypeForMeal(mealType: MealType): MealComponentType {
+  if (mealType === "side") {
+    return "side";
+  }
+
+  if (mealType === "snack") {
+    return "snack";
+  }
+
+  if (mealType === "drink") {
+    return "drink";
+  }
+
+  if (mealType === "baby_meal") {
+    return "baby_food";
+  }
+
+  return "main";
+}
+
+async function getScopedWeeklyPlan(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  householdId: string,
+  weeklyPlanId: string
+) {
+  const { data, error } = await supabase
+    .from("weekly_plans")
+    .select("id")
+    .eq("household_id", householdId)
+    .eq("id", weeklyPlanId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
+}
+
+async function getScopedMealProfile(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  householdId: string,
+  mealProfileId: string
+) {
+  const { data, error } = await supabase
+    .from("meal_profiles")
+    .select("id")
+    .eq("household_id", householdId)
+    .eq("id", mealProfileId)
+    .is("archived_at", null)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
+}
+
+async function getScopedRecipe(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  householdId: string,
+  recipeId: string
+) {
+  const { data, error } = await supabase
+    .from("recipes")
+    .select(
+      "id, name, estimated_calories_per_serving, estimated_protein_grams_per_serving"
+    )
+    .eq("household_id", householdId)
+    .eq("id", recipeId)
+    .is("archived_at", null)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
 }

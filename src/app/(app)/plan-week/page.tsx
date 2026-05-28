@@ -2,16 +2,20 @@ import {
   createOrSelectWeeklyPlan,
   saveWeeklyPlanSetup
 } from "@/app/(app)/plan-week/actions";
+import { ManualPlanSection } from "@/components/plan-week/manual-plan-section";
 import { getMealProfiles } from "@/lib/settings/data";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 import {
+  getPlanRecipeOptions,
   getWeeklyPlan,
   getWeeklyPlanGoals,
+  getWeeklyPlanItems,
   getWeeklyPlanProfileDays
 } from "@/lib/weekly-plans/data";
 import {
   formatAdultDayType,
   formatWeeklyGoal,
+  type WeeklyPlanItem,
   weeklyGoalTypes,
   type AdultDayType
 } from "@/lib/weekly-plans/types";
@@ -44,13 +48,18 @@ export default async function PlanWeekPage({
       profile.profile_type === "adult" &&
       ["Brianna", "Elaine"].includes(profile.name)
   );
+  const planningProfiles = profiles.filter((profile) =>
+    ["adult", "baby", "shared"].includes(profile.profile_type)
+  );
   const weekDates = getWeekDates(weekStartDate);
-  const [profileDays, goals] = weeklyPlan
+  const [profileDays, goals, planItems, recipeOptions] = weeklyPlan
     ? await Promise.all([
         getWeeklyPlanProfileDays(householdContext.household.id, weeklyPlan.id),
-        getWeeklyPlanGoals(householdContext.household.id, weeklyPlan.id)
+        getWeeklyPlanGoals(householdContext.household.id, weeklyPlan.id),
+        getWeeklyPlanItems(householdContext.household.id, weeklyPlan.id),
+        getPlanRecipeOptions(householdContext.household.id)
       ])
-    : [[], []];
+    : [[], [], [], []];
   const profileDayLookup = new Map(
     profileDays.map((day) => [
       `${day.meal_profile_id}:${day.plan_date}`,
@@ -58,6 +67,12 @@ export default async function PlanWeekPage({
     ])
   );
   const selectedGoals = new Set(goals.map((goal) => goal.goal));
+  const planItemsByDate = new Map<string, WeeklyPlanItem[]>();
+
+  planItems.forEach((item) => {
+    const existingItems = planItemsByDate.get(item.plan_date) ?? [];
+    planItemsByDate.set(item.plan_date, [...existingItems, item]);
+  });
 
   return (
     <section className="space-y-6">
@@ -68,7 +83,8 @@ export default async function PlanWeekPage({
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
           Create a planning week, mark adult work/off days, and save the
-          week&apos;s goal tags. Recipe assignment starts in the next task.
+          week&apos;s goal tags. Add recipes manually to keep this first
+          planning slice explicit and reviewable.
         </p>
       </div>
 
@@ -103,95 +119,111 @@ export default async function PlanWeekPage({
       </form>
 
       {weeklyPlan ? (
-        <form action={saveWeeklyPlanSetup} className="space-y-6">
-          <input name="weekStartDate" type="hidden" value={weekStartDate} />
-          <input name="weeklyPlanId" type="hidden" value={weeklyPlan.id} />
+        <>
+          <form action={saveWeeklyPlanSetup} className="space-y-6">
+            <input name="weekStartDate" type="hidden" value={weekStartDate} />
+            <input name="weeklyPlanId" type="hidden" value={weeklyPlan.id} />
 
-          <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <h2 className="text-xl font-semibold">Adult day types</h2>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  Mark Brianna and Elaine as work or off days for this week.
+            <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold">Adult day types</h2>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    Mark Brianna and Elaine as work or off days for this week.
+                  </p>
+                </div>
+                <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
+                  Status: {weeklyPlan.status}
                 </p>
               </div>
-              <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
-                Status: {weeklyPlan.status}
-              </p>
-            </div>
 
-            <div className="mt-5 overflow-x-auto">
-              <div className="min-w-[720px] rounded-md border border-border">
-                <div className="grid grid-cols-[140px_repeat(7,minmax(78px,1fr))] border-b border-border bg-muted/60 text-sm font-medium">
-                  <div className="p-3">Profile</div>
-                  {weekDates.map((date) => (
-                    <div className="p-3 text-center" key={date.dateKey}>
-                      <span className="block">{date.dayLabel.slice(0, 3)}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {formatShortDate(date.dateKey)}
-                      </span>
+              <div className="mt-5 overflow-x-auto">
+                <div className="min-w-[720px] rounded-md border border-border">
+                  <div className="grid grid-cols-[140px_repeat(7,minmax(78px,1fr))] border-b border-border bg-muted/60 text-sm font-medium">
+                    <div className="p-3">Profile</div>
+                    {weekDates.map((date) => (
+                      <div className="p-3 text-center" key={date.dateKey}>
+                        <span className="block">
+                          {date.dayLabel.slice(0, 3)}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatShortDate(date.dateKey)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {adultProfiles.map((profile) => (
+                    <div
+                      className="grid grid-cols-[140px_repeat(7,minmax(78px,1fr))] border-b border-border last:border-b-0"
+                      key={profile.id}
+                    >
+                      <div className="p-3 text-sm font-medium">
+                        {profile.name}
+                      </div>
+                      {weekDates.map((date) => {
+                        const selected =
+                          profileDayLookup.get(
+                            `${profile.id}:${date.dateKey}`
+                          ) ?? "";
+
+                        return (
+                          <div className="p-2" key={date.dateKey}>
+                            <DayTypeSelect
+                              dayLabel={date.dayLabel}
+                              name={`adultDayType:${profile.id}:${date.dateKey}:${date.dayLabel}`}
+                              selected={selected}
+                            />
+                          </div>
+                        );
+                      })}
                     </div>
                   ))}
                 </div>
+              </div>
+            </section>
 
-                {adultProfiles.map((profile) => (
-                  <div
-                    className="grid grid-cols-[140px_repeat(7,minmax(78px,1fr))] border-b border-border last:border-b-0"
-                    key={profile.id}
+            <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+              <h2 className="text-xl font-semibold">Weekly goals</h2>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                Save high-level goal tags for the selected week. Goal-specific
+                recipe suggestions come later.
+              </p>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {weeklyGoalTypes.map((goal) => (
+                  <label
+                    className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm"
+                    key={goal}
                   >
-                    <div className="p-3 text-sm font-medium">{profile.name}</div>
-                    {weekDates.map((date) => {
-                      const selected =
-                        profileDayLookup.get(`${profile.id}:${date.dateKey}`) ??
-                        "";
-
-                      return (
-                        <div className="p-2" key={date.dateKey}>
-                          <DayTypeSelect
-                            dayLabel={date.dayLabel}
-                            name={`adultDayType:${profile.id}:${date.dateKey}:${date.dayLabel}`}
-                            selected={selected}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
+                    <input
+                      defaultChecked={selectedGoals.has(goal)}
+                      name="weeklyGoals"
+                      type="checkbox"
+                      value={goal}
+                    />
+                    {formatWeeklyGoal(goal)}
+                  </label>
                 ))}
               </div>
-            </div>
-          </section>
+            </section>
 
-          <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
-            <h2 className="text-xl font-semibold">Weekly goals</h2>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Save high-level goal tags for the selected week. Goal-specific
-              recipe suggestions come later.
-            </p>
-            <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {weeklyGoalTypes.map((goal) => (
-                <label
-                  className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm"
-                  key={goal}
-                >
-                  <input
-                    defaultChecked={selectedGoals.has(goal)}
-                    name="weeklyGoals"
-                    type="checkbox"
-                    value={goal}
-                  />
-                  {formatWeeklyGoal(goal)}
-                </label>
-              ))}
-            </div>
-          </section>
+            <button
+              className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              type="submit"
+            >
+              Save weekly setup
+            </button>
+          </form>
 
-          <button
-            className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-            type="submit"
-          >
-            Save weekly setup
-          </button>
-        </form>
+          <ManualPlanSection
+            planItemsByDate={planItemsByDate}
+            profiles={planningProfiles}
+            recipeOptions={recipeOptions}
+            weekDates={weekDates}
+            weekStartDate={weekStartDate}
+            weeklyPlanId={weeklyPlan.id}
+          />
+        </>
       ) : (
         <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
           <h2 className="text-xl font-semibold">Create this week first</h2>
