@@ -1,22 +1,23 @@
-"use client";
-
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { mainNavigation } from "@/lib/navigation";
-import { cn } from "@/lib/utils";
+import { signOut } from "@/app/login/actions";
+import { AppNav } from "@/components/app-shell/app-nav";
 
 type AppShellProps = {
   children: React.ReactNode;
+  householdName?: string;
+  userEmail?: string;
 };
 
-export function AppShell({ children }: AppShellProps) {
-  const pathname = usePathname();
-
+export function AppShell({
+  children,
+  householdName,
+  userEmail
+}: AppShellProps) {
   return (
     <div className="min-h-screen">
       <header className="border-b border-border bg-card">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <Link href="/dashboard" className="flex items-center gap-3">
               <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-base font-bold text-primary-foreground">
                 MB
@@ -30,31 +31,30 @@ export function AppShell({ children }: AppShellProps) {
                 </span>
               </span>
             </Link>
+
+            <div className="flex flex-col items-start gap-2 text-sm text-muted-foreground sm:items-end">
+              <div>
+                {householdName ? (
+                  <span className="font-medium text-foreground">
+                    {householdName}
+                  </span>
+                ) : (
+                  <span>No household linked</span>
+                )}
+                {userEmail ? <span> · {userEmail}</span> : null}
+              </div>
+              <form action={signOut}>
+                <button
+                  className="rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  type="submit"
+                >
+                  Sign out
+                </button>
+              </form>
+            </div>
           </div>
 
-          <nav aria-label="Main navigation" className="overflow-x-auto">
-            <div className="flex min-w-max gap-2">
-              {mainNavigation.map((item) => {
-                const active =
-                  pathname === item.href || pathname.startsWith(`${item.href}/`);
-
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={cn(
-                      "rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors",
-                      "hover:bg-muted hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-                      active && "bg-secondary text-foreground"
-                    )}
-                    aria-current={active ? "page" : undefined}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </div>
-          </nav>
+          <AppNav />
         </div>
       </header>
 
