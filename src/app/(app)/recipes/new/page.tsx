@@ -33,8 +33,8 @@ export default async function NewRecipePage({
           Add Recipe
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
-          Add a basic recipe with reviewed structured ingredients. Ingredient
-          paste parsing is intentionally left for Task 06.
+          Add a basic recipe with reviewed structured ingredients, pasted
+          ingredient text, tags, nutrition estimates, and profile approvals.
         </p>
       </div>
 

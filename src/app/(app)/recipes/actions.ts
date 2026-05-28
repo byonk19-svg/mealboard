@@ -26,6 +26,7 @@ type ParsedNumber =
 type IngredientInput = {
   display_name: string;
   food_id: string | null;
+  new_food_name: string | null;
   quantity: number | null;
   unit: string | null;
   grocery_category_id: string | null;
@@ -34,6 +35,8 @@ type IngredientInput = {
   optional: boolean;
   sort_order: number;
 };
+
+type PersistedIngredientInput = Omit<IngredientInput, "new_food_name">;
 
 function recipeRedirect(path: string, message: string): never {
   redirect(`${path}?message=${encodeURIComponent(message)}`);
@@ -186,8 +189,13 @@ function parseIngredients(formData: FormData, path: string): IngredientInput[] {
   const quantities = formData.getAll("ingredientQuantity");
   const units = formData.getAll("ingredientUnit");
   const categoryIds = formData.getAll("ingredientCategoryId");
+  const newFoodNames = formData.getAll("ingredientNewFoodName");
   const preparations = formData.getAll("ingredientPreparation");
   const notes = formData.getAll("ingredientNotes");
+  const needsReviewValues = formData.getAll("ingredientNeedsReview");
+  const reviewedRows = new Set(
+    formData.getAll("ingredientReviewed").map((value) => String(value))
+  );
   const optionalRows = new Set(
     formData.getAll("ingredientOptional").map((value) => String(value))
   );
@@ -210,9 +218,16 @@ function parseIngredients(formData: FormData, path: string): IngredientInput[] {
         recipeRedirect(path, quantity.error);
       }
 
+      const needsReview = String(needsReviewValues[index] ?? "false") === "true";
+
+      if (needsReview && !reviewedRows.has(String(index))) {
+        recipeRedirect(path, `Review ingredient ${index + 1} before saving.`);
+      }
+
       return {
         display_name: name,
         food_id: textOrNull(foodIds[index] ?? null),
+        new_food_name: textOrNull(newFoodNames[index] ?? null),
         quantity: quantity.value,
         unit: textOrNull(units[index] ?? null),
         grocery_category_id: textOrNull(categoryIds[index] ?? null),
@@ -252,10 +267,16 @@ export async function createRecipe(formData: FormData) {
   const path = "/recipes/new";
   const household = await requireHousehold(path);
   const recipePayload = parseRecipePayload(formData, path);
-  const ingredients = parseIngredients(formData, path);
+  const parsedIngredients = parseIngredients(formData, path);
   const tags = parseTags(formData);
   const approvedProfileIds = parseApprovedProfileIds(formData);
   const supabase = await createClient();
+  const ingredients = await resolveIngredientFoodIds({
+    householdId: household.id,
+    ingredients: parsedIngredients,
+    path,
+    supabase
+  });
 
   const { data: recipe, error } = await supabase
     .from("recipes")
@@ -294,10 +315,16 @@ export async function updateRecipe(formData: FormData) {
 
   const household = await requireHousehold(path);
   const recipePayload = parseRecipePayload(formData, path);
-  const ingredients = parseIngredients(formData, path);
+  const parsedIngredients = parseIngredients(formData, path);
   const tags = parseTags(formData);
   const approvedProfileIds = parseApprovedProfileIds(formData);
   const supabase = await createClient();
+  const ingredients = await resolveIngredientFoodIds({
+    householdId: household.id,
+    ingredients: parsedIngredients,
+    path,
+    supabase
+  });
 
   const { error } = await supabase
     .from("recipes")
@@ -335,7 +362,7 @@ async function replaceRecipeChildren({
 }: {
   approvedProfileIds: string[];
   householdId: string;
-  ingredients: IngredientInput[];
+  ingredients: PersistedIngredientInput[];
   path: string;
   recipeId: string;
   status: RecipeStatus;
@@ -402,4 +429,103 @@ async function replaceRecipeChildren({
       recipeRedirect(path, error.message);
     }
   }
+}
+
+async function resolveIngredientFoodIds({
+  householdId,
+  ingredients,
+  path,
+  supabase
+}: {
+  householdId: string;
+  ingredients: IngredientInput[];
+  path: string;
+  supabase: Awaited<ReturnType<typeof createClient>>;
+}) {
+  const resolvedIngredients: PersistedIngredientInput[] = [];
+
+  for (const ingredient of ingredients) {
+    const { new_food_name: newFoodName, ...ingredientPayload } = ingredient;
+
+    if (!newFoodName) {
+      resolvedIngredients.push(ingredientPayload);
+      continue;
+    }
+
+    const foodId = await findOrCreateFood({
+      categoryId: ingredient.grocery_category_id,
+      householdId,
+      name: newFoodName,
+      path,
+      unit: ingredient.unit,
+      supabase
+    });
+
+    resolvedIngredients.push({
+      ...ingredientPayload,
+      food_id: foodId
+    });
+  }
+
+  return resolvedIngredients;
+}
+
+async function findOrCreateFood({
+  categoryId,
+  householdId,
+  name,
+  path,
+  unit,
+  supabase
+}: {
+  categoryId: string | null;
+  householdId: string;
+  name: string;
+  path: string;
+  unit: string | null;
+  supabase: Awaited<ReturnType<typeof createClient>>;
+}) {
+  const normalizedName = name.trim();
+  const { data: existingFood, error: existingError } = await supabase
+    .from("foods")
+    .select("id")
+    .eq("household_id", householdId)
+    .ilike("name", normalizedName)
+    .maybeSingle();
+
+  if (existingError) {
+    recipeRedirect(path, existingError.message);
+  }
+
+  if (existingFood) {
+    return existingFood.id;
+  }
+
+  const { data: createdFood, error: createError } = await supabase
+    .from("foods")
+    .insert({
+      default_grocery_category_id: categoryId,
+      default_unit: unit,
+      household_id: householdId,
+      name: normalizedName
+    })
+    .select("id")
+    .single();
+
+  if (createError) {
+    const { data: fallbackFood, error: fallbackError } = await supabase
+      .from("foods")
+      .select("id")
+      .eq("household_id", householdId)
+      .ilike("name", normalizedName)
+      .maybeSingle();
+
+    if (fallbackError || !fallbackFood) {
+      recipeRedirect(path, createError.message);
+    }
+
+    return fallbackFood.id;
+  }
+
+  return createdFood.id;
 }

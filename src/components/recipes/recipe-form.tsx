@@ -4,6 +4,10 @@ import {
 } from "@/app/(app)/recipes/actions";
 import type { InputHTMLAttributes } from "react";
 import {
+  IngredientReviewEditor,
+  type IngredientFormRow
+} from "@/components/recipes/ingredient-review-editor";
+import {
   estimateConfidences,
   formatEstimateConfidence,
   formatMealType,
@@ -157,24 +161,11 @@ export function RecipeForm({
         </div>
       </section>
 
-      <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
-        <h2 className="text-xl font-semibold">Structured ingredients</h2>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          Enter reviewed ingredient rows. Paste parsing and uncertain-row review
-          are intentionally deferred to Task 06.
-        </p>
-        <div className="mt-4 space-y-4">
-          {ingredientRows.map((ingredient, index) => (
-            <IngredientRow
-              categories={categories}
-              foods={foods}
-              index={index}
-              ingredient={ingredient}
-              key={index}
-            />
-          ))}
-        </div>
-      </section>
+      <IngredientReviewEditor
+        categories={categories}
+        foods={foods}
+        initialRows={ingredientRows}
+      />
 
       <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
         <h2 className="text-xl font-semibold">Tags and profile approvals</h2>
@@ -221,12 +212,23 @@ export function RecipeForm({
   );
 }
 
-function buildIngredientRows(recipe?: RecipeWithDetails) {
+function buildIngredientRows(recipe?: RecipeWithDetails): IngredientFormRow[] {
   const existing = recipe?.ingredients ?? [];
   const blankCount = Math.max(minimumIngredientRows - existing.length, 3);
 
   return [
-    ...existing,
+    ...existing.map((ingredient) => ({
+      display_name: ingredient.display_name,
+      food_id: ingredient.food_id,
+      quantity: ingredient.quantity,
+      unit: ingredient.unit,
+      grocery_category_id: ingredient.grocery_category_id,
+      preparation: ingredient.preparation,
+      notes: ingredient.notes,
+      optional: ingredient.optional,
+      needsReview: false,
+      reviewReason: null
+    })),
     ...Array.from({ length: blankCount }, () => ({
       display_name: "",
       food_id: null,
@@ -235,125 +237,11 @@ function buildIngredientRows(recipe?: RecipeWithDetails) {
       grocery_category_id: null,
       preparation: null,
       notes: null,
-      optional: false
+      optional: false,
+      needsReview: false,
+      reviewReason: null
     }))
   ];
-}
-
-function IngredientRow({
-  categories,
-  foods,
-  index,
-  ingredient
-}: {
-  categories: GroceryCategory[];
-  foods: Food[];
-  index: number;
-  ingredient: {
-    display_name: string;
-    food_id: string | null;
-    quantity: number | null;
-    unit: string | null;
-    grocery_category_id: string | null;
-    preparation: string | null;
-    notes: string | null;
-    optional: boolean;
-  };
-}) {
-  return (
-    <div className="rounded-md border border-border p-4">
-      <p className="text-sm font-medium text-muted-foreground">
-        Ingredient {index + 1}
-      </p>
-      <div className="mt-3 grid gap-3 md:grid-cols-6">
-        <label className="block text-sm font-medium md:col-span-2">
-          Display name
-          <input
-            className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-            defaultValue={ingredient.display_name}
-            name="ingredientDisplayName"
-            placeholder="Chicken breast"
-          />
-        </label>
-        <label className="block text-sm font-medium md:col-span-2">
-          Matched food
-          <select
-            className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-            defaultValue={ingredient.food_id ?? ""}
-            name="ingredientFoodId"
-          >
-            <option value="">No food match</option>
-            {foods.map((food) => (
-              <option key={food.id} value={food.id}>
-                {food.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block text-sm font-medium">
-          Quantity
-          <input
-            className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-            defaultValue={ingredient.quantity ?? ""}
-            min="0.01"
-            name="ingredientQuantity"
-            step="0.01"
-            type="number"
-          />
-        </label>
-        <label className="block text-sm font-medium">
-          Unit
-          <input
-            className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-            defaultValue={ingredient.unit ?? ""}
-            name="ingredientUnit"
-            placeholder="lb"
-          />
-        </label>
-        <label className="block text-sm font-medium md:col-span-2">
-          Category
-          <select
-            className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-            defaultValue={ingredient.grocery_category_id ?? ""}
-            name="ingredientCategoryId"
-          >
-            <option value="">No category</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block text-sm font-medium md:col-span-2">
-          Preparation
-          <input
-            className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-            defaultValue={ingredient.preparation ?? ""}
-            name="ingredientPreparation"
-            placeholder="diced, shredded, cooked"
-          />
-        </label>
-        <label className="block text-sm font-medium md:col-span-2">
-          Notes
-          <input
-            className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-            defaultValue={ingredient.notes ?? ""}
-            name="ingredientNotes"
-          />
-        </label>
-        <label className="flex items-center gap-2 text-sm font-medium md:col-span-6">
-          <input
-            defaultChecked={ingredient.optional}
-            name="ingredientOptional"
-            type="checkbox"
-            value={index}
-          />
-          Optional ingredient
-        </label>
-      </div>
-    </div>
-  );
 }
 
 function TextField({
