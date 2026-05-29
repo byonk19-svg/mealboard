@@ -2,6 +2,7 @@ import {
   createOrSelectWeeklyPlan,
   saveWeeklyPlanSetup
 } from "@/app/(app)/plan-week/actions";
+import { generateGroceryListForWeek } from "@/app/(app)/grocery-list/actions";
 import { ManualPlanSection } from "@/components/plan-week/manual-plan-section";
 import { getMealProfiles } from "@/lib/settings/data";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
@@ -223,6 +224,15 @@ export default async function PlanWeekPage({
             weekStartDate={weekStartDate}
             weeklyPlanId={weeklyPlan.id}
           />
+
+          <GroceryGenerationPanel
+            approvedRecipeItemCount={
+              planItems.filter((item) => item.is_approved && item.recipe_id)
+                .length
+            }
+            weekStartDate={weekStartDate}
+            weeklyPlanId={weeklyPlan.id}
+          />
         </>
       ) : (
         <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
@@ -233,6 +243,54 @@ export default async function PlanWeekPage({
           </p>
         </div>
       )}
+    </section>
+  );
+}
+
+function GroceryGenerationPanel({
+  approvedRecipeItemCount,
+  weekStartDate,
+  weeklyPlanId
+}: {
+  approvedRecipeItemCount: number;
+  weekStartDate: string;
+  weeklyPlanId: string;
+}) {
+  const canGenerate = approvedRecipeItemCount > 0;
+
+  return (
+    <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold">Grocery list</h2>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Generate a draft grocery list from approved recipe items in this
+            week. If a draft already exists for this week, MealBoard replaces
+            that draft instead of creating duplicates.
+          </p>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Approved recipe items ready: {approvedRecipeItemCount}
+          </p>
+        </div>
+
+        <form action={generateGroceryListForWeek}>
+          <input name="weekStartDate" type="hidden" value={weekStartDate} />
+          <input name="weeklyPlanId" type="hidden" value={weeklyPlanId} />
+          <button
+            className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            disabled={!canGenerate}
+            type="submit"
+          >
+            Generate grocery list
+          </button>
+        </form>
+      </div>
+
+      {!canGenerate ? (
+        <p className="mt-4 rounded-md border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+          Approve at least one recipe item before generating groceries.
+        </p>
+      ) : null}
     </section>
   );
 }
