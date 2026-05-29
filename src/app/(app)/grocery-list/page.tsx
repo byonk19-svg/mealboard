@@ -7,8 +7,13 @@ import {
   type GroceryItemContextGroup
 } from "@/lib/grocery/group-grocery-list-items";
 import { getNextGroceryListStatus } from "@/lib/grocery/lifecycle";
+import { getGroceryCategories } from "@/lib/recipes/data";
+import type { GroceryCategory } from "@/lib/recipes/types";
+import { getMealProfiles } from "@/lib/settings/data";
+import type { MealProfile } from "@/lib/settings/types";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 import {
+  addManualGroceryItemAction,
   advanceGroceryListLifecycleAction,
   updateGroceryItemAlreadyHave,
   updateGroceryItemChecked
@@ -40,7 +45,11 @@ export default async function GroceryListPage({
     return null;
   }
 
-  const groceryList = await getLatestGroceryList(householdContext.household.id);
+  const [groceryList, groceryCategories, mealProfiles] = await Promise.all([
+    getLatestGroceryList(householdContext.household.id),
+    getGroceryCategories(householdContext.household.id),
+    getMealProfiles(householdContext.household.id)
+  ]);
   const categoryGroups = groceryList
     ? groupItemsByCategory(groceryList.items)
     : [];
@@ -102,6 +111,13 @@ export default async function GroceryListPage({
               />
             </div>
           </section>
+
+          <ManualGroceryItemForm
+            groceryCategories={groceryCategories}
+            groceryListId={groceryList.id}
+            mealProfiles={mealProfiles}
+            view={view}
+          />
 
           <ViewSelector view={view} />
 
@@ -179,6 +195,101 @@ function ViewSelector({ view }: { view: GroceryListView }) {
         );
       })}
     </nav>
+  );
+}
+
+function ManualGroceryItemForm({
+  groceryCategories,
+  groceryListId,
+  mealProfiles,
+  view
+}: {
+  groceryCategories: GroceryCategory[];
+  groceryListId: string;
+  mealProfiles: MealProfile[];
+  view: GroceryListView;
+}) {
+  return (
+    <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+      <h2 className="text-lg font-semibold">Add grocery item</h2>
+      <form action={addManualGroceryItemAction} className="mt-4 space-y-4">
+        <input name="groceryListId" type="hidden" value={groceryListId} />
+        <input name="view" type="hidden" value={view} />
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,0.6fr)_minmax(0,0.7fr)]">
+          <label className="text-sm font-medium">
+            Item
+            <input
+              className="mt-1 min-h-12 w-full rounded-md border border-border bg-background px-3 py-2 text-base"
+              name="displayName"
+              required
+              type="text"
+            />
+          </label>
+          <label className="text-sm font-medium">
+            Quantity
+            <input
+              className="mt-1 min-h-12 w-full rounded-md border border-border bg-background px-3 py-2 text-base"
+              min="0.01"
+              name="quantity"
+              step="any"
+              type="number"
+            />
+          </label>
+          <label className="text-sm font-medium">
+            Unit
+            <input
+              className="mt-1 min-h-12 w-full rounded-md border border-border bg-background px-3 py-2 text-base"
+              name="unit"
+              type="text"
+            />
+          </label>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          <label className="text-sm font-medium">
+            Category
+            <select
+              className="mt-1 min-h-12 w-full rounded-md border border-border bg-background px-3 py-2 text-base"
+              name="groceryCategoryId"
+            >
+              <option value="">Needs category</option>
+              {groceryCategories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm font-medium">
+            Context
+            <select
+              className="mt-1 min-h-12 w-full rounded-md border border-border bg-background px-3 py-2 text-base"
+              name="mealProfileId"
+            >
+              <option value="">Household</option>
+              {mealProfiles.map((profile) => (
+                <option key={profile.id} value={profile.id}>
+                  {profile.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <label className="block text-sm font-medium">
+          Note
+          <input
+            className="mt-1 min-h-12 w-full rounded-md border border-border bg-background px-3 py-2 text-base"
+            name="note"
+            type="text"
+          />
+        </label>
+        <button
+          className="min-h-12 w-full rounded-md bg-primary px-4 py-3 text-sm font-medium text-primary-foreground md:w-auto"
+          type="submit"
+        >
+          Add item
+        </button>
+      </form>
+    </section>
   );
 }
 

@@ -7,6 +7,10 @@ import {
   getGroceryLifecycleTimestampField,
   getNextGroceryListStatus
 } from "./lifecycle";
+import {
+  buildManualGrocerySourceLabel,
+  type NormalizedManualGroceryItemInput
+} from "./manual-grocery-item";
 
 export type GroceryListStatus =
   | "draft"
@@ -89,6 +93,14 @@ type PreferredProductRow = {
 type InsertedGroceryListItem = {
   id: string;
   sort_order: number;
+};
+
+type LatestGroceryListItemSortOrderRow = {
+  sort_order: number;
+};
+
+type MealProfileNameRow = {
+  name: string;
 };
 
 type GroceryListRow = {
@@ -324,6 +336,75 @@ export async function updateGroceryListItemState({
   }
 }
 
+export async function addManualGroceryItem({
+  groceryCategoryId,
+  groceryListId,
+  householdId,
+  item,
+  mealProfileId
+}: {
+  groceryCategoryId: string | null;
+  groceryListId: string;
+  householdId: string;
+  item: NormalizedManualGroceryItemInput;
+  mealProfileId: string | null;
+}) {
+  const supabase = await createClient();
+  const mealProfileName = mealProfileId
+    ? await getScopedMealProfileName(supabase, householdId, mealProfileId)
+    : null;
+  const sortOrder = await getNextGroceryItemSortOrder(
+    supabase,
+    householdId,
+    groceryListId
+  );
+  const { data: insertedItem, error: itemError } = await supabase
+    .from("grocery_list_items")
+    .insert({
+      display_name: item.displayName,
+      grocery_category_id: groceryCategoryId,
+      grocery_list_id: groceryListId,
+      household_id: householdId,
+      manual_item: true,
+      notes: item.note,
+      quantity: item.quantity,
+      sort_order: sortOrder,
+      unit: item.unit
+    })
+    .select("id")
+    .maybeSingle();
+
+  if (itemError) {
+    throw new Error(itemError.message);
+  }
+
+  if (!insertedItem) {
+    throw new Error("Manual grocery item could not be added.");
+  }
+
+  const { error: sourceError } = await supabase
+    .from("grocery_item_sources")
+    .insert({
+      grocery_list_item_id: insertedItem.id,
+      household_id: householdId,
+      meal_profile_id: mealProfileId,
+      notes: item.note,
+      quantity: item.quantity,
+      source_label: buildManualGrocerySourceLabel(mealProfileName),
+      source_type: "manual_add",
+      unit: item.unit
+    });
+
+  if (sourceError) {
+    await supabase
+      .from("grocery_list_items")
+      .delete()
+      .eq("household_id", householdId)
+      .eq("id", insertedItem.id);
+    throw new Error(sourceError.message);
+  }
+}
+
 export async function advanceGroceryListLifecycle({
   groceryListId,
   householdId
@@ -395,6 +476,51 @@ async function getScopedWeeklyPlan(
   }
 
   return data as WeeklyPlanRow | null;
+}
+
+async function getScopedMealProfileName(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  householdId: string,
+  mealProfileId: string
+) {
+  const { data, error } = await supabase
+    .from("meal_profiles")
+    .select("name")
+    .eq("household_id", householdId)
+    .eq("id", mealProfileId)
+    .is("archived_at", null)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data) {
+    throw new Error("That meal profile is no longer available.");
+  }
+
+  return (data as MealProfileNameRow).name;
+}
+
+async function getNextGroceryItemSortOrder(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  householdId: string,
+  groceryListId: string
+) {
+  const { data, error } = await supabase
+    .from("grocery_list_items")
+    .select("sort_order")
+    .eq("household_id", householdId)
+    .eq("grocery_list_id", groceryListId)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data ? ((data as LatestGroceryListItemSortOrderRow).sort_order + 1) : 0;
 }
 
 async function getApprovedWeeklyPlanItems(

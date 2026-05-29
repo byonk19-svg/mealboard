@@ -3,10 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
+  addManualGroceryItem,
   advanceGroceryListLifecycle,
   generateAndPersistGroceryList,
   updateGroceryListItemState
 } from "@/lib/grocery/data";
+import { normalizeManualGroceryItemInput } from "@/lib/grocery/manual-grocery-item";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 import { getWeekStartDate } from "@/lib/weekly-plans/week-dates";
 
@@ -105,6 +107,45 @@ export async function updateGroceryItemChecked(formData: FormData) {
 
   revalidatePath("/grocery-list");
   groceryListRedirect("Grocery item updated.", view);
+}
+
+export async function addManualGroceryItemAction(formData: FormData) {
+  const groceryListId = textOrNull(formData.get("groceryListId"));
+  const view = normalizeGroceryListView(formData.get("view"));
+
+  if (!groceryListId) {
+    groceryListRedirect("Choose a grocery list first.", view);
+  }
+
+  const householdContext = await getCurrentHouseholdContext();
+
+  if (!householdContext.household) {
+    groceryListRedirect("Link your user to a household first.", view);
+  }
+
+  try {
+    const item = normalizeManualGroceryItemInput({
+      displayName: textOrNull(formData.get("displayName")),
+      note: textOrNull(formData.get("note")),
+      quantity: textOrNull(formData.get("quantity")),
+      unit: textOrNull(formData.get("unit"))
+    });
+
+    await addManualGroceryItem({
+      groceryCategoryId: textOrNull(formData.get("groceryCategoryId")),
+      groceryListId,
+      householdId: householdContext.household.id,
+      item,
+      mealProfileId: textOrNull(formData.get("mealProfileId"))
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Manual grocery item failed.";
+    groceryListRedirect(message, view);
+  }
+
+  revalidatePath("/grocery-list");
+  groceryListRedirect("Manual grocery item added.", view);
 }
 
 export async function updateGroceryItemAlreadyHave(formData: FormData) {
