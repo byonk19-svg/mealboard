@@ -1,5 +1,11 @@
+import Link from "next/link";
 import type { GroceryListItem, GroceryListStatus } from "@/lib/grocery/data";
 import { getLatestGroceryList } from "@/lib/grocery/data";
+import {
+  groupGroceryItemsByMeal,
+  groupGroceryItemsByProfile,
+  type GroceryItemContextGroup
+} from "@/lib/grocery/group-grocery-list-items";
 import { getNextGroceryListStatus } from "@/lib/grocery/lifecycle";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 import {
@@ -11,8 +17,11 @@ import {
 type GroceryListPageProps = {
   searchParams: Promise<{
     message?: string;
+    view?: string;
   }>;
 };
+
+type GroceryListView = "shopping" | "profile" | "meal";
 
 type GroceryCategoryGroup = {
   categoryName: string;
@@ -24,14 +33,23 @@ export default async function GroceryListPage({
   searchParams
 }: GroceryListPageProps) {
   const householdContext = await getCurrentHouseholdContext();
-  const { message } = await searchParams;
+  const { message, view: viewParam } = await searchParams;
+  const view = parseGroceryListView(viewParam);
 
   if (!householdContext.household) {
     return null;
   }
 
   const groceryList = await getLatestGroceryList(householdContext.household.id);
-  const groups = groceryList ? groupItemsByCategory(groceryList.items) : [];
+  const categoryGroups = groceryList
+    ? groupItemsByCategory(groceryList.items)
+    : [];
+  const profileGroups = groceryList
+    ? groupGroceryItemsByProfile(groceryList.items)
+    : [];
+  const mealGroups = groceryList
+    ? groupGroceryItemsByMeal(groceryList.items)
+    : [];
   const completedItemCount =
     groceryList?.items.filter((item) => item.checked).length ?? 0;
 
@@ -80,30 +98,34 @@ export default async function GroceryListPage({
               <LifecycleAction
                 groceryListId={groceryList.id}
                 status={groceryList.status}
+                view={view}
               />
             </div>
           </section>
 
-          {groups.map((group) => (
-            <details
-              className="rounded-lg border border-border bg-card p-5 shadow-sm"
-              key={group.categoryName}
-              open
-            >
-              <summary className="cursor-pointer list-none text-xl font-semibold">
-                <span>{group.categoryName}</span>
-                <span className="ml-2 text-sm font-normal text-muted-foreground">
-                  {group.items.length} item
-                  {group.items.length === 1 ? "" : "s"}
-                </span>
-              </summary>
-              <div className="mt-4 divide-y divide-border">
-                {group.items.map((item) => (
-                  <GroceryItemRow item={item} key={item.id} />
-                ))}
-              </div>
-            </details>
-          ))}
+          <ViewSelector view={view} />
+
+          {view === "shopping" ? (
+            <CategoryGroupList groups={categoryGroups} view={view} />
+          ) : null}
+
+          {view === "profile" ? (
+            <ContextGroupList
+              emptyMessage="No profile source context is available for this grocery list."
+              groups={profileGroups}
+              note="Profile View is source context. Consolidated items can appear under more than one profile."
+              view={view}
+            />
+          ) : null}
+
+          {view === "meal" ? (
+            <ContextGroupList
+              emptyMessage="No meal source context is available for this grocery list."
+              groups={mealGroups}
+              note="Meal View is source context. Consolidated items can appear under more than one meal."
+              view={view}
+            />
+          ) : null}
         </>
       )}
     </section>
@@ -122,7 +144,134 @@ function EmptyGroceryListState() {
   );
 }
 
-function GroceryItemRow({ item }: { item: GroceryListItem }) {
+function ViewSelector({ view }: { view: GroceryListView }) {
+  const options: Array<{
+    href: string;
+    label: string;
+    view: GroceryListView;
+  }> = [
+    { href: "/grocery-list", label: "Shopping", view: "shopping" },
+    { href: "/grocery-list?view=profile", label: "Profile", view: "profile" },
+    { href: "/grocery-list?view=meal", label: "Meal", view: "meal" }
+  ];
+
+  return (
+    <nav
+      aria-label="Grocery list view"
+      className="grid grid-cols-3 gap-2 rounded-lg border border-border bg-card p-2 shadow-sm"
+    >
+      {options.map((option) => {
+        const isActive = option.view === view;
+
+        return (
+          <Link
+            aria-current={isActive ? "page" : undefined}
+            className={`min-h-12 rounded-md px-3 py-3 text-center text-sm font-medium transition ${
+              isActive
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-muted"
+            }`}
+            href={option.href}
+            key={option.view}
+          >
+            {option.label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+function CategoryGroupList({
+  groups,
+  view
+}: {
+  groups: GroceryCategoryGroup[];
+  view: GroceryListView;
+}) {
+  return (
+    <>
+      {groups.map((group) => (
+        <details
+          className="rounded-lg border border-border bg-card p-5 shadow-sm"
+          key={group.categoryName}
+          open
+        >
+          <summary className="cursor-pointer list-none text-xl font-semibold">
+            <span>{group.categoryName}</span>
+            <span className="ml-2 text-sm font-normal text-muted-foreground">
+              {formatItemCount(group.items.length)}
+            </span>
+          </summary>
+          <div className="mt-4 divide-y divide-border">
+            {group.items.map((item) => (
+              <GroceryItemRow item={item} key={item.id} view={view} />
+            ))}
+          </div>
+        </details>
+      ))}
+    </>
+  );
+}
+
+function ContextGroupList({
+  emptyMessage,
+  groups,
+  note,
+  view
+}: {
+  emptyMessage: string;
+  groups: GroceryItemContextGroup[];
+  note: string;
+  view: GroceryListView;
+}) {
+  if (groups.length === 0) {
+    return (
+      <p className="rounded-lg border border-border bg-card p-5 text-sm text-muted-foreground shadow-sm">
+        {emptyMessage}
+      </p>
+    );
+  }
+
+  return (
+    <section className="space-y-4">
+      <p className="rounded-lg border border-border bg-muted px-4 py-3 text-sm text-muted-foreground">
+        {note}
+      </p>
+      {groups.map((group) => (
+        <details
+          className="rounded-lg border border-border bg-card p-5 shadow-sm"
+          key={group.groupKey}
+          open
+        >
+          <summary className="cursor-pointer list-none text-xl font-semibold">
+            <span>{group.groupName}</span>
+            <span className="ml-2 text-sm font-normal text-muted-foreground">
+              {formatItemCount(group.items.length)}
+            </span>
+          </summary>
+          <div className="mt-4 divide-y divide-border">
+            {group.items.map((item) => (
+              <GroceryItemRow
+                item={item}
+                key={`${group.groupKey}:${item.id}`}
+                view={view}
+              />
+            ))}
+          </div>
+        </details>
+      ))}
+    </section>
+  );
+}
+
+function GroceryItemRow({
+  item,
+  view
+}: {
+  item: GroceryListItem;
+  view: GroceryListView;
+}) {
   return (
     <article
       className={`py-4 first:pt-0 last:pb-0 ${
@@ -163,6 +312,7 @@ function GroceryItemRow({ item }: { item: GroceryListItem }) {
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:min-w-64">
           <form action={updateGroceryItemChecked}>
             <input name="itemId" type="hidden" value={item.id} />
+            <input name="view" type="hidden" value={view} />
             <input
               name="checked"
               type="hidden"
@@ -181,6 +331,7 @@ function GroceryItemRow({ item }: { item: GroceryListItem }) {
           </form>
           <form action={updateGroceryItemAlreadyHave}>
             <input name="itemId" type="hidden" value={item.id} />
+            <input name="view" type="hidden" value={view} />
             <input
               name="alreadyHave"
               type="hidden"
@@ -219,10 +370,12 @@ function GroceryItemRow({ item }: { item: GroceryListItem }) {
 
 function LifecycleAction({
   groceryListId,
-  status
+  status,
+  view
 }: {
   groceryListId: string;
   status: GroceryListStatus;
+  view: GroceryListView;
 }) {
   const nextStatus = getNextGroceryListStatus(status);
 
@@ -237,6 +390,7 @@ function LifecycleAction({
   return (
     <form action={advanceGroceryListLifecycleAction}>
       <input name="groceryListId" type="hidden" value={groceryListId} />
+      <input name="view" type="hidden" value={view} />
       <button
         className="min-h-12 rounded-md bg-primary px-4 py-3 text-sm font-medium text-primary-foreground"
         type="submit"
@@ -245,6 +399,14 @@ function LifecycleAction({
       </button>
     </form>
   );
+}
+
+function parseGroceryListView(value: string | undefined): GroceryListView {
+  if (value === "profile" || value === "meal") {
+    return value;
+  }
+
+  return "shopping";
 }
 
 function GroceryListMessage({ message }: { message: string }) {
@@ -276,6 +438,10 @@ function groupItemsByCategory(items: GroceryListItem[]) {
 
     return a.categoryName.localeCompare(b.categoryName);
   });
+}
+
+function formatItemCount(count: number) {
+  return `${count} item${count === 1 ? "" : "s"}`;
 }
 
 function formatQuantity(item: GroceryListItem) {

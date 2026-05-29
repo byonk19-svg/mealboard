@@ -10,8 +10,15 @@ import {
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 import { getWeekStartDate } from "@/lib/weekly-plans/week-dates";
 
-function groceryListRedirect(message: string): never {
-  redirect(`/grocery-list?message=${encodeURIComponent(message)}`);
+function groceryListRedirect(message: string, view?: string): never {
+  const params = new URLSearchParams({ message });
+  const groceryListView = normalizeGroceryListView(view);
+
+  if (groceryListView !== "shopping") {
+    params.set("view", groceryListView);
+  }
+
+  redirect(`/grocery-list?${params.toString()}`);
 }
 
 function planWeekRedirect(weekStartDate: string, message: string): never {
@@ -27,6 +34,16 @@ function textOrNull(value: FormDataEntryValue | null) {
 
 function booleanFromForm(value: FormDataEntryValue | null) {
   return String(value ?? "") === "true";
+}
+
+function normalizeGroceryListView(value: FormDataEntryValue | string | null | undefined) {
+  const view = String(value ?? "").trim();
+
+  if (view === "profile" || view === "meal") {
+    return view;
+  }
+
+  return "shopping";
 }
 
 export async function generateGroceryListForWeek(formData: FormData) {
@@ -62,15 +79,16 @@ export async function generateGroceryListForWeek(formData: FormData) {
 
 export async function updateGroceryItemChecked(formData: FormData) {
   const itemId = textOrNull(formData.get("itemId"));
+  const view = normalizeGroceryListView(formData.get("view"));
 
   if (!itemId) {
-    groceryListRedirect("Choose a grocery item first.");
+    groceryListRedirect("Choose a grocery item first.", view);
   }
 
   const householdContext = await getCurrentHouseholdContext();
 
   if (!householdContext.household) {
-    groceryListRedirect("Link your user to a household first.");
+    groceryListRedirect("Link your user to a household first.", view);
   }
 
   try {
@@ -82,24 +100,25 @@ export async function updateGroceryItemChecked(formData: FormData) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Grocery item update failed.";
-    groceryListRedirect(message);
+    groceryListRedirect(message, view);
   }
 
   revalidatePath("/grocery-list");
-  groceryListRedirect("Grocery item updated.");
+  groceryListRedirect("Grocery item updated.", view);
 }
 
 export async function updateGroceryItemAlreadyHave(formData: FormData) {
   const itemId = textOrNull(formData.get("itemId"));
+  const view = normalizeGroceryListView(formData.get("view"));
 
   if (!itemId) {
-    groceryListRedirect("Choose a grocery item first.");
+    groceryListRedirect("Choose a grocery item first.", view);
   }
 
   const householdContext = await getCurrentHouseholdContext();
 
   if (!householdContext.household) {
-    groceryListRedirect("Link your user to a household first.");
+    groceryListRedirect("Link your user to a household first.", view);
   }
 
   try {
@@ -111,24 +130,25 @@ export async function updateGroceryItemAlreadyHave(formData: FormData) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Grocery item update failed.";
-    groceryListRedirect(message);
+    groceryListRedirect(message, view);
   }
 
   revalidatePath("/grocery-list");
-  groceryListRedirect("Grocery item updated.");
+  groceryListRedirect("Grocery item updated.", view);
 }
 
 export async function advanceGroceryListLifecycleAction(formData: FormData) {
   const groceryListId = textOrNull(formData.get("groceryListId"));
+  const view = normalizeGroceryListView(formData.get("view"));
 
   if (!groceryListId) {
-    groceryListRedirect("Choose a grocery list first.");
+    groceryListRedirect("Choose a grocery list first.", view);
   }
 
   const householdContext = await getCurrentHouseholdContext();
 
   if (!householdContext.household) {
-    groceryListRedirect("Link your user to a household first.");
+    groceryListRedirect("Link your user to a household first.", view);
   }
 
   try {
@@ -139,9 +159,9 @@ export async function advanceGroceryListLifecycleAction(formData: FormData) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Grocery lifecycle update failed.";
-    groceryListRedirect(message);
+    groceryListRedirect(message, view);
   }
 
   revalidatePath("/grocery-list");
-  groceryListRedirect("Grocery list status updated.");
+  groceryListRedirect("Grocery list status updated.", view);
 }
