@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import {
   generateGroceryList,
-  type GroceryGenerationPlanItem
+  type GroceryGenerationPlanItem,
+  type GroceryGenerationSelectedStaple
 } from "./generate-grocery-list";
 import {
   getGroceryLifecycleTimestampField,
@@ -85,6 +86,23 @@ type RecipeIngredientRow = {
   unit: string | null;
 };
 
+type WeeklyPlanStapleRow = {
+  staple_id: string;
+};
+
+type SelectedStapleRow = {
+  default_quantity: number | string | null;
+  default_unit: string | null;
+  display_name: string;
+  food_id: string | null;
+  grocery_category_id: string | null;
+  id: string;
+  meal_profile_id: string | null;
+  meal_profiles: { name: string } | Array<{ name: string }> | null;
+  notes: string | null;
+  preferred_quantity_text: string | null;
+};
+
 type PreferredProductRow = {
   food_id: string | null;
   preferred_quantity: string | null;
@@ -166,9 +184,16 @@ export async function generateAndPersistGroceryList({
     householdId,
     weeklyPlan.id
   );
+  const selectedStaples = await getSelectedWeeklyPlanStaples(
+    supabase,
+    householdId,
+    weeklyPlan.id
+  );
 
-  if (weeklyPlanItems.length === 0) {
-    throw new Error("Approve at least one recipe before generating groceries.");
+  if (weeklyPlanItems.length === 0 && selectedStaples.length === 0) {
+    throw new Error(
+      "Approve at least one recipe or select one staple before generating groceries."
+    );
   }
 
   const recipeIds = Array.from(
@@ -184,7 +209,7 @@ export async function generateAndPersistGroceryList({
     recipeIds
   );
 
-  if (recipeIngredients.length === 0) {
+  if (weeklyPlanItems.length > 0 && recipeIngredients.length === 0) {
     throw new Error("Approved recipes need ingredients before generating groceries.");
   }
 
@@ -208,11 +233,12 @@ export async function generateAndPersistGroceryList({
       recipeId: ingredient.recipe_id,
       unit: ingredient.unit
     })),
+    selectedStaples: selectedStaples.map(toGenerationSelectedStaple),
     weeklyPlanItems: weeklyPlanItems.map(toGenerationPlanItem)
   });
 
   if (generated.items.length === 0) {
-    throw new Error("No grocery items were generated from approved recipes.");
+    throw new Error("No grocery items were generated from this weekly plan.");
   }
 
   const { error: deleteDraftError } = await supabase
@@ -574,6 +600,47 @@ async function getRecipeIngredients(
   return (data ?? []) as RecipeIngredientRow[];
 }
 
+async function getSelectedWeeklyPlanStaples(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  householdId: string,
+  weeklyPlanId: string
+) {
+  const { data: selections, error: selectionError } = await supabase
+    .from("weekly_plan_staples")
+    .select("staple_id")
+    .eq("household_id", householdId)
+    .eq("weekly_plan_id", weeklyPlanId)
+    .order("created_at", { ascending: true });
+
+  if (selectionError) {
+    throw new Error(selectionError.message);
+  }
+
+  const stapleIds = ((selections ?? []) as WeeklyPlanStapleRow[]).map(
+    (selection) => selection.staple_id
+  );
+
+  if (stapleIds.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from("staples")
+    .select(
+      "id, meal_profile_id, food_id, display_name, default_quantity, default_unit, preferred_quantity_text, grocery_category_id, notes, meal_profiles(name)"
+    )
+    .eq("household_id", householdId)
+    .eq("active", true)
+    .in("id", stapleIds)
+    .order("display_name", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []) as SelectedStapleRow[];
+}
+
 async function getPreferredQuantityByFoodId(
   supabase: Awaited<ReturnType<typeof createClient>>,
   householdId: string,
@@ -689,6 +756,7 @@ async function createGroceryItemSources(
       grocery_list_item_id: groceryListItemId,
       household_id: householdId,
       meal_profile_id: source.mealProfileId,
+      notes: source.notes,
       quantity: source.quantity,
       recipe_id: source.recipeId,
       recipe_ingredient_id: source.ingredientId,
@@ -814,6 +882,23 @@ function toGenerationPlanItem(
     recipeId: row.recipe_id,
     recipeName: getJoinedValue(row.recipes)?.name ?? null,
     scaleFactor: toNullableNumber(row.scale_factor)
+  };
+}
+
+function toGenerationSelectedStaple(
+  row: SelectedStapleRow
+): GroceryGenerationSelectedStaple {
+  return {
+    defaultQuantity: toNullableNumber(row.default_quantity),
+    defaultUnit: row.default_unit,
+    displayName: row.display_name,
+    foodId: row.food_id,
+    groceryCategoryId: row.grocery_category_id,
+    id: row.id,
+    mealProfileId: row.meal_profile_id,
+    mealProfileName: getJoinedValue(row.meal_profiles)?.name ?? null,
+    notes: row.notes,
+    preferredQuantityText: row.preferred_quantity_text
   };
 }
 

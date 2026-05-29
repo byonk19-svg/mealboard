@@ -110,6 +110,7 @@ describe("generateGroceryList", () => {
         mealProfileId: "profile-brianna",
         mealProfileName: "Brianna",
         mealType: "dinner",
+        notes: null,
         planDate: "2026-05-24",
         quantity: 2,
         recipeId: "recipe-taco",
@@ -126,6 +127,7 @@ describe("generateGroceryList", () => {
         mealProfileId: "profile-elaine",
         mealProfileName: "Elaine",
         mealType: "dinner",
+        notes: null,
         planDate: "2026-05-25",
         quantity: 4,
         recipeId: "recipe-wrap",
@@ -254,6 +256,147 @@ describe("generateGroceryList", () => {
         reviewReason: "Quantity or unit is missing.",
         unit: null
       }
+    ]);
+  });
+
+  it("includes selected weekly staples with staple source context", () => {
+    const generated = generateGroceryList({
+      recipeIngredients: [],
+      selectedStaples: [
+        {
+          defaultQuantity: 1,
+          defaultUnit: "pack",
+          displayName: "Paper towels",
+          foodId: "food-paper-towels",
+          groceryCategoryId: "cat-household",
+          id: "staple-1",
+          mealProfileId: null,
+          mealProfileName: null,
+          notes: "For the kitchen",
+          preferredQuantityText: "1 pack"
+        },
+        {
+          defaultQuantity: 2,
+          defaultUnit: "cups",
+          displayName: "Yogurt",
+          foodId: "food-yogurt",
+          groceryCategoryId: "cat-dairy",
+          id: "staple-2",
+          mealProfileId: "profile-brianna",
+          mealProfileName: "Brianna",
+          notes: null,
+          preferredQuantityText: null
+        }
+      ],
+      weeklyPlanItems: []
+    });
+
+    expect(generated.items).toEqual([
+      {
+        categoryId: "cat-household",
+        displayName: "Paper towels",
+        foodId: "food-paper-towels",
+        needsReview: false,
+        preferredQuantityText: "1 pack",
+        quantity: 1,
+        reviewReason: null,
+        unit: "pack"
+      },
+      {
+        categoryId: "cat-dairy",
+        displayName: "Yogurt",
+        foodId: "food-yogurt",
+        needsReview: false,
+        preferredQuantityText: null,
+        quantity: 2,
+        reviewReason: null,
+        unit: "cup"
+      }
+    ]);
+    expect(generated.sources).toEqual([
+      {
+        groceryItemIndex: 0,
+        ingredientId: null,
+        label: "Selected staple for Household",
+        mealProfileId: null,
+        mealProfileName: null,
+        mealType: null,
+        notes: "For the kitchen",
+        planDate: null,
+        quantity: 1,
+        recipeId: null,
+        recipeName: null,
+        sourceId: "staple-1",
+        sourceType: "staple",
+        unit: "pack",
+        weeklyPlanItemId: null
+      },
+      {
+        groceryItemIndex: 1,
+        ingredientId: null,
+        label: "Selected staple for Brianna",
+        mealProfileId: "profile-brianna",
+        mealProfileName: "Brianna",
+        mealType: null,
+        notes: null,
+        planDate: null,
+        quantity: 2,
+        recipeId: null,
+        recipeName: null,
+        sourceId: "staple-2",
+        sourceType: "staple",
+        unit: "cups",
+        weeklyPlanItemId: null
+      }
+    ]);
+  });
+
+  it("combines selected staples with recipe items using existing safe consolidation rules", () => {
+    const generated = generateGroceryList({
+      recipeIngredients: [
+        {
+          id: "ingredient-1",
+          displayName: "Yogurt",
+          foodId: "food-yogurt",
+          groceryCategoryId: "cat-dairy",
+          preferredQuantityText: null,
+          quantity: 1,
+          recipeId: "recipe-taco",
+          unit: "cup"
+        }
+      ],
+      selectedStaples: [
+        {
+          defaultQuantity: 2,
+          defaultUnit: "cups",
+          displayName: "Yogurt",
+          foodId: "food-yogurt",
+          groceryCategoryId: "cat-dairy",
+          id: "staple-1",
+          mealProfileId: "profile-brianna",
+          mealProfileName: "Brianna",
+          notes: null,
+          preferredQuantityText: "1 tub"
+        }
+      ],
+      weeklyPlanItems: [briannaDinner]
+    });
+
+    expect(generated.items).toEqual([
+      {
+        categoryId: "cat-dairy",
+        displayName: "Yogurt",
+        foodId: "food-yogurt",
+        needsReview: false,
+        preferredQuantityText: "1 tub",
+        quantity: 4,
+        reviewReason: null,
+        unit: "cup"
+      }
+    ]);
+    expect(generated.sources.map((source) => source.sourceType)).toEqual([
+      "meal_generated",
+      "staple"
     ]);
   });
 });

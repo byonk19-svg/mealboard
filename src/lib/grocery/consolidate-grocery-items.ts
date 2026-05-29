@@ -5,6 +5,7 @@ export type GroceryItemSource = {
   mealProfileId?: string | null;
   mealProfileName?: string | null;
   mealType?: string;
+  notes?: string | null;
   planDate?: string;
   quantity?: number | null;
   recipeId?: string | null;

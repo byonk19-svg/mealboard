@@ -29,6 +29,19 @@ export type GroceryGenerationRecipeIngredient = {
   unit: string | null;
 };
 
+export type GroceryGenerationSelectedStaple = {
+  defaultQuantity: number | null;
+  defaultUnit: string | null;
+  displayName: string;
+  foodId: string | null;
+  groceryCategoryId: string | null;
+  id: string;
+  mealProfileId: string | null;
+  mealProfileName: string | null;
+  notes: string | null;
+  preferredQuantityText: string | null;
+};
+
 export type GeneratedGroceryItem = {
   categoryId: string | null;
   displayName: string;
@@ -42,19 +55,20 @@ export type GeneratedGroceryItem = {
 
 export type GeneratedGroceryItemSource = {
   groceryItemIndex: number;
-  ingredientId: string;
+  ingredientId: string | null;
   label: string;
   mealProfileId: string | null;
   mealProfileName: string | null;
-  mealType: string;
-  planDate: string;
+  mealType: string | null;
+  notes: string | null;
+  planDate: string | null;
   quantity: number | null;
   recipeId: string | null;
   recipeName: string | null;
   sourceId: string;
-  sourceType: "meal_generated";
+  sourceType: "meal_generated" | "staple";
   unit: string | null;
-  weeklyPlanItemId: string;
+  weeklyPlanItemId: string | null;
 };
 
 export type GeneratedGroceryList = {
@@ -63,34 +77,39 @@ export type GeneratedGroceryList = {
 };
 
 type GroceryGenerationSource = GroceryItemSource & {
-  ingredientId: string;
+  ingredientId?: string;
   mealProfileId: string | null;
   mealProfileName: string | null;
-  mealType: string;
-  planDate: string;
+  mealType: string | null;
+  notes: string | null;
+  planDate: string | null;
   quantity: number | null;
   recipeId: string | null;
   recipeName: string | null;
-  sourceType: "meal_generated";
+  sourceType: "meal_generated" | "staple";
   unit: string | null;
-  weeklyPlanItemId: string;
+  weeklyPlanItemId: string | null;
 };
 
 export function generateGroceryList({
   recipeIngredients,
+  selectedStaples = [],
   weeklyPlanItems
 }: {
   recipeIngredients: GroceryGenerationRecipeIngredient[];
+  selectedStaples?: GroceryGenerationSelectedStaple[];
   weeklyPlanItems: GroceryGenerationPlanItem[];
 }): GeneratedGroceryList {
   const ingredientsByRecipeId = groupIngredientsByRecipeId(recipeIngredients);
-  const groceryInputs = weeklyPlanItems
+  const recipeInputs = weeklyPlanItems
     .filter((item) => item.isApproved && item.recipeId)
     .flatMap((item) =>
       (ingredientsByRecipeId.get(item.recipeId ?? "") ?? []).map((ingredient) =>
-        toGroceryInput(item, ingredient)
+        toRecipeGroceryInput(item, ingredient)
       )
     );
+  const stapleInputs = selectedStaples.map(toStapleGroceryInput);
+  const groceryInputs = [...recipeInputs, ...stapleInputs];
   const categoryConflictsByItemKey = getCategoryConflictsByItemKey(
     groceryInputs
   );
@@ -140,7 +159,7 @@ function groupIngredientsByRecipeId(
   return grouped;
 }
 
-function toGroceryInput(
+function toRecipeGroceryInput(
   item: GroceryGenerationPlanItem,
   ingredient: GroceryGenerationRecipeIngredient
 ): GroceryItemInput {
@@ -163,6 +182,7 @@ function toGroceryInput(
         mealProfileId: item.mealProfileId,
         mealProfileName: item.mealProfileName,
         mealType: item.mealType,
+        notes: null,
         planDate: item.planDate,
         quantity,
         recipeId: item.recipeId,
@@ -174,6 +194,37 @@ function toGroceryInput(
       }
     ],
     unit: ingredient.unit
+  };
+}
+
+function toStapleGroceryInput(
+  staple: GroceryGenerationSelectedStaple
+): GroceryItemInput {
+  return {
+    displayName: staple.displayName,
+    foodId: staple.foodId,
+    preferredQuantityText: staple.preferredQuantityText,
+    quantity: staple.defaultQuantity,
+    sources: [
+      {
+        groceryCategoryId: staple.groceryCategoryId,
+        ingredientId: undefined,
+        label: formatStapleSourceLabel(staple),
+        mealProfileId: staple.mealProfileId,
+        mealProfileName: staple.mealProfileName,
+        mealType: undefined,
+        notes: staple.notes,
+        planDate: undefined,
+        quantity: staple.defaultQuantity,
+        recipeId: null,
+        recipeName: null,
+        sourceId: staple.id,
+        sourceType: "staple",
+        unit: staple.defaultUnit,
+        weeklyPlanItemId: undefined
+      }
+    ],
+    unit: staple.defaultUnit
   };
 }
 
@@ -259,19 +310,20 @@ function toGeneratedSource(
 ): GeneratedGroceryItemSource {
   return {
     groceryItemIndex,
-    ingredientId: source.ingredientId,
+    ingredientId: source.ingredientId ?? null,
     label: source.label,
     mealProfileId: source.mealProfileId,
     mealProfileName: source.mealProfileName,
-    mealType: source.mealType,
-    planDate: source.planDate,
+    mealType: source.mealType ?? null,
+    notes: source.notes ?? null,
+    planDate: source.planDate ?? null,
     quantity: source.quantity,
     recipeId: source.recipeId,
     recipeName: source.recipeName,
     sourceId: source.sourceId,
     sourceType: source.sourceType,
     unit: source.unit,
-    weeklyPlanItemId: source.weeklyPlanItemId
+    weeklyPlanItemId: source.weeklyPlanItemId ?? null
   };
 }
 
@@ -280,6 +332,10 @@ function formatSourceLabel(item: GroceryGenerationPlanItem) {
   const profile = item.mealProfileName ?? "Unassigned";
 
   return `${recipeName} for ${profile} ${item.mealType} on ${item.planDate}`;
+}
+
+function formatStapleSourceLabel(staple: GroceryGenerationSelectedStaple) {
+  return `Selected staple for ${staple.mealProfileName ?? "Household"}`;
 }
 
 function mergeReviewReasons(

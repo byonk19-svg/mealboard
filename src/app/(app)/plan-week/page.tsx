@@ -253,6 +253,7 @@ export default async function PlanWeekPage({
               planItems.filter((item) => item.is_approved && item.recipe_id)
                 .length
             }
+            selectedStapleCount={stapleSelections.length}
             weekStartDate={weekStartDate}
             weeklyPlanId={weeklyPlan.id}
           />
@@ -272,14 +273,16 @@ export default async function PlanWeekPage({
 
 function GroceryGenerationPanel({
   approvedRecipeItemCount,
+  selectedStapleCount,
   weekStartDate,
   weeklyPlanId
 }: {
   approvedRecipeItemCount: number;
+  selectedStapleCount: number;
   weekStartDate: string;
   weeklyPlanId: string;
 }) {
-  const canGenerate = approvedRecipeItemCount > 0;
+  const canGenerate = approvedRecipeItemCount > 0 || selectedStapleCount > 0;
 
   return (
     <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
@@ -293,6 +296,9 @@ function GroceryGenerationPanel({
           </p>
           <p className="mt-3 text-sm text-muted-foreground">
             Approved recipe items ready: {approvedRecipeItemCount}
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Selected staples ready: {selectedStapleCount}
           </p>
         </div>
 
@@ -311,7 +317,8 @@ function GroceryGenerationPanel({
 
       {!canGenerate ? (
         <p className="mt-4 rounded-md border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-          Approve at least one recipe item before generating groceries.
+          Approve at least one recipe item or select one staple before
+          generating groceries.
         </p>
       ) : null}
     </section>
