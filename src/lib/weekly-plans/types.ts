@@ -57,6 +57,12 @@ export type WeeklyPlanGoal = {
   goal: WeeklyGoalType;
 };
 
+export type WeeklyPlanStapleSelection = {
+  id: string;
+  weekly_plan_id: string;
+  staple_id: string;
+};
+
 export type WeeklyPlanItem = {
   id: string;
   weekly_plan_id: string;

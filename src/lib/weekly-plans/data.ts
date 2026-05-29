@@ -4,7 +4,8 @@ import type {
   WeeklyPlan,
   WeeklyPlanGoal,
   WeeklyPlanItem,
-  WeeklyPlanProfileDay
+  WeeklyPlanProfileDay,
+  WeeklyPlanStapleSelection
 } from "@/lib/weekly-plans/types";
 
 type WeeklyPlanItemRow = Omit<
@@ -76,6 +77,25 @@ export async function getWeeklyPlanGoals(
   }
 
   return (data ?? []) as WeeklyPlanGoal[];
+}
+
+export async function getWeeklyPlanStapleSelections(
+  householdId: string,
+  weeklyPlanId: string
+) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("weekly_plan_staples")
+    .select("id, weekly_plan_id, staple_id")
+    .eq("household_id", householdId)
+    .eq("weekly_plan_id", weeklyPlanId)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []) as WeeklyPlanStapleSelection[];
 }
 
 export async function getWeeklyPlanItems(

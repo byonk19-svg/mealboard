@@ -121,6 +121,77 @@ export async function saveWeeklyPlanSetup(formData: FormData) {
   planWeekRedirect(weekStartDate, "Weekly planning setup saved.");
 }
 
+export async function saveWeeklyPlanStaples(formData: FormData) {
+  const weekStartDate =
+    textOrNull(formData.get("weekStartDate")) ?? getWeekStartDate(new Date());
+  const weeklyPlanId = textOrNull(formData.get("weeklyPlanId"));
+
+  if (!weeklyPlanId) {
+    planWeekRedirect(weekStartDate, "Create the planning week before saving staples.");
+  }
+
+  const household = await requireHousehold(weekStartDate);
+  const supabase = await createClient();
+  const weeklyPlan = await getScopedWeeklyPlan(
+    supabase,
+    household.id,
+    weeklyPlanId
+  );
+
+  if (!weeklyPlan) {
+    planWeekRedirect(weekStartDate, "That planning week is no longer available.");
+  }
+
+  const selectedStapleIds = parseSelectedStapleIds(formData);
+  const scopedStapleIds = await getScopedActiveStapleIds(
+    supabase,
+    household.id,
+    selectedStapleIds
+  );
+
+  if (scopedStapleIds.length !== selectedStapleIds.length) {
+    planWeekRedirect(weekStartDate, "One selected staple is no longer available.");
+  }
+
+  if (scopedStapleIds.length > 0) {
+    const { error } = await supabase.from("weekly_plan_staples").upsert(
+      scopedStapleIds.map((stapleId) => ({
+        household_id: household.id,
+        staple_id: stapleId,
+        weekly_plan_id: weeklyPlan.id
+      })),
+      { onConflict: "weekly_plan_id,staple_id" }
+    );
+
+    if (error) {
+      planWeekRedirect(weekStartDate, error.message);
+    }
+  }
+
+  let deleteQuery = supabase
+    .from("weekly_plan_staples")
+    .delete()
+    .eq("household_id", household.id)
+    .eq("weekly_plan_id", weeklyPlan.id);
+
+  if (scopedStapleIds.length > 0) {
+    deleteQuery = deleteQuery.not(
+      "staple_id",
+      "in",
+      `(${scopedStapleIds.join(",")})`
+    );
+  }
+
+  const { error: deleteError } = await deleteQuery;
+
+  if (deleteError) {
+    planWeekRedirect(weekStartDate, deleteError.message);
+  }
+
+  revalidatePath("/plan-week");
+  planWeekRedirect(weekStartDate, "Weekly staples saved.");
+}
+
 export async function addWeeklyPlanItem(formData: FormData) {
   const weekStartDate =
     textOrNull(formData.get("weekStartDate")) ?? getWeekStartDate(new Date());
@@ -297,6 +368,17 @@ function parseWeeklyGoals(formData: FormData): WeeklyGoalType[] {
     .filter(isWeeklyGoalType);
 }
 
+function parseSelectedStapleIds(formData: FormData) {
+  return Array.from(
+    new Set(
+      formData
+        .getAll("stapleIds")
+        .map((stapleId) => String(stapleId).trim())
+        .filter((stapleId) => stapleId.length > 0)
+    )
+  );
+}
+
 function isAdultDayType(value: string | null): value is AdultDayType {
   return value !== null && adultDayTypes.includes(value as AdultDayType);
 }
@@ -388,4 +470,27 @@ async function getScopedRecipe(
   }
 
   return data;
+}
+
+async function getScopedActiveStapleIds(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  householdId: string,
+  stapleIds: string[]
+) {
+  if (stapleIds.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from("staples")
+    .select("id")
+    .eq("household_id", householdId)
+    .eq("active", true)
+    .in("id", stapleIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []).map((staple) => staple.id);
 }

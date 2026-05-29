@@ -4,14 +4,16 @@ import {
 } from "@/app/(app)/plan-week/actions";
 import { generateGroceryListForWeek } from "@/app/(app)/grocery-list/actions";
 import { ManualPlanSection } from "@/components/plan-week/manual-plan-section";
-import { getMealProfiles } from "@/lib/settings/data";
+import { StaplesReviewSection } from "@/components/plan-week/staples-review-section";
+import { getMealProfiles, getStaples } from "@/lib/settings/data";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 import {
   getPlanRecipeOptions,
   getWeeklyPlan,
   getWeeklyPlanGoals,
   getWeeklyPlanItems,
-  getWeeklyPlanProfileDays
+  getWeeklyPlanProfileDays,
+  getWeeklyPlanStapleSelections
 } from "@/lib/weekly-plans/data";
 import {
   formatAdultDayType,
@@ -53,14 +55,26 @@ export default async function PlanWeekPage({
     ["adult", "baby", "shared"].includes(profile.profile_type)
   );
   const weekDates = getWeekDates(weekStartDate);
-  const [profileDays, goals, planItems, recipeOptions] = weeklyPlan
+  const [
+    profileDays,
+    goals,
+    planItems,
+    recipeOptions,
+    staples,
+    stapleSelections
+  ] = weeklyPlan
     ? await Promise.all([
         getWeeklyPlanProfileDays(householdContext.household.id, weeklyPlan.id),
         getWeeklyPlanGoals(householdContext.household.id, weeklyPlan.id),
         getWeeklyPlanItems(householdContext.household.id, weeklyPlan.id),
-        getPlanRecipeOptions(householdContext.household.id)
+        getPlanRecipeOptions(householdContext.household.id),
+        getStaples(householdContext.household.id),
+        getWeeklyPlanStapleSelections(
+          householdContext.household.id,
+          weeklyPlan.id
+        )
       ])
-    : [[], [], [], []];
+    : [[], [], [], [], [], []];
   const profileDayLookup = new Map(
     profileDays.map((day) => [
       `${day.meal_profile_id}:${day.plan_date}`,
@@ -221,6 +235,15 @@ export default async function PlanWeekPage({
             profiles={planningProfiles}
             recipeOptions={recipeOptions}
             weekDates={weekDates}
+            weekStartDate={weekStartDate}
+            weeklyPlanId={weeklyPlan.id}
+          />
+
+          <StaplesReviewSection
+            selectedStapleIds={
+              new Set(stapleSelections.map((selection) => selection.staple_id))
+            }
+            staples={staples}
             weekStartDate={weekStartDate}
             weeklyPlanId={weeklyPlan.id}
           />
