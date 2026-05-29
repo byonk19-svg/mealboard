@@ -1,5 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
-import type { Food, FoodPreference, MealProfile } from "@/lib/settings/types";
+import type {
+  Food,
+  FoodPreference,
+  MealProfile,
+  Staple
+} from "@/lib/settings/types";
 
 type FoodPreferenceRow = {
   id: string;
@@ -11,6 +16,15 @@ type FoodPreferenceRow = {
   prep_notes: string | null;
   meal_profiles: { name: string } | { name: string }[] | null;
   foods: { name: string } | { name: string }[] | null;
+};
+
+type StapleRow = Omit<
+  Staple,
+  "food_name" | "grocery_category_name" | "meal_profile_name"
+> & {
+  foods: { name: string } | { name: string }[] | null;
+  grocery_categories: { name: string } | { name: string }[] | null;
+  meal_profiles: { name: string } | { name: string }[] | null;
 };
 
 export async function getMealProfiles(householdId: string) {
@@ -83,10 +97,63 @@ export async function getFoodPreferences(householdId: string) {
   }));
 }
 
+export async function getStaples(householdId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("staples")
+    .select(
+      "id, household_id, meal_profile_id, food_id, display_name, default_quantity, default_unit, preferred_quantity_text, grocery_category_id, frequency, notes, active, meal_profiles(name), foods(name), grocery_categories(name)"
+    )
+    .eq("household_id", householdId)
+    .order("active", { ascending: false })
+    .order("display_name", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data ?? []) as StapleRow[]).map((row) => ({
+    active: row.active,
+    default_quantity: toNullableNumber(row.default_quantity),
+    default_unit: row.default_unit,
+    display_name: row.display_name,
+    food_id: row.food_id,
+    food_name: getOptionalJoinedName(row.foods),
+    frequency: row.frequency,
+    grocery_category_id: row.grocery_category_id,
+    grocery_category_name: getOptionalJoinedName(row.grocery_categories),
+    household_id: row.household_id,
+    id: row.id,
+    meal_profile_id: row.meal_profile_id,
+    meal_profile_name: getOptionalJoinedName(row.meal_profiles),
+    notes: row.notes,
+    preferred_quantity_text: row.preferred_quantity_text
+  }));
+}
+
 function getJoinedName(value: { name: string } | { name: string }[] | null) {
   if (Array.isArray(value)) {
     return value[0]?.name ?? "Unknown";
   }
 
   return value?.name ?? "Unknown";
+}
+
+function getOptionalJoinedName(
+  value: { name: string } | { name: string }[] | null
+) {
+  if (Array.isArray(value)) {
+    return value[0]?.name ?? null;
+  }
+
+  return value?.name ?? null;
+}
+
+function toNullableNumber(value: number | string | null) {
+  if (value === null) {
+    return null;
+  }
+
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : null;
 }

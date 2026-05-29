@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { normalizeStapleInput } from "@/lib/settings/staples";
 import { preferenceLevels, type FoodPreferenceLevel } from "@/lib/settings/types";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
@@ -172,4 +173,85 @@ export async function deleteFoodPreference(formData: FormData) {
 
   revalidatePath(path);
   settingsRedirect(path, "Food preference deleted.");
+}
+
+export async function saveStaple(formData: FormData) {
+  const path = "/settings/staples";
+  const household = await requireHousehold(path);
+  const stapleId = textOrNull(formData.get("stapleId"));
+
+  let staple;
+
+  try {
+    staple = normalizeStapleInput({
+      displayName: textOrNull(formData.get("displayName")),
+      frequency: textOrNull(formData.get("frequency")),
+      notes: textOrNull(formData.get("notes")),
+      preferredQuantityText: textOrNull(formData.get("preferredQuantityText")),
+      quantity: textOrNull(formData.get("quantity")),
+      unit: textOrNull(formData.get("unit"))
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Staple could not be saved.";
+    settingsRedirect(path, message);
+  }
+
+  const payload = {
+    default_quantity: staple.quantity,
+    default_unit: staple.unit,
+    display_name: staple.displayName,
+    food_id: textOrNull(formData.get("foodId")),
+    frequency: staple.frequency,
+    grocery_category_id: textOrNull(formData.get("groceryCategoryId")),
+    household_id: household.id,
+    meal_profile_id: textOrNull(formData.get("mealProfileId")),
+    notes: staple.notes,
+    preferred_quantity_text: staple.preferredQuantityText
+  };
+
+  const supabase = await createClient();
+  const { error } = stapleId
+    ? await supabase
+        .from("staples")
+        .update(payload)
+        .eq("household_id", household.id)
+        .eq("id", stapleId)
+    : await supabase.from("staples").insert({
+        ...payload,
+        active: true
+      });
+
+  if (error) {
+    settingsRedirect(path, error.message);
+  }
+
+  revalidatePath("/settings");
+  revalidatePath(path);
+  settingsRedirect(path, stapleId ? "Staple updated." : "Staple created.");
+}
+
+export async function deactivateStaple(formData: FormData) {
+  const path = "/settings/staples";
+  const household = await requireHousehold(path);
+  const stapleId = textOrNull(formData.get("stapleId"));
+
+  if (!stapleId) {
+    settingsRedirect(path, "Staple is required.");
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("staples")
+    .update({ active: false })
+    .eq("household_id", household.id)
+    .eq("id", stapleId);
+
+  if (error) {
+    settingsRedirect(path, error.message);
+  }
+
+  revalidatePath("/settings");
+  revalidatePath(path);
+  settingsRedirect(path, "Staple deactivated.");
 }

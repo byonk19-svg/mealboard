@@ -1,6 +1,8 @@
 import type { FoodPreferenceLevel } from "@/lib/preferences/evaluate-recipe-for-profile";
+import type { StapleFrequency } from "@/lib/settings/staples";
 
 export type { FoodPreferenceLevel };
+export type { StapleFrequency };
 
 export type ProfileType = "adult" | "baby" | "shared" | "household";
 
@@ -36,6 +38,24 @@ export type FoodPreference = {
   prep_notes: string | null;
   meal_profile_name: string;
   food_name: string;
+};
+
+export type Staple = {
+  active: boolean;
+  default_quantity: number | null;
+  default_unit: string | null;
+  display_name: string;
+  food_id: string | null;
+  food_name: string | null;
+  frequency: StapleFrequency;
+  grocery_category_id: string | null;
+  grocery_category_name: string | null;
+  household_id: string;
+  id: string;
+  meal_profile_id: string | null;
+  meal_profile_name: string | null;
+  notes: string | null;
+  preferred_quantity_text: string | null;
 };
 
 export const preferenceLevels = [

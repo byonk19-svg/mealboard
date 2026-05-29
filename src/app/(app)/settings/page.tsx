@@ -11,8 +11,8 @@ export default function SettingsPage() {
           Settings
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
-          Manage the MealBoard profile and preference foundation. Recipes,
-          planning, staples, and grocery settings come in later task slices.
+          Manage the MealBoard profile, preference, and staple foundation.
+          Planning and grocery review settings come in later task slices.
         </p>
       </div>
 
@@ -42,6 +42,20 @@ export default function SettingsPage() {
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Set Love, Like, Okay, Dislike, Hard No, and Allergy preferences
             using seeded foods.
+          </p>
+        </Link>
+
+        <Link
+          className="rounded-lg border border-border bg-card p-5 shadow-sm transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          href="/settings/staples"
+        >
+          <p className="text-sm font-medium text-muted-foreground">
+            Reusable groceries
+          </p>
+          <h2 className="mt-2 text-xl font-semibold">Staples</h2>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Create household and profile staples with default quantity,
+            category, frequency, and notes.
           </p>
         </Link>
       </div>
