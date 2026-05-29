@@ -1,7 +1,18 @@
 export type GroceryItemSource = {
+  groceryCategoryId?: string | null;
+  ingredientId?: string;
   label: string;
+  mealProfileId?: string | null;
+  mealProfileName?: string | null;
+  mealType?: string;
+  planDate?: string;
+  quantity?: number | null;
+  recipeId?: string | null;
+  recipeName?: string | null;
   sourceId: string;
   sourceType: string;
+  unit?: string | null;
+  weeklyPlanItemId?: string;
 };
 
 export type GroceryItemInput = {
