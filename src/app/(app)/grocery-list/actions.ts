@@ -2,7 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { generateAndPersistGroceryList } from "@/lib/grocery/data";
+import {
+  advanceGroceryListLifecycle,
+  generateAndPersistGroceryList,
+  updateGroceryListItemState
+} from "@/lib/grocery/data";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 import { getWeekStartDate } from "@/lib/weekly-plans/week-dates";
 
@@ -19,6 +23,10 @@ function planWeekRedirect(weekStartDate: string, message: string): never {
 function textOrNull(value: FormDataEntryValue | null) {
   const text = String(value ?? "").trim();
   return text.length > 0 ? text : null;
+}
+
+function booleanFromForm(value: FormDataEntryValue | null) {
+  return String(value ?? "") === "true";
 }
 
 export async function generateGroceryListForWeek(formData: FormData) {
@@ -50,4 +58,90 @@ export async function generateGroceryListForWeek(formData: FormData) {
   revalidatePath("/plan-week");
   revalidatePath("/grocery-list");
   groceryListRedirect("Draft grocery list generated.");
+}
+
+export async function updateGroceryItemChecked(formData: FormData) {
+  const itemId = textOrNull(formData.get("itemId"));
+
+  if (!itemId) {
+    groceryListRedirect("Choose a grocery item first.");
+  }
+
+  const householdContext = await getCurrentHouseholdContext();
+
+  if (!householdContext.household) {
+    groceryListRedirect("Link your user to a household first.");
+  }
+
+  try {
+    await updateGroceryListItemState({
+      checked: booleanFromForm(formData.get("checked")),
+      householdId: householdContext.household.id,
+      itemId
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Grocery item update failed.";
+    groceryListRedirect(message);
+  }
+
+  revalidatePath("/grocery-list");
+  groceryListRedirect("Grocery item updated.");
+}
+
+export async function updateGroceryItemAlreadyHave(formData: FormData) {
+  const itemId = textOrNull(formData.get("itemId"));
+
+  if (!itemId) {
+    groceryListRedirect("Choose a grocery item first.");
+  }
+
+  const householdContext = await getCurrentHouseholdContext();
+
+  if (!householdContext.household) {
+    groceryListRedirect("Link your user to a household first.");
+  }
+
+  try {
+    await updateGroceryListItemState({
+      alreadyHave: booleanFromForm(formData.get("alreadyHave")),
+      householdId: householdContext.household.id,
+      itemId
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Grocery item update failed.";
+    groceryListRedirect(message);
+  }
+
+  revalidatePath("/grocery-list");
+  groceryListRedirect("Grocery item updated.");
+}
+
+export async function advanceGroceryListLifecycleAction(formData: FormData) {
+  const groceryListId = textOrNull(formData.get("groceryListId"));
+
+  if (!groceryListId) {
+    groceryListRedirect("Choose a grocery list first.");
+  }
+
+  const householdContext = await getCurrentHouseholdContext();
+
+  if (!householdContext.household) {
+    groceryListRedirect("Link your user to a household first.");
+  }
+
+  try {
+    await advanceGroceryListLifecycle({
+      groceryListId,
+      householdId: householdContext.household.id
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Grocery lifecycle update failed.";
+    groceryListRedirect(message);
+  }
+
+  revalidatePath("/grocery-list");
+  groceryListRedirect("Grocery list status updated.");
 }

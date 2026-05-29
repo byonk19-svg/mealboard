@@ -3,6 +3,10 @@ import {
   generateGroceryList,
   type GroceryGenerationPlanItem
 } from "./generate-grocery-list";
+import {
+  getGroceryLifecycleTimestampField,
+  getNextGroceryListStatus
+} from "./lifecycle";
 
 export type GroceryListStatus =
   | "draft"
@@ -21,8 +25,10 @@ export type GroceryListItemSource = {
 };
 
 export type GroceryListItem = {
+  alreadyHave: boolean;
   categoryName: string | null;
   categorySortOrder: number | null;
+  checked: boolean;
   displayName: string;
   id: string;
   needsReview: boolean;
@@ -98,6 +104,8 @@ type GroceryListRow = {
 };
 
 type GroceryListItemRow = {
+  already_have: boolean;
+  checked: boolean;
   display_name: string;
   grocery_categories:
     | { name: string; sort_order: number }
@@ -271,6 +279,103 @@ export async function getLatestGroceryList(householdId: string) {
     status: groceryList.status,
     weekStartDate
   } satisfies GroceryList;
+}
+
+export async function updateGroceryListItemState({
+  alreadyHave,
+  checked,
+  householdId,
+  itemId
+}: {
+  alreadyHave?: boolean;
+  checked?: boolean;
+  householdId: string;
+  itemId: string;
+}) {
+  const updates: { already_have?: boolean; checked?: boolean } = {};
+
+  if (typeof alreadyHave === "boolean") {
+    updates.already_have = alreadyHave;
+  }
+
+  if (typeof checked === "boolean") {
+    updates.checked = checked;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    throw new Error("Choose an item state to update.");
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("grocery_list_items")
+    .update(updates)
+    .eq("household_id", householdId)
+    .eq("id", itemId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data) {
+    throw new Error("That grocery item is no longer available.");
+  }
+}
+
+export async function advanceGroceryListLifecycle({
+  groceryListId,
+  householdId
+}: {
+  groceryListId: string;
+  householdId: string;
+}) {
+  const supabase = await createClient();
+  const { data: currentList, error: currentListError } = await supabase
+    .from("grocery_lists")
+    .select("id, status")
+    .eq("household_id", householdId)
+    .eq("id", groceryListId)
+    .maybeSingle();
+
+  if (currentListError) {
+    throw new Error(currentListError.message);
+  }
+
+  if (!currentList) {
+    throw new Error("That grocery list is no longer available.");
+  }
+
+  const currentStatus = currentList.status as GroceryListStatus;
+  const nextStatus = getNextGroceryListStatus(currentStatus);
+
+  if (!nextStatus) {
+    throw new Error("This grocery list is already completed.");
+  }
+
+  const timestampField = getGroceryLifecycleTimestampField(nextStatus);
+  const { data: updatedList, error: updateError } = await supabase
+    .from("grocery_lists")
+    .update({
+      [timestampField]: new Date().toISOString(),
+      status: nextStatus
+    })
+    .eq("household_id", householdId)
+    .eq("id", groceryListId)
+    .eq("status", currentStatus)
+    .select("id")
+    .maybeSingle();
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  if (!updatedList) {
+    throw new Error("The grocery list changed. Reload and try again.");
+  }
+
+  return nextStatus;
 }
 
 async function getScopedWeeklyPlan(
@@ -485,7 +590,7 @@ async function getGroceryListItems(
   const { data, error } = await supabase
     .from("grocery_list_items")
     .select(
-      "id, display_name, quantity, unit, preferred_quantity_text, needs_review, review_reason, sort_order, grocery_categories(name, sort_order)"
+      "id, display_name, quantity, unit, preferred_quantity_text, checked, already_have, needs_review, review_reason, sort_order, grocery_categories(name, sort_order)"
     )
     .eq("household_id", householdId)
     .eq("grocery_list_id", groceryListId)
@@ -499,8 +604,10 @@ async function getGroceryListItems(
     const category = getJoinedValue(row.grocery_categories);
 
     return {
+      alreadyHave: row.already_have,
       categoryName: category?.name ?? null,
       categorySortOrder: category?.sort_order ?? null,
+      checked: row.checked,
       displayName: row.display_name,
       id: row.id,
       needsReview: row.needs_review,
