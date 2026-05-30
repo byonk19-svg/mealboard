@@ -11,8 +11,8 @@ export default function SettingsPage() {
           Settings
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
-          Manage the MealBoard profile, preference, and staple foundation.
-          Planning and grocery review settings come in later task slices.
+          Manage the MealBoard profiles, food preferences, and reusable
+          staples that support weekly planning and grocery lists.
         </p>
       </div>
 

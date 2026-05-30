@@ -9,8 +9,8 @@ export function AppNav() {
   const pathname = usePathname();
 
   return (
-    <nav aria-label="Main navigation" className="overflow-x-auto">
-      <div className="flex min-w-max gap-2">
+    <nav aria-label="Main navigation">
+      <div className="flex flex-wrap gap-2">
         {mainNavigation.map((item) => {
           const active =
             pathname === item.href || pathname.startsWith(`${item.href}/`);

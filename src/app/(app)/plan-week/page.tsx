@@ -164,13 +164,16 @@ export default async function PlanWeekPage({
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">
                     Mark Brianna and Elaine as work or off days for this week.
                   </p>
+                  <p className="mt-1 text-xs text-muted-foreground sm:hidden">
+                    Scroll the day grid sideways to see the full week.
+                  </p>
                 </div>
                 <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
                   Status: {weeklyPlan.status}
                 </p>
               </div>
 
-              <div className="mt-5 overflow-x-auto">
+              <div className="mt-5 overflow-x-auto pb-2">
                 <div className="min-w-[720px] rounded-md border border-border">
                   <div className="grid grid-cols-[140px_repeat(7,minmax(78px,1fr))] border-b border-border bg-muted/60 text-sm font-medium">
                     <div className="p-3">Profile</div>
@@ -312,7 +315,7 @@ function PlanWeekSummaryPanel({ summary }: { summary: PlanWeekSummary }) {
         </span>
       </div>
 
-      <dl className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <dl className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
         <SummaryMetric label="Planned items" value={summary.totalItemCount} />
         <SummaryMetric label="Approved" value={summary.approvedItemCount} />
         <SummaryMetric label="Locked" value={summary.lockedItemCount} />

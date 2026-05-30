@@ -41,7 +41,7 @@ export function AppShell({
                 ) : (
                   <span>No household linked</span>
                 )}
-                {userEmail ? <span> · {userEmail}</span> : null}
+                {userEmail ? <span> - {userEmail}</span> : null}
               </div>
               <form action={signOut}>
                 <button
