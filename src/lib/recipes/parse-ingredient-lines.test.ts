@@ -121,7 +121,7 @@ describe("parseIngredientText", () => {
   });
 
   it("flags vague or unparsed rows for review", () => {
-    expect(parseIngredientText("- salt to taste\n\npepper")).toEqual([
+    expect(parseIngredientText("- salt to taste\n\u2022 pepper")).toEqual([
       {
         originalLine: "salt to taste",
         displayName: "salt",
@@ -132,6 +132,21 @@ describe("parseIngredientText", () => {
         needsReview: true,
         reviewReason: "Quantity or unit needs review."
       },
+      {
+        originalLine: "pepper",
+        displayName: "pepper",
+        quantity: null,
+        unit: null,
+        preparation: null,
+        notes: null,
+        needsReview: true,
+        reviewReason: "Quantity or unit needs review."
+      }
+    ]);
+  });
+
+  it("keeps unbulleted vague pantry rows reviewable", () => {
+    expect(parseIngredientText("pepper")).toEqual([
       {
         originalLine: "pepper",
         displayName: "pepper",

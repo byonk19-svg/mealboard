@@ -135,7 +135,7 @@ export function IngredientReviewEditor({
             foods={foods}
             index={index}
             ingredient={ingredient}
-            key={`${index}-${ingredient.display_name}`}
+            key={index}
             onDelete={() => deleteRow(index)}
             onUpdate={(patch) => updateRow(index, patch)}
           />
