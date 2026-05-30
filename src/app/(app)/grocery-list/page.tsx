@@ -576,6 +576,11 @@ function GroceryItemRow({
                     Source amount: {formatSourceQuantity(source)}
                   </p>
                 ) : null}
+                {source.notes ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {source.notes}
+                  </p>
+                ) : null}
               </div>
             ))}
           </div>

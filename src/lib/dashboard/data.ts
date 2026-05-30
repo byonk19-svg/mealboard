@@ -63,8 +63,12 @@ export async function getDashboardCurrentWeekSnapshot({
     };
   }
 
-  const [approvedRecipeItemCount, selectedStapleCount, totalPlanItemCount] =
-    await Promise.all([
+  const [
+    approvedRecipeItemCount,
+    selectedStapleCount,
+    totalPlanItemCount,
+    unapprovedPlanItemCount
+  ] = await Promise.all([
       countApprovedRecipeItems({
         householdId,
         supabase,
@@ -79,6 +83,11 @@ export async function getDashboardCurrentWeekSnapshot({
         householdId,
         supabase,
         weeklyPlanId: weeklyPlan.id
+      }),
+      countUnapprovedPlanItems({
+        householdId,
+        supabase,
+        weeklyPlanId: weeklyPlan.id
       })
     ]);
   const weeklyPlanSummary = {
@@ -86,7 +95,8 @@ export async function getDashboardCurrentWeekSnapshot({
     id: weeklyPlan.id,
     selectedStapleCount,
     status: weeklyPlan.status,
-    totalPlanItemCount
+    totalPlanItemCount,
+    unapprovedPlanItemCount
   };
   const groceryList = await getCurrentWeekGroceryListSummary({
     householdId,
@@ -166,6 +176,29 @@ async function countApprovedRecipeItems({
     .eq("weekly_plan_id", weeklyPlanId)
     .eq("is_approved", true)
     .not("recipe_id", "is", null);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return count ?? 0;
+}
+
+async function countUnapprovedPlanItems({
+  householdId,
+  supabase,
+  weeklyPlanId
+}: {
+  householdId: string;
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  weeklyPlanId: string;
+}) {
+  const { count, error } = await supabase
+    .from("weekly_plan_items")
+    .select("id", { count: "exact", head: true })
+    .eq("household_id", householdId)
+    .eq("weekly_plan_id", weeklyPlanId)
+    .eq("is_approved", false);
 
   if (error) {
     throw new Error(error.message);

@@ -27,8 +27,8 @@ export function StaplesReviewSection({
         <div>
           <h2 className="text-xl font-semibold">Staples review</h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Choose reusable staples for this weekly plan. Saved choices do not
-            change the grocery list in this step.
+            Choose reusable staples for this weekly plan. Selected staples are
+            included the next time you generate groceries for this week.
           </p>
         </div>
         <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">

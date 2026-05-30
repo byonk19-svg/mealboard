@@ -6,6 +6,7 @@ export type DashboardWeeklyPlanSummary = {
   selectedStapleCount: number;
   status: WeeklyPlanStatus;
   totalPlanItemCount: number;
+  unapprovedPlanItemCount: number;
 };
 
 export type DashboardGroceryListSummary = {
@@ -36,7 +37,10 @@ export function getDashboardNextAction({
   }
 
   if (groceryList) {
-    return getGroceryListNextAction(groceryList.status);
+    return getGroceryListNextAction({
+      status: groceryList.status,
+      weeklyPlan
+    });
   }
 
   if (
@@ -57,9 +61,22 @@ export function getDashboardNextAction({
   };
 }
 
-function getGroceryListNextAction(
-  status: GroceryListStatus
-): DashboardNextAction {
+function getGroceryListNextAction({
+  status,
+  weeklyPlan
+}: {
+  status: GroceryListStatus;
+  weeklyPlan: DashboardWeeklyPlanSummary;
+}): DashboardNextAction {
+  if (status === "completed" && weeklyPlan.unapprovedPlanItemCount > 0) {
+    return {
+      description:
+        "A planned meal still needs approval after the completed grocery list.",
+      href: "/plan-week",
+      label: "Review planned meals"
+    };
+  }
+
   const actions: Record<GroceryListStatus, DashboardNextAction> = {
     completed: {
       description: "This week's shopping list is completed.",

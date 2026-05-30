@@ -64,7 +64,7 @@ export default async function DashboardPage() {
           }
         >
           {snapshot.weeklyPlan ? (
-            <dl className="grid gap-3 text-sm sm:grid-cols-3">
+            <dl className="grid gap-3 text-sm sm:grid-cols-4">
               <Metric
                 label="Planned items"
                 value={String(snapshot.weeklyPlan.totalPlanItemCount)}
@@ -72,6 +72,10 @@ export default async function DashboardPage() {
               <Metric
                 label="Approved recipes"
                 value={String(snapshot.weeklyPlan.approvedRecipeItemCount)}
+              />
+              <Metric
+                label="Needs review"
+                value={String(snapshot.weeklyPlan.unapprovedPlanItemCount)}
               />
               <Metric
                 label="Selected staples"

@@ -175,6 +175,7 @@ function source(
     id,
     label: overrides.label,
     mealProfileName: overrides.mealProfileName,
+    notes: null,
     quantity: 1,
     recipeName: overrides.recipeName,
     sourceType: "meal_generated",

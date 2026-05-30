@@ -23,7 +23,8 @@ describe("getDashboardNextAction", () => {
           approvedRecipeItemCount: 0,
           selectedStapleCount: 0,
           status: "draft",
-          totalPlanItemCount: 2
+          totalPlanItemCount: 2,
+          unapprovedPlanItemCount: 2
         }
       })
     ).toEqual({
@@ -41,7 +42,8 @@ describe("getDashboardNextAction", () => {
           approvedRecipeItemCount: 1,
           selectedStapleCount: 0,
           status: "draft",
-          totalPlanItemCount: 2
+          totalPlanItemCount: 2,
+          unapprovedPlanItemCount: 1
         }
       })
     ).toEqual({
@@ -63,7 +65,8 @@ describe("getDashboardNextAction", () => {
           approvedRecipeItemCount: 1,
           selectedStapleCount: 1,
           status: "draft",
-          totalPlanItemCount: 2
+          totalPlanItemCount: 2,
+          unapprovedPlanItemCount: 0
         }
       })
     ).toEqual({
@@ -83,13 +86,38 @@ describe("getDashboardNextAction", () => {
           approvedRecipeItemCount: 1,
           selectedStapleCount: 1,
           status: "draft",
-          totalPlanItemCount: 2
+          totalPlanItemCount: 2,
+          unapprovedPlanItemCount: 0
         }
       })
     ).toEqual({
       description: "Keep checking off items while shopping.",
       href: "/grocery-list",
       label: "Continue shopping"
+    });
+  });
+
+  it("returns to Plan Week when a completed list leaves planned meals unapproved", () => {
+    expect(
+      getDashboardNextAction({
+        groceryList: {
+          checkedItemCount: 3,
+          itemCount: 3,
+          status: "completed"
+        },
+        weeklyPlan: {
+          approvedRecipeItemCount: 2,
+          selectedStapleCount: 1,
+          status: "draft",
+          totalPlanItemCount: 3,
+          unapprovedPlanItemCount: 1
+        }
+      })
+    ).toEqual({
+      description:
+        "A planned meal still needs approval after the completed grocery list.",
+      href: "/plan-week",
+      label: "Review planned meals"
     });
   });
 });
