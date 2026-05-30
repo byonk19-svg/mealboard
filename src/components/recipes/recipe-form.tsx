@@ -133,17 +133,21 @@ export function RecipeForm({
 
       <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
         <h2 className="text-xl font-semibold">Nutrition estimates</h2>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+          Optional per-serving estimates used by Plan Week profile/day
+          summaries. Leave values blank when they are unknown.
+        </p>
         <div className="mt-4 grid gap-4 md:grid-cols-3">
           <TextField
             defaultValue={recipe?.estimated_calories_per_serving ?? ""}
-            label="Calories per serving"
+            label="Estimated calories per serving"
             min="1"
             name="estimatedCaloriesPerServing"
             type="number"
           />
           <TextField
             defaultValue={recipe?.estimated_protein_grams_per_serving ?? ""}
-            label="Protein grams"
+            label="Estimated protein grams per serving"
             min="0"
             name="estimatedProteinGramsPerServing"
             type="number"
@@ -151,7 +155,7 @@ export function RecipeForm({
           <SelectField
             defaultValue={recipe?.nutrition_confidence ?? ""}
             includeBlank="No estimate"
-            label="Confidence"
+            label="Estimate confidence"
             name="nutritionConfidence"
             options={estimateConfidences.map((confidence) => ({
               label: formatEstimateConfidence(confidence),
@@ -183,6 +187,9 @@ export function RecipeForm({
           <legend className="text-sm font-medium">
             Approved for planning
           </legend>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">
+            Select each profile that can use this recipe in weekly planning.
+          </p>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             {profiles.map((profile) => (
               <label

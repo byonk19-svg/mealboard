@@ -5,6 +5,10 @@ import {
   type RecipeWithDetails
 } from "@/lib/recipes/types";
 import { getRecipes } from "@/lib/recipes/data";
+import {
+  getRecipeApprovalDisplay,
+  getRecipeNutritionDisplay
+} from "@/lib/recipes/recipe-display";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 
 type RecipesPageProps = {
@@ -71,9 +75,8 @@ export default async function RecipesPage({ searchParams }: RecipesPageProps) {
 }
 
 function RecipeCard({ recipe }: { recipe: RecipeWithDetails }) {
-  const approvedProfiles = recipe.approvals
-    .filter((approval) => approval.approved_for_planning)
-    .map((approval) => approval.meal_profile_name);
+  const approvalDisplay = getRecipeApprovalDisplay(recipe.approvals);
+  const nutritionDisplay = getRecipeNutritionDisplay(recipe);
   const warningEvaluations = recipe.preferenceEvaluations.filter(
     ({ evaluation }) => evaluation.status !== "allowed"
   );
@@ -112,28 +115,56 @@ function RecipeCard({ recipe }: { recipe: RecipeWithDetails }) {
           <dd className="font-medium">{recipe.ingredients.length}</dd>
         </div>
         <div>
-          <dt className="text-muted-foreground">Approved profiles</dt>
+          <dt className="text-muted-foreground">Planning approvals</dt>
           <dd className="font-medium">
-            {approvedProfiles.length > 0 ? approvedProfiles.join(", ") : "None"}
+            {approvalDisplay.summaryLabel}
           </dd>
         </div>
         <div>
-          <dt className="text-muted-foreground">Calories</dt>
-          <dd className="font-medium">
-            {recipe.estimated_calories_per_serving
-              ? `${recipe.estimated_calories_per_serving} per serving`
-              : "Not set"}
+          <dt className="text-muted-foreground">Estimated calories</dt>
+          <dd
+            className={
+              nutritionDisplay.missingFields.includes("calories")
+                ? "font-medium text-muted-foreground"
+                : "font-medium"
+            }
+          >
+            {nutritionDisplay.caloriesLabel}
           </dd>
         </div>
         <div>
-          <dt className="text-muted-foreground">Protein</dt>
-          <dd className="font-medium">
-            {recipe.estimated_protein_grams_per_serving
-              ? `${recipe.estimated_protein_grams_per_serving}g per serving`
-              : "Not set"}
+          <dt className="text-muted-foreground">Estimated protein</dt>
+          <dd
+            className={
+              nutritionDisplay.missingFields.includes("protein")
+                ? "font-medium text-muted-foreground"
+                : "font-medium"
+            }
+          >
+            {nutritionDisplay.proteinLabel}
           </dd>
         </div>
       </dl>
+
+      <div className="mt-4 flex flex-wrap gap-2 text-xs font-medium">
+        <span
+          className={
+            nutritionDisplay.isComplete
+              ? "rounded-md bg-muted px-2 py-1 text-muted-foreground"
+              : "rounded-md border border-border px-2 py-1 text-muted-foreground"
+          }
+        >
+          {nutritionDisplay.statusLabel}
+        </span>
+        <span className="rounded-md bg-muted px-2 py-1 text-muted-foreground">
+          {nutritionDisplay.confidenceLabel}
+        </span>
+        {!approvalDisplay.hasApprovedProfiles ? (
+          <span className="rounded-md border border-border px-2 py-1 text-muted-foreground">
+            Add profile approval
+          </span>
+        ) : null}
+      </div>
 
       {warningEvaluations.length > 0 ? (
         <div className="mt-4 rounded-md border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
