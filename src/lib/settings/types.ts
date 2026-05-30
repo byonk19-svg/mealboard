@@ -26,6 +26,7 @@ export type Food = {
   household_id: string;
   name: string;
   default_unit: string | null;
+  default_grocery_category_id: string | null;
 };
 
 export type FoodPreference = {

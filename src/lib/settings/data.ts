@@ -50,7 +50,7 @@ export async function getFoods(householdId: string, search?: string) {
   const supabase = await createClient();
   let query = supabase
     .from("foods")
-    .select("id, household_id, name, default_unit")
+    .select("id, household_id, name, default_unit, default_grocery_category_id")
     .eq("household_id", householdId)
     .is("archived_at", null)
     .order("name", { ascending: true });

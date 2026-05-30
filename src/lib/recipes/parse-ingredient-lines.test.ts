@@ -66,6 +66,60 @@ describe("parseIngredientText", () => {
     ]);
   });
 
+  it("parses compact unicode fractions", () => {
+    expect(parseIngredientText("\u00bd cup milk\n1\u00bd cups rice")).toEqual([
+      {
+        originalLine: "\u00bd cup milk",
+        displayName: "milk",
+        quantity: 0.5,
+        unit: "cup",
+        preparation: null,
+        notes: null,
+        needsReview: false,
+        reviewReason: null
+      },
+      {
+        originalLine: "1\u00bd cups rice",
+        displayName: "rice",
+        quantity: 1.5,
+        unit: "cups",
+        preparation: null,
+        notes: null,
+        needsReview: false,
+        reviewReason: null
+      }
+    ]);
+  });
+
+  it("parses package sizes written between quantity and unit", () => {
+    expect(
+      parseIngredientText(
+        "2 10-oz bags frozen strawberries\n3 8 oz cans tomato sauce"
+      )
+    ).toEqual([
+      {
+        originalLine: "2 10-oz bags frozen strawberries",
+        displayName: "strawberries",
+        quantity: 2,
+        unit: "bags",
+        preparation: "frozen",
+        notes: "10 oz",
+        needsReview: false,
+        reviewReason: null
+      },
+      {
+        originalLine: "3 8 oz cans tomato sauce",
+        displayName: "tomato sauce",
+        quantity: 3,
+        unit: "cans",
+        preparation: null,
+        notes: "8 oz",
+        needsReview: false,
+        reviewReason: null
+      }
+    ]);
+  });
+
   it("flags vague or unparsed rows for review", () => {
     expect(parseIngredientText("- salt to taste\n\npepper")).toEqual([
       {

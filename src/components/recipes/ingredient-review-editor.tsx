@@ -1,22 +1,17 @@
 "use client";
 
 import { useId, useState } from "react";
+import {
+  buildIngredientReviewRows,
+  resolveFoodMatch,
+  resolveFoodSelection,
+  type IngredientReviewRow
+} from "@/lib/recipes/ingredient-review";
 import { parseIngredientText } from "@/lib/recipes/parse-ingredient-lines";
 import type { GroceryCategory } from "@/lib/recipes/types";
 import type { Food } from "@/lib/settings/types";
 
-export type IngredientFormRow = {
-  display_name: string;
-  food_id: string | null;
-  quantity: number | null;
-  unit: string | null;
-  grocery_category_id: string | null;
-  preparation: string | null;
-  notes: string | null;
-  optional: boolean;
-  needsReview?: boolean;
-  reviewReason?: string | null;
-};
+export type IngredientFormRow = IngredientReviewRow;
 
 type IngredientReviewEditorProps = {
   categories: GroceryCategory[];
@@ -47,18 +42,10 @@ export function IngredientReviewEditor({
   const foodOptionsId = useId();
 
   function parsePasteText() {
-    const parsedRows = parseIngredientText(pasteText).map((ingredient) => ({
-      display_name: ingredient.displayName,
-      food_id: findFoodId(foods, ingredient.displayName),
-      quantity: ingredient.quantity,
-      unit: ingredient.unit,
-      grocery_category_id: null,
-      preparation: ingredient.preparation,
-      notes: ingredient.notes,
-      optional: false,
-      needsReview: ingredient.needsReview,
-      reviewReason: ingredient.reviewReason
-    }));
+    const parsedRows = buildIngredientReviewRows({
+      foods,
+      parsedIngredients: parseIngredientText(pasteText)
+    });
 
     if (parsedRows.length === 0) {
       return;
@@ -102,7 +89,8 @@ export function IngredientReviewEditor({
         <div>
           <h2 className="text-xl font-semibold">Structured ingredients</h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Paste ingredient lines, then review the structured rows before saving.
+            Paste ingredient lines, then review flagged rows before saving.
+            Matched foods can fill the grocery category automatically.
           </p>
         </div>
         <button
@@ -214,12 +202,15 @@ function IngredientRow({
           <input
             className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             name="ingredientDisplayName"
-            onChange={(event) =>
+            onChange={(event) => {
+              const foodMatch = resolveFoodMatch(foods, event.target.value);
               onUpdate({
                 display_name: event.target.value,
-                food_id: ingredient.food_id ?? findFoodId(foods, event.target.value)
-              })
-            }
+                food_id: ingredient.food_id ?? foodMatch.foodId,
+                grocery_category_id:
+                  ingredient.grocery_category_id ?? foodMatch.groceryCategoryId
+              });
+            }}
             placeholder="Chicken breast"
             value={ingredient.display_name}
           />
@@ -229,9 +220,17 @@ function IngredientRow({
           <select
             className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             name="ingredientFoodId"
-            onChange={(event) =>
-              onUpdate({ food_id: event.target.value || null })
-            }
+            onChange={(event) => {
+              const foodMatch = resolveFoodSelection(
+                foods,
+                event.target.value || null
+              );
+              onUpdate({
+                food_id: foodMatch.foodId,
+                grocery_category_id:
+                  ingredient.grocery_category_id ?? foodMatch.groceryCategoryId
+              });
+            }}
             value={ingredient.food_id ?? ""}
           >
             <option value="">No food match</option>
@@ -329,35 +328,10 @@ function IngredientRow({
         {needsReview ? (
           <label className="flex items-center gap-2 text-sm font-medium md:col-span-3">
             <input name="ingredientReviewed" type="checkbox" value={index} />
-            Reviewed
+            I reviewed this row
           </label>
         ) : null}
       </div>
     </div>
   );
-}
-
-function findFoodId(foods: Food[], displayName: string) {
-  const normalizedDisplayName = normalizeName(displayName);
-
-  if (!normalizedDisplayName) {
-    return null;
-  }
-
-  const exactMatch = foods.find(
-    (food) => normalizeName(food.name) === normalizedDisplayName
-  );
-
-  if (exactMatch) {
-    return exactMatch.id;
-  }
-
-  return (
-    foods.find((food) => normalizedDisplayName.includes(normalizeName(food.name)))
-      ?.id ?? null
-  );
-}
-
-function normalizeName(value: string) {
-  return value.trim().toLowerCase().replace(/\s+/g, " ");
 }

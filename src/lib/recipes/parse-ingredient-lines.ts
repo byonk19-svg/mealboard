@@ -87,7 +87,9 @@ function parseIngredientLine(line: string): ParsedIngredientLine {
   const originalLine = line;
   const packageMatch = line.match(/\(([^)]+)\)/);
   const packageNote = packageMatch?.[1]?.trim() ?? null;
-  let remaining = line.replace(/\([^)]+\)/g, " ").replace(/\s+/g, " ").trim();
+  let remaining = normalizeUnicodeFractions(
+    line.replace(/\([^)]+\)/g, " ").replace(/\s+/g, " ").trim()
+  );
   const commaParts = remaining.split(",").map((part) => part.trim());
   remaining = commaParts[0] ?? remaining;
   const commaPreparation = commaParts.slice(1).join(", ") || null;
@@ -96,11 +98,15 @@ function parseIngredientLine(line: string): ParsedIngredientLine {
   remaining = remaining.replace(/\bto taste\b/gi, "").trim();
   const tokens = remaining.split(/\s+/).filter(Boolean);
   const quantityResult = parseQuantity(tokens);
-  const unitResult = parseUnit(tokens, quantityResult.nextIndex);
+  const packageSizeResult = parsePackageSize(tokens, quantityResult.nextIndex);
+  const unitResult = parseUnit(tokens, packageSizeResult.nextIndex);
   const words = tokens.slice(unitResult.nextIndex);
   const extractedPreparation = extractLeadingPreparation(words);
   const displayName = extractedPreparation.words.join(" ").trim();
-  const notes = [packageNote, toTasteNote].filter(Boolean).join("; ") || null;
+  const notes =
+    [packageNote, packageSizeResult.note, toTasteNote]
+      .filter(Boolean)
+      .join("; ") || null;
   const preparation = [extractedPreparation.preparation, commaPreparation]
     .filter(Boolean)
     .join(", ") || null;
@@ -116,6 +122,18 @@ function parseIngredientLine(line: string): ParsedIngredientLine {
     needsReview,
     reviewReason: needsReview ? "Quantity or unit needs review." : null
   };
+}
+
+function normalizeUnicodeFractions(value: string) {
+  return value
+    .replace(
+      /(\d)([\u00bc\u00bd\u00be\u2153\u2154\u215b\u215c\u215d\u215e])/g,
+      "$1 $2"
+    )
+    .replace(
+      /[\u00bc\u00bd\u00be\u2153\u2154\u215b\u215c\u215d\u215e]/g,
+      (fraction) => unicodeFractions[fraction] ?? fraction
+    );
 }
 
 function normalizeLine(line: string) {
@@ -168,6 +186,29 @@ function parseUnit(tokens: string[], index: number) {
   return { unit: null, nextIndex: index };
 }
 
+function parsePackageSize(tokens: string[], index: number) {
+  const token = tokens[index];
+  const match = token?.match(/^(\d+(?:\.\d+)?)[- ]?(oz|g|gram|grams|lb|lbs|ml)$/i);
+
+  if (match) {
+    return {
+      nextIndex: index + 1,
+      note: `${match[1]} ${match[2].toLowerCase()}`
+    };
+  }
+
+  const nextToken = tokens[index + 1];
+
+  if (isNumber(token) && isPackageSizeUnit(nextToken)) {
+    return {
+      nextIndex: index + 2,
+      note: `${token} ${nextToken.toLowerCase()}`
+    };
+  }
+
+  return { nextIndex: index, note: null };
+}
+
 function extractLeadingPreparation(words: string[]) {
   const preparation: string[] = [];
   let index = 0;
@@ -197,6 +238,12 @@ function isFraction(value: string | undefined) {
   return value !== undefined && /^\d+\/\d+$/.test(value);
 }
 
+function isPackageSizeUnit(value: string | undefined) {
+  return (
+    value !== undefined && /^(oz|g|gram|grams|lb|lbs|ml)$/i.test(value)
+  );
+}
+
 function parseFraction(value: string) {
   const [numerator, denominator] = value.split("/").map(Number);
 
@@ -206,3 +253,15 @@ function parseFraction(value: string) {
 
   return numerator / denominator;
 }
+
+const unicodeFractions: Record<string, string> = {
+  "\u00bc": "1/4",
+  "\u00bd": "1/2",
+  "\u00be": "3/4",
+  "\u2153": "1/3",
+  "\u2154": "2/3",
+  "\u215b": "1/8",
+  "\u215c": "3/8",
+  "\u215d": "5/8",
+  "\u215e": "7/8"
+};
