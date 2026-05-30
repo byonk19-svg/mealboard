@@ -8,22 +8,28 @@ This repo is separate from RT Scheduler. Product and technical decisions should 
 - `docs/TECHNICAL_PLAN.md`
 - `docs/CODEX_TASKS.md`
 
-## Current Slice
+## Current MVP Status
 
-This repo currently contains the Task 03 auth and household bootstrap foundation:
+MealBoard has reached a private family MVP readiness checkpoint through Task 17.
 
-- Next.js App Router
-- TypeScript
-- Tailwind
-- shadcn/ui-compatible project structure
-- Protected placeholder pages for the main navigation
-- Supabase auth client helpers
-- Simple email/password auth flow
-- Current household membership lookup
-- Supabase migrations for household, profile, category, food, preference, and preferred-product foundation tables
-- Local Supabase seed data for one household, core profiles, grocery categories, and sample foods
+The current core loop is:
 
-It does not implement recipes, meal planning, grocery generation, profile editing, baby planning, or nutrition yet.
+```txt
+Recipes -> Plan Week -> Staples -> Grocery List -> Dashboard
+```
+
+Implemented MVP surfaces include:
+
+- Email/password auth and household-scoped app routes
+- Household profiles, preferences, grocery categories, and foods foundation
+- Recipe library with structured ingredients, profile approvals, and calorie/protein estimate fields
+- Weekly planning with adult work/off days, planned recipe items, approval/lock/remove actions, staples review, and a small nutrition estimate summary
+- Staples settings CRUD, weekly staple selection, and selected staples flowing into grocery generation
+- Grocery list generation from approved planned meals and selected staples
+- Mobile-friendly grocery shopping list with Shopping/Profile/Meal views, source context, manual add-ons, checked/already-have state, and Draft -> Finalized -> Shopping Started -> Completed lifecycle
+- Dashboard current-week summary with planning status, grocery status, and next best action
+
+See `docs/MVP_READINESS.md` for the manual smoke checklist, known gaps, deferred features, and local environment notes.
 
 ## Local Setup
 
@@ -109,12 +115,13 @@ Local Studio is available after `supabase start`; check your CLI output for the 
 Run the available checks:
 
 ```bash
+npm test
 npm run lint
 npm run typecheck
 npm run build
 ```
 
-If the Supabase CLI is installed and Docker is running, also verify the database foundation with:
+If the Supabase CLI is installed and Docker is running, also verify the local database with:
 
 ```bash
 supabase db reset
