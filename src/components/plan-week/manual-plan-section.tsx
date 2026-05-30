@@ -46,9 +46,8 @@ export function ManualPlanSection({
       <div>
         <h2 className="text-xl font-semibold">Manual plan</h2>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          Add saved recipes to a specific day, profile, and meal slot. This
-          stays manual for now; smart suggestions and grocery generation come
-          later.
+          Add saved recipes to specific days, profiles, and meal slots. Approve
+          items when they should count toward grocery generation.
         </p>
       </div>
 
@@ -74,13 +73,19 @@ export function ManualPlanSection({
             </div>
 
             <div className="mt-4 grid gap-3">
-              {(planItemsByDate.get(date.dateKey) ?? []).map((item) => (
-                <PlanItemCard
-                  item={item}
-                  key={item.id}
-                  weekStartDate={weekStartDate}
-                />
-              ))}
+              {(planItemsByDate.get(date.dateKey) ?? []).length > 0 ? (
+                (planItemsByDate.get(date.dateKey) ?? []).map((item) => (
+                  <PlanItemCard
+                    item={item}
+                    key={item.id}
+                    weekStartDate={weekStartDate}
+                  />
+                ))
+              ) : (
+                <p className="rounded-md border border-dashed border-border bg-muted/30 px-3 py-4 text-sm text-muted-foreground">
+                  Nothing planned for this day yet.
+                </p>
+              )}
             </div>
 
             {canAddItems ? (
@@ -191,13 +196,19 @@ function PlanItemCard({
             <StatusChip>{item.meal_profile_name ?? "Unassigned"}</StatusChip>
             <StatusChip>{formatMealType(item.meal_type)}</StatusChip>
             <StatusChip tone={item.is_approved ? "success" : "muted"}>
-              {item.is_approved ? "Approved" : "Draft"}
+              {item.is_approved ? "Approved for groceries" : "Needs approval"}
             </StatusChip>
             <StatusChip tone={item.is_locked ? "success" : "muted"}>
               {item.is_locked ? "Locked" : "Unlocked"}
             </StatusChip>
+            {hasMissingEstimate(item) ? (
+              <StatusChip tone="muted">Missing estimate</StatusChip>
+            ) : null}
           </div>
           <p className="mt-2 font-medium">{item.display_name}</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {formatPlanItemSupportText(item)}
+          </p>
           {item.recipe_name && item.recipe_name !== item.display_name ? (
             <p className="mt-1 text-sm text-muted-foreground">
               Recipe: {item.recipe_name}
@@ -209,7 +220,7 @@ function PlanItemCard({
           {!item.is_approved ? (
             <PlanItemActionForm
               action={approveWeeklyPlanItem}
-              buttonLabel="Approve"
+              buttonLabel="Approve for groceries"
               itemId={item.id}
               weekStartDate={weekStartDate}
             />
@@ -230,6 +241,26 @@ function PlanItemCard({
         </div>
       </div>
     </div>
+  );
+}
+
+function formatPlanItemSupportText(item: WeeklyPlanItem) {
+  const approvalText = item.is_approved
+    ? "Will be included when groceries are generated."
+    : "Approve this item when it should be included in groceries.";
+  const lockText = item.is_locked
+    ? "Locked for this week's plan."
+    : "Unlocked and easy to change.";
+  const nutritionText = hasMissingEstimate(item)
+    ? "Nutrition estimate is incomplete."
+    : "Nutrition estimate is available.";
+
+  return `${approvalText} ${lockText} ${nutritionText}`;
+}
+
+function hasMissingEstimate(item: WeeklyPlanItem) {
+  return (
+    item.estimated_calories === null || item.estimated_protein_grams === null
   );
 }
 

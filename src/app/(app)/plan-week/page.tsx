@@ -18,6 +18,10 @@ import {
   getWeeklyPlanStapleSelections
 } from "@/lib/weekly-plans/data";
 import {
+  buildPlanWeekSummary,
+  type PlanWeekSummary
+} from "@/lib/weekly-plans/plan-week-summary";
+import {
   formatAdultDayType,
   formatWeeklyGoal,
   type WeeklyPlanItem,
@@ -86,6 +90,13 @@ export default async function PlanWeekPage({
   const selectedGoals = new Set(goals.map((goal) => goal.goal));
   const planItemsByDate = new Map<string, WeeklyPlanItem[]>();
   const nutritionSummaries = calculateDailyNutritionTotals(planItems);
+  const planWeekSummary = weeklyPlan
+    ? buildPlanWeekSummary({
+        planItems,
+        selectedStapleCount: stapleSelections.length,
+        weekDateKeys: weekDates.map((date) => date.dateKey)
+      })
+    : null;
 
   planItems.forEach((item) => {
     const existingItems = planItemsByDate.get(item.plan_date) ?? [];
@@ -141,6 +152,10 @@ export default async function PlanWeekPage({
           <form action={saveWeeklyPlanSetup} className="space-y-6">
             <input name="weekStartDate" type="hidden" value={weekStartDate} />
             <input name="weeklyPlanId" type="hidden" value={weeklyPlan.id} />
+
+            {planWeekSummary ? (
+              <PlanWeekSummaryPanel summary={planWeekSummary} />
+            ) : null}
 
             <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -255,6 +270,7 @@ export default async function PlanWeekPage({
 
           <GroceryGenerationPanel
             approvedRecipeItemCount={
+              planWeekSummary?.approvedItemCount ??
               planItems.filter((item) => item.is_approved && item.recipe_id)
                 .length
             }
@@ -273,6 +289,54 @@ export default async function PlanWeekPage({
         </div>
       )}
     </section>
+  );
+}
+
+function PlanWeekSummaryPanel({ summary }: { summary: PlanWeekSummary }) {
+  return (
+    <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <p className="text-sm font-medium text-muted-foreground">
+            Week at a glance
+          </p>
+          <h2 className="mt-2 text-xl font-semibold">
+            {summary.primaryAttention.label}
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+            {summary.primaryAttention.description}
+          </p>
+        </div>
+        <span className={getAttentionClassName(summary.primaryAttention.tone)}>
+          {formatAttentionTone(summary.primaryAttention.tone)}
+        </span>
+      </div>
+
+      <dl className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <SummaryMetric label="Planned items" value={summary.totalItemCount} />
+        <SummaryMetric label="Approved" value={summary.approvedItemCount} />
+        <SummaryMetric label="Locked" value={summary.lockedItemCount} />
+        <SummaryMetric label="Selected staples" value={summary.selectedStapleCount} />
+        <SummaryMetric label="Empty days" value={summary.emptyDayCount} />
+      </dl>
+
+      {summary.missingEstimateItemCount > 0 ? (
+        <p className="mt-4 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+          {summary.missingEstimateItemCount} planned{" "}
+          {summary.missingEstimateItemCount === 1 ? "item is" : "items are"}{" "}
+          missing calories or protein. That affects estimates only.
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+function SummaryMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-md border border-border bg-background p-3">
+      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
+      <dd className="mt-1 text-xl font-semibold">{value}</dd>
+    </div>
   );
 }
 
@@ -295,16 +359,19 @@ function GroceryGenerationPanel({
         <div>
           <h2 className="text-xl font-semibold">Grocery list</h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Generate a draft grocery list from approved recipe items in this
-            week. If a draft already exists for this week, MealBoard replaces
-            that draft instead of creating duplicates.
+            Generate a draft grocery list from approved recipe items and
+            selected staples. Existing draft lists for this week are replaced.
           </p>
-          <p className="mt-3 text-sm text-muted-foreground">
-            Approved recipe items ready: {approvedRecipeItemCount}
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Selected staples ready: {selectedStapleCount}
-          </p>
+          <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+            <div>
+              <dt className="text-muted-foreground">Approved recipes ready</dt>
+              <dd className="font-medium">{approvedRecipeItemCount}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Selected staples ready</dt>
+              <dd className="font-medium">{selectedStapleCount}</dd>
+            </div>
+          </dl>
         </div>
 
         <form action={generateGroceryListForWeek}>
@@ -322,8 +389,8 @@ function GroceryGenerationPanel({
 
       {!canGenerate ? (
         <p className="mt-4 rounded-md border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-          Approve at least one recipe item or select one staple before
-          generating groceries.
+          Nothing is ready for groceries yet. Approve a planned recipe or select
+          a staple first.
         </p>
       ) : null}
     </section>
@@ -361,6 +428,30 @@ function PlanWeekMessage({ message }: { message: string }) {
       {message}
     </p>
   );
+}
+
+function getAttentionClassName(tone: PlanWeekSummary["primaryAttention"]["tone"]) {
+  if (tone === "success") {
+    return "w-fit rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-800";
+  }
+
+  if (tone === "info") {
+    return "w-fit rounded-full border border-border bg-muted px-3 py-1.5 text-sm font-medium text-muted-foreground";
+  }
+
+  return "w-fit rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-900";
+}
+
+function formatAttentionTone(tone: PlanWeekSummary["primaryAttention"]["tone"]) {
+  if (tone === "success") {
+    return "Ready";
+  }
+
+  if (tone === "info") {
+    return "Estimate cue";
+  }
+
+  return "Needs review";
 }
 
 function formatDisplayDate(dateKey: string) {
