@@ -6,6 +6,7 @@ import { generateGroceryListForWeek } from "@/app/(app)/grocery-list/actions";
 import { ManualPlanSection } from "@/components/plan-week/manual-plan-section";
 import { NutritionSummarySection } from "@/components/plan-week/nutrition-summary-section";
 import { StaplesReviewSection } from "@/components/plan-week/staples-review-section";
+import { calculateCalorieTargetGuidance } from "@/lib/nutrition/calculate-calorie-target-guidance";
 import { calculateDailyNutritionTotals } from "@/lib/nutrition/calculate-daily-totals";
 import { getMealProfiles, getStaples } from "@/lib/settings/data";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
@@ -90,6 +91,14 @@ export default async function PlanWeekPage({
   const selectedGoals = new Set(goals.map((goal) => goal.goal));
   const planItemsByDate = new Map<string, WeeklyPlanItem[]>();
   const nutritionSummaries = calculateDailyNutritionTotals(planItems);
+  const calorieGuidance = weeklyPlan
+    ? calculateCalorieTargetGuidance({
+        profileDays,
+        profiles,
+        strictness: weeklyPlan.calorie_strictness,
+        summaries: nutritionSummaries
+      })
+    : [];
   const planWeekSummary = weeklyPlan
     ? buildPlanWeekSummary({
         planItems,
@@ -260,7 +269,11 @@ export default async function PlanWeekPage({
             weeklyPlanId={weeklyPlan.id}
           />
 
-          <NutritionSummarySection summaries={nutritionSummaries} />
+          <NutritionSummarySection
+            calorieGuidance={calorieGuidance}
+            calorieStrictness={weeklyPlan.calorie_strictness}
+            summaries={nutritionSummaries}
+          />
 
           <StaplesReviewSection
             selectedStapleIds={
