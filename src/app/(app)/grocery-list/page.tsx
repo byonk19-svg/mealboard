@@ -184,7 +184,7 @@ function GroceryListOverview({
         />
       </div>
 
-      <dl className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <dl className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <SummaryMetric label="Total items" value={summary.totalItemCount} />
         <SummaryMetric
           label="Remaining"
@@ -206,7 +206,7 @@ function SummaryMetric({ label, value }: { label: string; value: number }) {
       <dt className="text-xs font-medium uppercase text-muted-foreground">
         {label}
       </dt>
-      <dd className="mt-1 text-2xl font-semibold">{value}</dd>
+      <dd className="mt-1 text-xl font-semibold sm:text-2xl">{value}</dd>
     </div>
   );
 }
@@ -291,8 +291,13 @@ function ManualGroceryItemForm({
   view: GroceryListView;
 }) {
   return (
-    <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
-      <h2 className="text-lg font-semibold">Add grocery item</h2>
+    <details className="rounded-lg border border-border bg-card p-5 shadow-sm">
+      <summary className="min-h-11 cursor-pointer list-none text-lg font-semibold">
+        Add grocery item
+        <span className="mt-1 block text-sm font-normal text-muted-foreground">
+          Open when something extra comes up while shopping.
+        </span>
+      </summary>
       <form action={addManualGroceryItemAction} className="mt-4 space-y-4">
         <input name="groceryListId" type="hidden" value={groceryListId} />
         <input name="view" type="hidden" value={view} />
@@ -370,7 +375,7 @@ function ManualGroceryItemForm({
           Add item
         </button>
       </form>
-    </section>
+    </details>
   );
 }
 
@@ -513,7 +518,7 @@ function GroceryItemRow({
           ) : null}
         </div>
 
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:min-w-64">
+        <div className="grid grid-cols-2 gap-2 md:min-w-64">
           <form action={updateGroceryItemChecked}>
             <input name="itemId" type="hidden" value={item.id} />
             <input name="view" type="hidden" value={view} />
