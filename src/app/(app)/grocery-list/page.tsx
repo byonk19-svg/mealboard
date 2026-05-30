@@ -2,6 +2,10 @@ import Link from "next/link";
 import type { GroceryListItem, GroceryListStatus } from "@/lib/grocery/data";
 import { getLatestGroceryList } from "@/lib/grocery/data";
 import {
+  buildGroceryListSummary,
+  type GroceryListSummary
+} from "@/lib/grocery/grocery-list-summary";
+import {
   groupGroceryItemsByMeal,
   groupGroceryItemsByProfile,
   type GroceryItemContextGroup
@@ -59,8 +63,7 @@ export default async function GroceryListPage({
   const mealGroups = groceryList
     ? groupGroceryItemsByMeal(groceryList.items)
     : [];
-  const completedItemCount =
-    groceryList?.items.filter((item) => item.checked).length ?? 0;
+  const groceryListSummary = buildGroceryListSummary(groceryList?.items ?? []);
 
   return (
     <section className="space-y-6">
@@ -84,33 +87,14 @@ export default async function GroceryListPage({
         <EmptyGroceryListState />
       ) : (
         <>
-          <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <h2 className="text-xl font-semibold">
-                  {groceryList.name ?? "Generated grocery list"}
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  {groceryList.weekStartDate
-                    ? `Week of ${formatDisplayDate(groceryList.weekStartDate)}`
-                    : "No weekly plan attached"}
-                </p>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <span className="rounded-full border border-border bg-muted px-3 py-1.5 text-sm font-medium">
-                    {formatStatus(groceryList.status)}
-                  </span>
-                  <span className="rounded-full border border-border px-3 py-1.5 text-sm text-muted-foreground">
-                    {completedItemCount} of {groceryList.items.length} checked
-                  </span>
-                </div>
-              </div>
-              <LifecycleAction
-                groceryListId={groceryList.id}
-                status={groceryList.status}
-                view={view}
-              />
-            </div>
-          </section>
+          <GroceryListOverview
+            groceryListId={groceryList.id}
+            name={groceryList.name}
+            status={groceryList.status}
+            summary={groceryListSummary}
+            view={view}
+            weekStartDate={groceryList.weekStartDate}
+          />
 
           <ManualGroceryItemForm
             groceryCategories={groceryCategories}
@@ -121,11 +105,15 @@ export default async function GroceryListPage({
 
           <ViewSelector view={view} />
 
-          {view === "shopping" ? (
+          {groceryListSummary.totalItemCount === 0 ? (
+            <EmptyCurrentListState />
+          ) : null}
+
+          {view === "shopping" && groceryListSummary.totalItemCount > 0 ? (
             <CategoryGroupList groups={categoryGroups} view={view} />
           ) : null}
 
-          {view === "profile" ? (
+          {view === "profile" && groceryListSummary.totalItemCount > 0 ? (
             <ContextGroupList
               emptyMessage="No profile source context is available for this grocery list."
               groups={profileGroups}
@@ -134,7 +122,7 @@ export default async function GroceryListPage({
             />
           ) : null}
 
-          {view === "meal" ? (
+          {view === "meal" && groceryListSummary.totalItemCount > 0 ? (
             <ContextGroupList
               emptyMessage="No meal source context is available for this grocery list."
               groups={mealGroups}
@@ -148,13 +136,106 @@ export default async function GroceryListPage({
   );
 }
 
+function GroceryListOverview({
+  groceryListId,
+  name,
+  status,
+  summary,
+  view,
+  weekStartDate
+}: {
+  groceryListId: string;
+  name: string | null;
+  status: GroceryListStatus;
+  summary: GroceryListSummary;
+  view: GroceryListView;
+  weekStartDate: string | null;
+}) {
+  return (
+    <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold">
+            {name ?? "Generated grocery list"}
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            {weekStartDate
+              ? `Week of ${formatDisplayDate(weekStartDate)}`
+              : "No weekly plan attached"}
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-border bg-muted px-3 py-1.5 text-sm font-medium">
+              {formatStatus(status)}
+            </span>
+            <span className="rounded-full border border-border px-3 py-1.5 text-sm text-muted-foreground">
+              {formatItemCount(summary.remainingItemCount)} left to buy
+            </span>
+            {summary.needsReviewItemCount > 0 ? (
+              <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-900">
+                {formatItemCount(summary.needsReviewItemCount)} need review
+              </span>
+            ) : null}
+          </div>
+        </div>
+        <LifecycleAction
+          groceryListId={groceryListId}
+          status={status}
+          view={view}
+        />
+      </div>
+
+      <dl className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <SummaryMetric label="Total items" value={summary.totalItemCount} />
+        <SummaryMetric
+          label="Remaining"
+          value={summary.remainingItemCount}
+        />
+        <SummaryMetric label="Checked" value={summary.checkedItemCount} />
+        <SummaryMetric
+          label="Already have"
+          value={summary.alreadyHaveItemCount}
+        />
+      </dl>
+    </section>
+  );
+}
+
+function SummaryMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-md border border-border bg-muted/40 px-3 py-3">
+      <dt className="text-xs font-medium uppercase text-muted-foreground">
+        {label}
+      </dt>
+      <dd className="mt-1 text-2xl font-semibold">{value}</dd>
+    </div>
+  );
+}
+
 function EmptyGroceryListState() {
   return (
     <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
       <h2 className="text-xl font-semibold">No grocery list yet</h2>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">
-        Open Plan Week, approve at least one recipe item, and generate a draft
-        grocery list.
+        Open Plan Week, approve a recipe item or select a staple, then generate
+        a draft grocery list.
+      </p>
+      <Link
+        className="mt-4 inline-flex min-h-11 items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+        href="/plan-week"
+      >
+        Open Plan Week
+      </Link>
+    </div>
+  );
+}
+
+function EmptyCurrentListState() {
+  return (
+    <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
+      <h2 className="text-xl font-semibold">This list has no items</h2>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">
+        Add a manual item here, or return to Plan Week and generate groceries
+        from approved recipes and selected staples.
       </p>
     </div>
   );
@@ -302,25 +383,34 @@ function CategoryGroupList({
 }) {
   return (
     <>
-      {groups.map((group) => (
-        <details
-          className="rounded-lg border border-border bg-card p-5 shadow-sm"
-          key={group.categoryName}
-          open
-        >
-          <summary className="cursor-pointer list-none text-xl font-semibold">
-            <span>{group.categoryName}</span>
-            <span className="ml-2 text-sm font-normal text-muted-foreground">
-              {formatItemCount(group.items.length)}
-            </span>
-          </summary>
-          <div className="mt-4 divide-y divide-border">
-            {group.items.map((item) => (
-              <GroceryItemRow item={item} key={item.id} view={view} />
-            ))}
-          </div>
-        </details>
-      ))}
+      {groups.map((group) => {
+        const summary = buildGroceryListSummary(group.items);
+
+        return (
+          <details
+            className="rounded-lg border border-border bg-card p-5 shadow-sm"
+            key={group.categoryName}
+            open
+          >
+            <summary className="cursor-pointer list-none">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <span className="text-xl font-semibold">
+                  {group.categoryName}
+                </span>
+                <span className="text-sm font-normal text-muted-foreground">
+                  {formatItemCount(summary.remainingItemCount)} left of{" "}
+                  {formatItemCount(summary.totalItemCount)}
+                </span>
+              </div>
+            </summary>
+            <div className="mt-4 divide-y divide-border">
+              {group.items.map((item) => (
+                <GroceryItemRow item={item} key={item.id} view={view} />
+              ))}
+            </div>
+          </details>
+        );
+      })}
     </>
   );
 }
@@ -355,8 +445,8 @@ function ContextGroupList({
           key={group.groupKey}
           open
         >
-          <summary className="cursor-pointer list-none text-xl font-semibold">
-            <span>{group.groupName}</span>
+          <summary className="cursor-pointer list-none">
+            <span className="text-xl font-semibold">{group.groupName}</span>
             <span className="ml-2 text-sm font-normal text-muted-foreground">
               {formatItemCount(group.items.length)}
             </span>
@@ -413,6 +503,9 @@ function GroceryItemRow({
           <p className="mt-1 text-sm text-muted-foreground">
             {formatQuantity(item)}
           </p>
+          <p className="mt-1 text-xs font-medium text-muted-foreground">
+            {formatItemShoppingState(item)}
+          </p>
           {item.reviewReason ? (
             <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
               {item.reviewReason}
@@ -463,14 +556,22 @@ function GroceryItemRow({
           <summary className="cursor-pointer text-sm font-medium">
             Why is this on the list?
           </summary>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
             {item.sources.map((source) => (
-              <span
-                className="rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium text-muted-foreground"
+              <div
+                className="rounded-md border border-border bg-card px-3 py-2 text-sm"
                 key={source.id}
               >
-                {formatSourceLabel(source)}
-              </span>
+                <p className="text-xs font-medium uppercase text-muted-foreground">
+                  {formatSourceType(source.sourceType)}
+                </p>
+                <p className="mt-1 font-medium">{formatSourceLabel(source)}</p>
+                {formatSourceQuantity(source) ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Source amount: {formatSourceQuantity(source)}
+                  </p>
+                ) : null}
+              </div>
             ))}
           </div>
         </details>
@@ -573,6 +674,47 @@ function formatSourceLabel(source: GroceryListItem["sources"][number]) {
     .join(" - ");
 
   return source.label ?? (fallbackLabel || "Grocery source");
+}
+
+function formatSourceType(sourceType: string) {
+  if (sourceType === "meal_generated") {
+    return "Recipe";
+  }
+
+  if (sourceType === "manual_add") {
+    return "Manual add";
+  }
+
+  if (sourceType === "staple") {
+    return "Selected staple";
+  }
+
+  return sourceType
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function formatSourceQuantity(source: GroceryListItem["sources"][number]) {
+  if (source.quantity === null && !source.unit) {
+    return null;
+  }
+
+  return [source.quantity, source.unit]
+    .filter((value) => value !== null && value !== "")
+    .join(" ");
+}
+
+function formatItemShoppingState(item: GroceryListItem) {
+  if (item.checked) {
+    return "Checked off";
+  }
+
+  if (item.alreadyHave) {
+    return "Already have at home";
+  }
+
+  return "Still needed";
 }
 
 function formatStatus(status: string) {
