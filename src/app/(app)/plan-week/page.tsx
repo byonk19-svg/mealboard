@@ -4,7 +4,9 @@ import {
 } from "@/app/(app)/plan-week/actions";
 import { generateGroceryListForWeek } from "@/app/(app)/grocery-list/actions";
 import { ManualPlanSection } from "@/components/plan-week/manual-plan-section";
+import { NutritionSummarySection } from "@/components/plan-week/nutrition-summary-section";
 import { StaplesReviewSection } from "@/components/plan-week/staples-review-section";
+import { calculateDailyNutritionTotals } from "@/lib/nutrition/calculate-daily-totals";
 import { getMealProfiles, getStaples } from "@/lib/settings/data";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 import {
@@ -83,6 +85,7 @@ export default async function PlanWeekPage({
   );
   const selectedGoals = new Set(goals.map((goal) => goal.goal));
   const planItemsByDate = new Map<string, WeeklyPlanItem[]>();
+  const nutritionSummaries = calculateDailyNutritionTotals(planItems);
 
   planItems.forEach((item) => {
     const existingItems = planItemsByDate.get(item.plan_date) ?? [];
@@ -238,6 +241,8 @@ export default async function PlanWeekPage({
             weekStartDate={weekStartDate}
             weeklyPlanId={weeklyPlan.id}
           />
+
+          <NutritionSummarySection summaries={nutritionSummaries} />
 
           <StaplesReviewSection
             selectedStapleIds={
