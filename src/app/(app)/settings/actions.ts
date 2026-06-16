@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { normalizeBabyProfileInput } from "@/lib/settings/baby-profile";
 import { normalizeStapleInput } from "@/lib/settings/staples";
 import { preferenceLevels, type FoodPreferenceLevel } from "@/lib/settings/types";
 import { createClient } from "@/lib/supabase/server";
@@ -66,40 +67,85 @@ export async function updateMealProfile(formData: FormData) {
     settingsRedirect(path, "Profile is required.");
   }
 
-  const defaultTarget = parseOptionalPositiveInteger(
-    formData.get("defaultDailyCalorieTarget"),
-    "Default daily calorie target"
-  );
-  const workTarget = parseOptionalPositiveInteger(
-    formData.get("workDayCalorieTarget"),
-    "Work day calorie target"
-  );
-  const offTarget = parseOptionalPositiveInteger(
-    formData.get("offDayCalorieTarget"),
-    "Off day calorie target"
-  );
-
-  if ("error" in defaultTarget) {
-    settingsRedirect(path, defaultTarget.error);
-  }
-
-  if ("error" in workTarget) {
-    settingsRedirect(path, workTarget.error);
-  }
-
-  if ("error" in offTarget) {
-    settingsRedirect(path, offTarget.error);
-  }
-
   const supabase = await createClient();
+  const { data: profile, error: profileError } = await supabase
+    .from("meal_profiles")
+    .select("id, profile_type")
+    .eq("household_id", household.id)
+    .eq("id", profileId)
+    .is("archived_at", null)
+    .maybeSingle();
+
+  if (profileError) {
+    settingsRedirect(path, profileError.message);
+  }
+
+  if (!profile) {
+    settingsRedirect(path, "That profile is no longer available.");
+  }
+
+  const payload: {
+    baby_stage_override_months?: number | null;
+    birthdate?: string | null;
+    default_daily_calorie_target?: number | null;
+    notes: string | null;
+    off_day_calorie_target?: number | null;
+    work_day_calorie_target?: number | null;
+  } = {
+    notes: textOrNull(formData.get("notes"))
+  };
+
+  if (profile.profile_type === "adult") {
+    const defaultTarget = parseOptionalPositiveInteger(
+      formData.get("defaultDailyCalorieTarget"),
+      "Default daily calorie target"
+    );
+    const workTarget = parseOptionalPositiveInteger(
+      formData.get("workDayCalorieTarget"),
+      "Work day calorie target"
+    );
+    const offTarget = parseOptionalPositiveInteger(
+      formData.get("offDayCalorieTarget"),
+      "Off day calorie target"
+    );
+
+    if ("error" in defaultTarget) {
+      settingsRedirect(path, defaultTarget.error);
+    }
+
+    if ("error" in workTarget) {
+      settingsRedirect(path, workTarget.error);
+    }
+
+    if ("error" in offTarget) {
+      settingsRedirect(path, offTarget.error);
+    }
+
+    payload.default_daily_calorie_target = defaultTarget.value;
+    payload.work_day_calorie_target = workTarget.value;
+    payload.off_day_calorie_target = offTarget.value;
+  }
+
+  if (profile.profile_type === "baby") {
+    try {
+      const babyInput = normalizeBabyProfileInput({
+        birthdate: textOrNull(formData.get("birthdate")),
+        stageOverrideMonths: textOrNull(formData.get("babyStageOverrideMonths"))
+      });
+
+      payload.birthdate = babyInput.birthdate;
+      payload.baby_stage_override_months = babyInput.babyStageOverrideMonths;
+    } catch (error) {
+      settingsRedirect(
+        path,
+        error instanceof Error ? error.message : "Baby profile could not be saved."
+      );
+    }
+  }
+
   const { error } = await supabase
     .from("meal_profiles")
-    .update({
-      notes: textOrNull(formData.get("notes")),
-      default_daily_calorie_target: defaultTarget.value,
-      work_day_calorie_target: workTarget.value,
-      off_day_calorie_target: offTarget.value
-    })
+    .update(payload)
     .eq("household_id", household.id)
     .eq("id", profileId);
 

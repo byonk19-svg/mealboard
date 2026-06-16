@@ -1,4 +1,5 @@
 import { updateMealProfile } from "@/app/(app)/settings/actions";
+import { resolveBabyStage } from "@/lib/baby/resolve-baby-stage";
 import {
   formatProfileType,
   type MealProfile
@@ -33,8 +34,8 @@ export default async function ProfilesPage({
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
           Manage the household meal profiles created by the seed data. This
-          slice keeps editing limited to profile notes and existing target
-          fields.
+          slice keeps editing limited to profile notes, adult calorie targets,
+          and Baby age/stage setup.
         </p>
       </div>
 
@@ -51,6 +52,14 @@ export default async function ProfilesPage({
 
 function ProfileCard({ profile }: { profile: MealProfile }) {
   const isAdult = profile.profile_type === "adult";
+  const isBaby = profile.profile_type === "baby";
+  const babyStage = isBaby
+    ? resolveBabyStage({
+        asOfDate: new Date(),
+        birthdate: profile.birthdate,
+        overrideMonths: profile.baby_stage_override_months
+      })
+    : null;
 
   return (
     <article className="rounded-lg border border-border bg-card p-5 shadow-sm">
@@ -100,10 +109,35 @@ function ProfileCard({ profile }: { profile: MealProfile }) {
               value={profile.off_day_calorie_target}
             />
           </div>
+        ) : isBaby ? (
+          <div className="space-y-4">
+            <BabyStageSummary resolution={babyStage} />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block text-sm font-medium">
+                Birthdate
+                <input
+                  className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  defaultValue={profile.birthdate ?? ""}
+                  name="birthdate"
+                  type="date"
+                />
+              </label>
+              <NumberField
+                label="Stage override months"
+                min={0}
+                name="babyStageOverrideMonths"
+                value={profile.baby_stage_override_months}
+              />
+            </div>
+            <p className="text-sm leading-6 text-muted-foreground">
+              Leave the override blank to use age from birthdate. Use the
+              override only when baby&apos;s solids stage is ahead or behind
+              calendar age.
+            </p>
+          </div>
         ) : (
           <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
-            Baby and shared-family planning details stay read-only in this
-            slice.
+            Shared-family planning details stay read-only in this slice.
           </p>
         )}
 
@@ -120,10 +154,12 @@ function ProfileCard({ profile }: { profile: MealProfile }) {
 
 function NumberField({
   label,
+  min = 1,
   name,
   value
 }: {
   label: string;
+  min?: number;
   name: string;
   value: number | null;
 }) {
@@ -133,12 +169,48 @@ function NumberField({
       <input
         className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         defaultValue={value ?? ""}
-        min={1}
+        min={min}
         name={name}
         type="number"
       />
     </label>
   );
+}
+
+function BabyStageSummary({
+  resolution
+}: {
+  resolution: ReturnType<typeof resolveBabyStage> | null;
+}) {
+  if (!resolution || resolution.setupWarning) {
+    return (
+      <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        {resolution?.setupWarning ??
+          "Add baby's birthdate for better solids planning."}
+      </p>
+    );
+  }
+
+  return (
+    <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
+      <p className="font-medium">
+        {resolution.stageName ?? "Stage not matched yet"}
+        {resolution.usedOverride ? " (manual override)" : ""}
+      </p>
+      <p className="mt-1 text-muted-foreground">
+        {formatBabyAgeText(resolution.ageMonths)} Stage month:{" "}
+        {resolution.effectiveStageMonths}.
+      </p>
+    </div>
+  );
+}
+
+function formatBabyAgeText(ageMonths: number | null) {
+  if (ageMonths === null) {
+    return "Age not set.";
+  }
+
+  return `Age: ${ageMonths} ${ageMonths === 1 ? "month" : "months"}.`;
 }
 
 function SettingsMessage({ message }: { message: string }) {

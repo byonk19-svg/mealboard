@@ -26,8 +26,8 @@ export default function SettingsPage() {
           </p>
           <h2 className="mt-2 text-xl font-semibold">Profiles</h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            View Brianna, Elaine, Baby, and Shared/Family profiles. Edit notes
-            and existing target fields.
+            View Brianna, Elaine, Baby, and Shared/Family profiles. Edit notes,
+            adult calorie targets, and Baby stage setup.
           </p>
         </Link>
 
