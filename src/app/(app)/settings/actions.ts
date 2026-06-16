@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { normalizeBabyProfileInput } from "@/lib/settings/baby-profile";
+import { resolveSettingsReturnPath } from "@/lib/settings/baby-settings";
 import { normalizeStapleInput } from "@/lib/settings/staples";
 import { preferenceLevels, type FoodPreferenceLevel } from "@/lib/settings/types";
 import { createClient } from "@/lib/supabase/server";
@@ -59,7 +60,7 @@ async function requireHousehold(path: string) {
 }
 
 export async function updateMealProfile(formData: FormData) {
-  const path = "/settings/profiles";
+  const path = resolveSettingsReturnPath(textOrNull(formData.get("returnPath")));
   const household = await requireHousehold(path);
   const profileId = textOrNull(formData.get("profileId"));
 
@@ -154,6 +155,7 @@ export async function updateMealProfile(formData: FormData) {
   }
 
   revalidatePath(path);
+  revalidatePath("/settings/profiles");
   settingsRedirect(path, "Profile updated.");
 }
 

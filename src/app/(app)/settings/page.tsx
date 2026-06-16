@@ -47,6 +47,20 @@ export default function SettingsPage() {
 
         <Link
           className="rounded-lg border border-border bg-card p-5 shadow-sm transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          href="/settings/baby"
+        >
+          <p className="text-sm font-medium text-muted-foreground">
+            Solids setup
+          </p>
+          <h2 className="mt-2 text-xl font-semibold">Baby</h2>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Review Baby age/stage context and update birthdate or manual stage
+            override for future solids planning.
+          </p>
+        </Link>
+
+        <Link
+          className="rounded-lg border border-border bg-card p-5 shadow-sm transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           href="/settings/staples"
         >
           <p className="text-sm font-medium text-muted-foreground">
