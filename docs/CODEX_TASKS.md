@@ -813,6 +813,101 @@ Run lint/typecheck/tests and report results.
 
 ---
 
+# Task 14A — Baby Food Status Foundation
+
+## Goal
+
+Add the smallest baby-specific food status foundation before broader baby
+meal planning.
+
+This task exists because the current Baby settings work only covers
+birthdate/stage setup. Existing `food_preferences` can still handle general
+profile preferences, hard-no foods, and allergies, but it should not be reused
+as the baby tried/liked/disliked lifecycle because `tried` is not a preference
+level and baby solids need their own simple planning state.
+
+## Codex Prompt
+
+```text
+Implement the baby food status foundation for MealBoard.
+
+Use docs/PRD.md and docs/TECHNICAL_PLAN.md as source of truth.
+
+Current state:
+- /settings/baby already handles baby birthdate and manual stage override.
+- food_preferences already handles profile-specific preference/allergy rules.
+- There is no baby_food_status enum/table yet.
+
+Build only the foundation:
+- Add a baby_food_status enum with tried, liked, disliked if it does not already exist.
+- Add a baby_food_statuses table if it does not already exist.
+- Keep rows household-scoped and linked to the Baby meal profile.
+- Link each baby status row to an existing foods row.
+- Add simple create/update/delete server behavior for Baby food statuses.
+- Add a Baby foods panel under /settings/baby.
+- Add focused helpers in src/lib/baby or src/lib/settings where practical.
+- Add tests for pure helper behavior before production code.
+
+Recommended minimal schema:
+- id uuid primary key default gen_random_uuid()
+- household_id uuid not null references households(id) on delete cascade
+- baby_profile_id uuid not null
+- food_id uuid not null
+- status baby_food_status not null
+- notes text
+- prep_notes text
+- last_offered_on date
+- created_at timestamptz not null default now()
+- updated_at timestamptz not null default now()
+- unique (baby_profile_id, food_id)
+- foreign key (baby_profile_id, household_id) references meal_profiles(id, household_id) on delete cascade
+- foreign key (food_id, household_id) references foods(id, household_id) on delete cascade
+
+RLS and grants:
+- Enable RLS on baby_food_statuses.
+- Add policies so authenticated household members can manage only their household rows.
+- Because newer Supabase projects may not expose new SQL-created public tables automatically, include explicit role grants needed by the app alongside RLS.
+- Do not use user_metadata in policies.
+- Do not add SECURITY DEFINER functions unless they are already part of an established local pattern and are genuinely needed.
+
+Validation rules:
+- Only the household Baby profile should be accepted as baby_profile_id.
+- If this is enforced in app/server code, fetch and verify profile_type before insert/update.
+- If this is enforced in SQL, keep the trigger/function narrow and covered by local migration verification.
+- The same Baby profile and food should not have duplicate status rows.
+- Status changes should be deterministic: tried, liked, and disliked replace each other instead of creating history rows.
+
+UI placement:
+- Keep the UI under /settings/baby for this slice.
+- Do not create a separate child route unless the page becomes too crowded.
+- Use existing foods as the selectable source; do not create a new food database UI in this slice.
+- Keep copy practical and non-medical.
+
+Important boundaries:
+- Do not add Baby Meal 1/2 planning yet.
+- Do not add Try This generation yet.
+- Do not add baby grocery generation.
+- Do not add nutrition, medical reaction, formula, breastmilk, or milk-intake tracking.
+- Do not add H-E-B behavior.
+- Do not push cloud Supabase migrations; local migration verification only.
+
+Run lint/typecheck/tests/build. If a migration is added, run supabase db reset
+locally when available and report the result. Stop before any cloud Supabase
+push unless explicitly approved.
+```
+
+## Acceptance Criteria
+
+* Baby food tried/liked/disliked statuses have a dedicated data model.
+* Each status is household-scoped, Baby-profile-scoped, and food-linked.
+* RLS and role grants are explicit for the new table.
+* `/settings/baby` can list, add/update, and delete baby food statuses.
+* Baby status UI does not imply medical or reaction tracking.
+* Baby Meal 1/2, Try This, grocery, and nutrition behavior remain unchanged.
+* Tests cover the pure status helper behavior.
+
+---
+
 # Task 14 — Baby Planning MVP
 
 ## Goal
@@ -825,6 +920,9 @@ Add solids-only baby planning basics.
 Implement baby planning MVP for MealBoard.
 
 Use docs/PRD.md and docs/TECHNICAL_PLAN.md as source of truth.
+
+Prerequisite:
+- Complete Task 14A first so baby food statuses have a narrow foundation.
 
 Build:
 - /settings/baby page

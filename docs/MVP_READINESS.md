@@ -92,6 +92,9 @@ These are intentionally out of scope for the current MVP unless a future task ex
 Good next slices should stay narrow and start from the verified MVP loop. Candidate directions:
 
 - Baby planning foundation
+- Baby food status foundation only: a dedicated tried/liked/disliked data model
+  and `/settings/baby` CRUD, with no Baby Meal 1/2, Try This, grocery, or
+  nutrition behavior yet
 - Calorie target and gentle warning foundation
 - Recipe paste/import usability
 - Shared household/member invite preparation
