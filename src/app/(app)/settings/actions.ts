@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { normalizeBabyFoodStatusInput } from "@/lib/settings/baby-food-statuses";
 import { normalizeBabyProfileInput } from "@/lib/settings/baby-profile";
 import { resolveSettingsReturnPath } from "@/lib/settings/baby-settings";
 import { normalizeStapleInput } from "@/lib/settings/staples";
@@ -47,6 +48,21 @@ function parseOptionalPositiveInteger(
 
 function isPreferenceLevel(value: string): value is FoodPreferenceLevel {
   return preferenceLevels.includes(value as FoodPreferenceLevel);
+}
+
+function babyFoodStatusDatabaseMessage(error: { code?: string; message: string }) {
+  if (
+    error.code === "23505" ||
+    error.message.includes("baby_food_statuses_baby_profile_id_food_id_key")
+  ) {
+    return "That food already has a baby status.";
+  }
+
+  if (error.message.includes("Baby food statuses can only be saved")) {
+    return "Baby food statuses can only be saved for the household Baby profile.";
+  }
+
+  return "Baby food status could not be saved.";
 }
 
 async function requireHousehold(path: string) {
@@ -221,6 +237,172 @@ export async function deleteFoodPreference(formData: FormData) {
 
   revalidatePath(path);
   settingsRedirect(path, "Food preference deleted.");
+}
+
+export async function saveBabyFoodStatus(formData: FormData) {
+  const path = "/settings/baby";
+  const household = await requireHousehold(path);
+  const babyFoodStatusId = textOrNull(formData.get("babyFoodStatusId"));
+  const babyProfileId = textOrNull(formData.get("babyProfileId"));
+
+  if (!babyProfileId) {
+    settingsRedirect(path, "Choose the household Baby profile.");
+  }
+
+  let babyFoodStatus;
+
+  try {
+    babyFoodStatus = normalizeBabyFoodStatusInput({
+      foodId: textOrNull(formData.get("foodId")),
+      lastOfferedOn: textOrNull(formData.get("lastOfferedOn")),
+      notes: textOrNull(formData.get("notes")),
+      prepNotes: textOrNull(formData.get("prepNotes")),
+      status: textOrNull(formData.get("status"))
+    });
+  } catch (error) {
+    settingsRedirect(
+      path,
+      error instanceof Error ? error.message : "Baby food status could not be saved."
+    );
+  }
+
+  const supabase = await createClient();
+  const { data: babyProfiles, error: babyProfileError } = await supabase
+    .from("meal_profiles")
+    .select("id, profile_type")
+    .eq("household_id", household.id)
+    .eq("profile_type", "baby")
+    .is("archived_at", null)
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true })
+    .limit(1);
+
+  if (babyProfileError) {
+    settingsRedirect(path, "Baby profile could not be loaded.");
+  }
+
+  const babyProfile = babyProfiles?.[0] ?? null;
+
+  if (!babyProfile || babyProfile.id !== babyProfileId) {
+    settingsRedirect(path, "Choose the household Baby profile.");
+  }
+
+  const { data: food, error: foodError } = await supabase
+    .from("foods")
+    .select("id")
+    .eq("household_id", household.id)
+    .eq("id", babyFoodStatus.foodId)
+    .is("archived_at", null)
+    .maybeSingle();
+
+  if (foodError) {
+    settingsRedirect(path, "Food could not be loaded.");
+  }
+
+  if (!food) {
+    settingsRedirect(path, "That food is no longer available.");
+  }
+
+  const payload = {
+    baby_profile_id: babyProfile.id,
+    food_id: babyFoodStatus.foodId,
+    household_id: household.id,
+    last_offered_on: babyFoodStatus.lastOfferedOn,
+    notes: babyFoodStatus.notes,
+    prep_notes: babyFoodStatus.prepNotes,
+    status: babyFoodStatus.status
+  };
+
+  if (babyFoodStatusId) {
+    const { data: existing, error: existingError } = await supabase
+      .from("baby_food_statuses")
+      .select("id")
+      .eq("household_id", household.id)
+      .eq("baby_profile_id", babyProfile.id)
+      .eq("id", babyFoodStatusId)
+      .maybeSingle();
+
+    if (existingError) {
+      settingsRedirect(path, "Baby food status could not be loaded.");
+    }
+
+    if (!existing) {
+      settingsRedirect(path, "That baby food status is no longer available.");
+    }
+
+    const { data: updated, error } = await supabase
+      .from("baby_food_statuses")
+      .update(payload)
+      .eq("household_id", household.id)
+      .eq("baby_profile_id", babyProfile.id)
+      .eq("id", babyFoodStatusId)
+      .select("id")
+      .maybeSingle();
+
+    if (error) {
+      settingsRedirect(path, babyFoodStatusDatabaseMessage(error));
+    }
+
+    if (!updated) {
+      settingsRedirect(path, "That baby food status is no longer available.");
+    }
+  } else {
+    const { error } = await supabase
+      .from("baby_food_statuses")
+      .upsert(payload, { onConflict: "baby_profile_id,food_id" });
+
+    if (error) {
+      settingsRedirect(path, babyFoodStatusDatabaseMessage(error));
+    }
+  }
+
+  revalidatePath(path);
+  settingsRedirect(path, "Baby food status saved.");
+}
+
+export async function deleteBabyFoodStatus(formData: FormData) {
+  const path = "/settings/baby";
+  const household = await requireHousehold(path);
+  const babyFoodStatusId = textOrNull(formData.get("babyFoodStatusId"));
+
+  if (!babyFoodStatusId) {
+    settingsRedirect(path, "Baby food status is required.");
+  }
+
+  const supabase = await createClient();
+  const { data: existing, error: existingError } = await supabase
+    .from("baby_food_statuses")
+    .select("id")
+    .eq("household_id", household.id)
+    .eq("id", babyFoodStatusId)
+    .maybeSingle();
+
+  if (existingError) {
+    settingsRedirect(path, "Baby food status could not be loaded.");
+  }
+
+  if (!existing) {
+    settingsRedirect(path, "That baby food status is no longer available.");
+  }
+
+  const { data: deleted, error } = await supabase
+    .from("baby_food_statuses")
+    .delete()
+    .eq("household_id", household.id)
+    .eq("id", babyFoodStatusId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    settingsRedirect(path, "Baby food status could not be deleted.");
+  }
+
+  if (!deleted) {
+    settingsRedirect(path, "That baby food status is no longer available.");
+  }
+
+  revalidatePath(path);
+  settingsRedirect(path, "Baby food status deleted.");
 }
 
 export async function saveStaple(formData: FormData) {

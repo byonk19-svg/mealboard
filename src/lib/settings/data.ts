@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import type {
+  BabyFoodStatusEntry,
   Food,
   FoodPreference,
   MealProfile,
@@ -25,6 +26,10 @@ type StapleRow = Omit<
   foods: { name: string } | { name: string }[] | null;
   grocery_categories: { name: string } | { name: string }[] | null;
   meal_profiles: { name: string } | { name: string }[] | null;
+};
+
+type BabyFoodStatusRow = Omit<BabyFoodStatusEntry, "food_name"> & {
+  foods: { name: string } | { name: string }[] | null;
 };
 
 export async function getMealProfiles(householdId: string) {
@@ -94,6 +99,38 @@ export async function getFoodPreferences(householdId: string) {
     prep_notes: row.prep_notes,
     meal_profile_name: getJoinedName(row.meal_profiles),
     food_name: getJoinedName(row.foods)
+  }));
+}
+
+export async function getBabyFoodStatuses(
+  householdId: string,
+  babyProfileId: string
+) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("baby_food_statuses")
+    .select(
+      "id, household_id, baby_profile_id, food_id, status, notes, prep_notes, last_offered_on, foods(name)"
+    )
+    .eq("household_id", householdId)
+    .eq("baby_profile_id", babyProfileId)
+    .order("last_offered_on", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data ?? []) as BabyFoodStatusRow[]).map((row) => ({
+    baby_profile_id: row.baby_profile_id,
+    food_id: row.food_id,
+    food_name: getJoinedName(row.foods),
+    household_id: row.household_id,
+    id: row.id,
+    last_offered_on: row.last_offered_on,
+    notes: row.notes,
+    prep_notes: row.prep_notes,
+    status: row.status
   }));
 }
 

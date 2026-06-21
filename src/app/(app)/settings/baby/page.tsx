@@ -1,10 +1,27 @@
-import { updateMealProfile } from "@/app/(app)/settings/actions";
+import {
+  deleteBabyFoodStatus,
+  saveBabyFoodStatus,
+  updateMealProfile
+} from "@/app/(app)/settings/actions";
 import {
   buildBabySettingsSummary,
   getBabyProfile
 } from "@/lib/settings/baby-settings";
-import { getMealProfiles } from "@/lib/settings/data";
-import type { MealProfile } from "@/lib/settings/types";
+import {
+  getBabyFoodStatuses,
+  getFoods,
+  getMealProfiles
+} from "@/lib/settings/data";
+import {
+  babyFoodStatuses as babyFoodStatusOptions,
+  buildBabyFoodStatusSummary,
+  formatBabyFoodStatus
+} from "@/lib/settings/baby-food-statuses";
+import type {
+  BabyFoodStatusEntry,
+  Food,
+  MealProfile
+} from "@/lib/settings/types";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 
 type BabySettingsPageProps = {
@@ -23,9 +40,15 @@ export default async function BabySettingsPage({
     return null;
   }
 
-  const profiles = await getMealProfiles(householdContext.household.id);
+  const [profiles, foods] = await Promise.all([
+    getMealProfiles(householdContext.household.id),
+    getFoods(householdContext.household.id)
+  ]);
   const babyProfile = getBabyProfile(profiles);
   const summary = buildBabySettingsSummary(babyProfile, new Date());
+  const babyFoodStatuses = babyProfile
+    ? await getBabyFoodStatuses(householdContext.household.id, babyProfile.id)
+    : [];
 
   return (
     <section className="space-y-6">
@@ -87,15 +110,245 @@ export default async function BabySettingsPage({
 
       {babyProfile ? <BabyProfileForm profile={babyProfile} /> : null}
 
+      {babyProfile ? (
+        <BabyFoodsPanel
+          babyFoodStatuses={babyFoodStatuses}
+          foods={foods}
+          profile={babyProfile}
+        />
+      ) : null}
+
       <section className="rounded-lg border border-dashed border-border bg-card p-5">
         <h2 className="text-xl font-semibold">Coming later</h2>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          Baby food tried/liked/disliked status, Baby Meal 1/2 planning, and
-          Try This ideas stay out of this slice so the stage foundation stays
-          clean.
+          Baby Meal 1/2 planning, Try This ideas, grocery behavior, nutrition,
+          milk intake, and reaction tracking stay out of this slice.
         </p>
       </section>
     </section>
+  );
+}
+
+function BabyFoodsPanel({
+  babyFoodStatuses,
+  foods,
+  profile
+}: {
+  babyFoodStatuses: BabyFoodStatusEntry[];
+  foods: Food[];
+  profile: MealProfile;
+}) {
+  const statusSummary = buildBabyFoodStatusSummary(babyFoodStatuses);
+
+  return (
+    <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+      <div>
+        <p className="text-sm font-medium text-muted-foreground">
+          Baby foods
+        </p>
+        <h2 className="mt-2 text-xl font-semibold">
+          Tried, liked, and disliked foods
+        </h2>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+          Track simple solids status for existing foods. This is planning
+          context only, not reaction or medical tracking.
+        </p>
+      </div>
+
+      <dl className="mt-5 grid gap-3 sm:grid-cols-4">
+        <StageMetric label="Tracked" value={String(statusSummary.total)} />
+        <StageMetric label="Tried" value={String(statusSummary.tried)} />
+        <StageMetric label="Liked" value={String(statusSummary.liked)} />
+        <StageMetric label="Disliked" value={String(statusSummary.disliked)} />
+      </dl>
+
+      <div className="mt-5 rounded-md border border-border bg-background p-4">
+        <h3 className="text-lg font-semibold">Add or update baby food</h3>
+        <BabyFoodStatusForm
+          foods={foods}
+          profile={profile}
+          submitLabel="Save baby food"
+        />
+      </div>
+
+      <div className="mt-5 space-y-3">
+        {babyFoodStatuses.length > 0 ? (
+          babyFoodStatuses.map((status) => (
+            <BabyFoodStatusCard
+              babyFoodStatus={status}
+              foods={foods}
+              key={status.id}
+              profile={profile}
+            />
+          ))
+        ) : (
+          <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+            No baby foods tracked yet.
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function BabyFoodStatusCard({
+  babyFoodStatus,
+  foods,
+  profile
+}: {
+  babyFoodStatus: BabyFoodStatusEntry;
+  foods: Food[];
+  profile: MealProfile;
+}) {
+  return (
+    <article className="rounded-md border border-border p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-lg font-semibold">
+              {babyFoodStatus.food_name}
+            </h3>
+            <span className="rounded-md bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground">
+              {formatBabyFoodStatus(babyFoodStatus.status)}
+            </span>
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Last offered: {formatLastOfferedOn(babyFoodStatus.last_offered_on)}
+          </p>
+          {babyFoodStatus.notes ? (
+            <p className="mt-2 text-sm text-muted-foreground">
+              {babyFoodStatus.notes}
+            </p>
+          ) : null}
+          {babyFoodStatus.prep_notes ? (
+            <p className="mt-1 text-sm text-muted-foreground">
+              Prep: {babyFoodStatus.prep_notes}
+            </p>
+          ) : null}
+        </div>
+        <form action={deleteBabyFoodStatus}>
+          <input
+            name="babyFoodStatusId"
+            type="hidden"
+            value={babyFoodStatus.id}
+          />
+          <button
+            className="rounded-md border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
+            type="submit"
+          >
+            Delete
+          </button>
+        </form>
+      </div>
+
+      <BabyFoodStatusForm
+        babyFoodStatus={babyFoodStatus}
+        foods={foods}
+        profile={profile}
+        submitLabel="Update baby food"
+      />
+    </article>
+  );
+}
+
+function BabyFoodStatusForm({
+  babyFoodStatus,
+  foods,
+  profile,
+  submitLabel
+}: {
+  babyFoodStatus?: BabyFoodStatusEntry;
+  foods: Food[];
+  profile: MealProfile;
+  submitLabel: string;
+}) {
+  return (
+    <form action={saveBabyFoodStatus} className="mt-4 space-y-4">
+      <input name="babyProfileId" type="hidden" value={profile.id} />
+      {babyFoodStatus ? (
+        <input
+          name="babyFoodStatusId"
+          type="hidden"
+          value={babyFoodStatus.id}
+        />
+      ) : null}
+
+      <div className="grid gap-3 md:grid-cols-3">
+        <label className="block text-sm font-medium">
+          Food
+          <select
+            className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+            defaultValue={babyFoodStatus?.food_id ?? ""}
+            name="foodId"
+            required
+          >
+            <option disabled value="">
+              {foods.length > 0 ? "Choose food" : "No foods available"}
+            </option>
+            {foods.map((food) => (
+              <option key={food.id} value={food.id}>
+                {food.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="block text-sm font-medium">
+          Status
+          <select
+            className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+            defaultValue={babyFoodStatus?.status ?? "tried"}
+            name="status"
+          >
+            {babyFoodStatusOptions.map((status) => (
+              <option key={status} value={status}>
+                {formatBabyFoodStatus(status)}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="block text-sm font-medium">
+          Last offered
+          <input
+            className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+            defaultValue={babyFoodStatus?.last_offered_on ?? ""}
+            name="lastOfferedOn"
+            type="date"
+          />
+        </label>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <label className="block text-sm font-medium">
+          Notes
+          <textarea
+            className="mt-1 min-h-20 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+            defaultValue={babyFoodStatus?.notes ?? ""}
+            name="notes"
+            placeholder="Plain-language planning context"
+          />
+        </label>
+
+        <label className="block text-sm font-medium">
+          Prep notes
+          <textarea
+            className="mt-1 min-h-20 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+            defaultValue={babyFoodStatus?.prep_notes ?? ""}
+            name="prepNotes"
+            placeholder="Mashed, soft pieces, mixed into yogurt"
+          />
+        </label>
+      </div>
+
+      <button
+        className="min-h-11 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+        disabled={foods.length === 0}
+        type="submit"
+      >
+        {submitLabel}
+      </button>
+    </form>
   );
 }
 
@@ -172,6 +425,10 @@ function SettingsMessage({ message }: { message: string }) {
       {message}
     </p>
   );
+}
+
+function formatLastOfferedOn(value: string | null) {
+  return value ?? "Not tracked";
 }
 
 function formatMonthValue(value: number | null) {

@@ -1,6 +1,8 @@
 import type { FoodPreferenceLevel } from "@/lib/preferences/evaluate-recipe-for-profile";
+import type { BabyFoodStatus } from "@/lib/settings/baby-food-statuses";
 import type { StapleFrequency } from "@/lib/settings/staples";
 
+export type { BabyFoodStatus };
 export type { FoodPreferenceLevel };
 export type { StapleFrequency };
 
@@ -39,6 +41,18 @@ export type FoodPreference = {
   prep_notes: string | null;
   meal_profile_name: string;
   food_name: string;
+};
+
+export type BabyFoodStatusEntry = {
+  baby_profile_id: string;
+  food_id: string;
+  food_name: string;
+  household_id: string;
+  id: string;
+  last_offered_on: string | null;
+  notes: string | null;
+  prep_notes: string | null;
+  status: BabyFoodStatus;
 };
 
 export type Staple = {
