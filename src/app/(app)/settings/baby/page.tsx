@@ -7,6 +7,7 @@ import {
   buildBabySettingsSummary,
   getBabyProfile
 } from "@/lib/settings/baby-settings";
+import { generateBabyMeals } from "@/lib/baby/generate-baby-meals";
 import {
   getBabyFoodStatuses,
   getFoods,
@@ -49,6 +50,9 @@ export default async function BabySettingsPage({
   const babyFoodStatuses = babyProfile
     ? await getBabyFoodStatuses(householdContext.household.id, babyProfile.id)
     : [];
+  const babyMealSuggestions = generateBabyMeals(babyFoodStatuses, {
+    stageName: summary.resolution?.stageName
+  });
 
   return (
     <section className="space-y-6">
@@ -118,13 +122,92 @@ export default async function BabySettingsPage({
         />
       ) : null}
 
+      {babyProfile ? (
+        <BabyMealPreview babyMealSuggestions={babyMealSuggestions} />
+      ) : null}
+
       <section className="rounded-lg border border-dashed border-border bg-card p-5">
         <h2 className="text-xl font-semibold">Coming later</h2>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          Baby Meal 1/2 planning, Try This ideas, grocery behavior, nutrition,
-          milk intake, and reaction tracking stay out of this slice.
+          Weekly plan writes, Try This ideas, grocery behavior, nutrition, milk
+          intake, and reaction tracking stay out of this slice.
         </p>
       </section>
+    </section>
+  );
+}
+
+function BabyMealPreview({
+  babyMealSuggestions
+}: {
+  babyMealSuggestions: ReturnType<typeof generateBabyMeals>;
+}) {
+  return (
+    <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+      <div>
+        <p className="text-sm font-medium text-muted-foreground">
+          Routine preview
+        </p>
+        <h2 className="mt-2 text-xl font-semibold">
+          Baby Meal 1 and Baby Meal 2
+        </h2>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+          This preview uses tried and liked foods only. Disliked foods, new
+          foods, grocery behavior, and weekly plan writes stay separate.
+        </p>
+      </div>
+
+      <div className="mt-5 grid gap-3 md:grid-cols-2">
+        {babyMealSuggestions.slots.map((slot) => (
+          <article
+            className="rounded-md border border-border bg-background p-4"
+            key={slot.slot}
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-lg font-semibold">{slot.label}</h3>
+              {slot.status ? (
+                <span className="rounded-md bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground">
+                  {formatBabyFoodStatus(slot.status)}
+                </span>
+              ) : null}
+            </div>
+            <p className="mt-2 text-sm font-medium">
+              {slot.foodName ?? "Needs another tried or liked food"}
+            </p>
+            {slot.lastOfferedOn ? (
+              <p className="mt-1 text-sm text-muted-foreground">
+                Last offered: {formatLastOfferedOn(slot.lastOfferedOn)}
+              </p>
+            ) : null}
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              {slot.reason}
+            </p>
+            {slot.notes ? (
+              <p className="mt-2 text-sm text-muted-foreground">
+                {slot.notes}
+              </p>
+            ) : null}
+            {slot.prepNotes ? (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Prep: {slot.prepNotes}
+              </p>
+            ) : null}
+          </article>
+        ))}
+      </div>
+
+      {babyMealSuggestions.warnings.length > 0 ? (
+        <div className="mt-4 space-y-2">
+          {babyMealSuggestions.warnings.map((warning) => (
+            <p
+              className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground"
+              key={warning}
+            >
+              {warning}
+            </p>
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }
