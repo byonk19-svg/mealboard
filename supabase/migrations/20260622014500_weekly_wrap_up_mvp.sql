@@ -15,6 +15,9 @@ create table public.weekly_wrap_ups (
     on delete cascade
 );
 
+create unique index if not exists weekly_plan_items_id_household_id_key
+  on public.weekly_plan_items (id, household_id);
+
 create table public.weekly_wrap_up_items (
   id uuid primary key default gen_random_uuid(),
   household_id uuid not null references public.households(id) on delete cascade,
