@@ -99,6 +99,7 @@ export default async function GroceryListPage({
           <ManualGroceryItemForm
             groceryCategories={groceryCategories}
             groceryListId={groceryList.id}
+            listStatus={groceryList.status}
             mealProfiles={mealProfiles}
             view={view}
           />
@@ -110,13 +111,18 @@ export default async function GroceryListPage({
           ) : null}
 
           {view === "shopping" && groceryListSummary.totalItemCount > 0 ? (
-            <CategoryGroupList groups={categoryGroups} view={view} />
+            <CategoryGroupList
+              groups={categoryGroups}
+              listStatus={groceryList.status}
+              view={view}
+            />
           ) : null}
 
           {view === "profile" && groceryListSummary.totalItemCount > 0 ? (
             <ContextGroupList
               emptyMessage="No profile source context is available for this grocery list."
               groups={profileGroups}
+              listStatus={groceryList.status}
               note="Profile View is source context. Consolidated items can appear under more than one profile."
               view={view}
             />
@@ -126,6 +132,7 @@ export default async function GroceryListPage({
             <ContextGroupList
               emptyMessage="No meal source context is available for this grocery list."
               groups={mealGroups}
+              listStatus={groceryList.status}
               note="Meal View is source context. Consolidated items can appear under more than one meal."
               view={view}
             />
@@ -152,7 +159,7 @@ function GroceryListOverview({
   weekStartDate: string | null;
 }) {
   return (
-    <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+    <section className="sticky top-0 z-10 rounded-lg border border-border bg-card p-5 shadow-sm">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h2 className="text-xl font-semibold">
@@ -282,14 +289,18 @@ function ViewSelector({ view }: { view: GroceryListView }) {
 function ManualGroceryItemForm({
   groceryCategories,
   groceryListId,
+  listStatus,
   mealProfiles,
   view
 }: {
   groceryCategories: GroceryCategory[];
   groceryListId: string;
+  listStatus: GroceryListStatus;
   mealProfiles: MealProfile[];
   view: GroceryListView;
 }) {
+  const canAddItems = canAddManualItems(listStatus);
+
   return (
     <details className="rounded-lg border border-border bg-card p-5 shadow-sm">
       <summary className="min-h-11 cursor-pointer list-none text-lg font-semibold">
@@ -298,12 +309,17 @@ function ManualGroceryItemForm({
           Open when something extra comes up while shopping.
         </span>
       </summary>
+      {!canAddItems ? (
+        <p className="mt-4 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+          Manual items are paused for this list status.
+        </p>
+      ) : null}
       <form action={addManualGroceryItemAction} className="mt-4 space-y-4">
         <input name="groceryListId" type="hidden" value={groceryListId} />
         <input name="view" type="hidden" value={view} />
         <div className="grid gap-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,0.6fr)_minmax(0,0.7fr)]">
           <label className="text-sm font-medium">
-            Item
+            Grocery item name
             <input
               className="mt-1 min-h-12 w-full rounded-md border border-border bg-background px-3 py-2 text-base"
               name="displayName"
@@ -312,7 +328,7 @@ function ManualGroceryItemForm({
             />
           </label>
           <label className="text-sm font-medium">
-            Quantity
+            Grocery item quantity
             <input
               className="mt-1 min-h-12 w-full rounded-md border border-border bg-background px-3 py-2 text-base"
               min="0.01"
@@ -322,7 +338,7 @@ function ManualGroceryItemForm({
             />
           </label>
           <label className="text-sm font-medium">
-            Unit
+            Grocery item unit
             <input
               className="mt-1 min-h-12 w-full rounded-md border border-border bg-background px-3 py-2 text-base"
               name="unit"
@@ -332,7 +348,7 @@ function ManualGroceryItemForm({
         </div>
         <div className="grid gap-3 md:grid-cols-2">
           <label className="text-sm font-medium">
-            Category
+            Grocery category
             <select
               className="mt-1 min-h-12 w-full rounded-md border border-border bg-background px-3 py-2 text-base"
               name="groceryCategoryId"
@@ -346,7 +362,7 @@ function ManualGroceryItemForm({
             </select>
           </label>
           <label className="text-sm font-medium">
-            Context
+            Grocery context
             <select
               className="mt-1 min-h-12 w-full rounded-md border border-border bg-background px-3 py-2 text-base"
               name="mealProfileId"
@@ -361,7 +377,7 @@ function ManualGroceryItemForm({
           </label>
         </div>
         <label className="block text-sm font-medium">
-          Note
+          Grocery item note
           <input
             className="mt-1 min-h-12 w-full rounded-md border border-border bg-background px-3 py-2 text-base"
             name="note"
@@ -370,6 +386,7 @@ function ManualGroceryItemForm({
         </label>
         <button
           className="min-h-12 w-full rounded-md bg-primary px-4 py-3 text-sm font-medium text-primary-foreground md:w-auto"
+          disabled={!canAddItems}
           type="submit"
         >
           Add item
@@ -381,9 +398,11 @@ function ManualGroceryItemForm({
 
 function CategoryGroupList({
   groups,
+  listStatus,
   view
 }: {
   groups: GroceryCategoryGroup[];
+  listStatus: GroceryListStatus;
   view: GroceryListView;
 }) {
   return (
@@ -397,7 +416,7 @@ function CategoryGroupList({
             key={group.categoryName}
             open
           >
-            <summary className="cursor-pointer list-none">
+            <summary className="cursor-pointer">
               <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                 <span className="text-xl font-semibold">
                   {group.categoryName}
@@ -410,7 +429,12 @@ function CategoryGroupList({
             </summary>
             <div className="mt-4 divide-y divide-border">
               {group.items.map((item) => (
-                <GroceryItemRow item={item} key={item.id} view={view} />
+                <GroceryItemRow
+                  item={item}
+                  key={item.id}
+                  listStatus={listStatus}
+                  view={view}
+                />
               ))}
             </div>
           </details>
@@ -423,11 +447,13 @@ function CategoryGroupList({
 function ContextGroupList({
   emptyMessage,
   groups,
+  listStatus,
   note,
   view
 }: {
   emptyMessage: string;
   groups: GroceryItemContextGroup[];
+  listStatus: GroceryListStatus;
   note: string;
   view: GroceryListView;
 }) {
@@ -450,7 +476,7 @@ function ContextGroupList({
           key={group.groupKey}
           open
         >
-          <summary className="cursor-pointer list-none">
+          <summary className="cursor-pointer">
             <span className="text-xl font-semibold">{group.groupName}</span>
             <span className="ml-2 text-sm font-normal text-muted-foreground">
               {formatItemCount(group.items.length)}
@@ -461,6 +487,7 @@ function ContextGroupList({
               <GroceryItemRow
                 item={item}
                 key={`${group.groupKey}:${item.id}`}
+                listStatus={listStatus}
                 view={view}
               />
             ))}
@@ -473,11 +500,15 @@ function ContextGroupList({
 
 function GroceryItemRow({
   item,
+  listStatus,
   view
 }: {
   item: GroceryListItem;
+  listStatus: GroceryListStatus;
   view: GroceryListView;
 }) {
+  const canToggleItems = canToggleGroceryItems(listStatus);
+
   return (
     <article
       className={`py-4 first:pt-0 last:pb-0 ${
@@ -511,6 +542,11 @@ function GroceryItemRow({
           <p className="mt-1 text-xs font-medium text-muted-foreground">
             {formatItemShoppingState(item)}
           </p>
+          {item.sources.length > 0 ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              From: {formatInlineSourceSummary(item.sources)}
+            </p>
+          ) : null}
           {item.reviewReason ? (
             <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
               {item.reviewReason}
@@ -533,6 +569,7 @@ function GroceryItemRow({
                   ? "border-border bg-muted text-muted-foreground"
                   : "border-primary bg-primary text-primary-foreground"
               }`}
+              disabled={!canToggleItems}
               type="submit"
             >
               {item.checked ? "Uncheck" : "Check off"}
@@ -547,7 +584,12 @@ function GroceryItemRow({
               value={String(!item.alreadyHave)}
             />
             <button
-              className="min-h-12 w-full rounded-md border border-border bg-card px-4 py-3 text-left text-sm font-medium transition hover:bg-muted"
+              className={`min-h-12 w-full rounded-md border px-4 py-3 text-left text-sm font-medium transition hover:bg-muted ${
+                item.alreadyHave
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                  : "border-border bg-card"
+              }`}
+              disabled={!canToggleItems}
               type="submit"
             >
               {item.alreadyHave ? "Need to buy" : "Already have"}
@@ -588,6 +630,14 @@ function GroceryItemRow({
       ) : null}
     </article>
   );
+}
+
+function canToggleGroceryItems(status: GroceryListStatus) {
+  return status === "draft" || status === "shopping_started";
+}
+
+function canAddManualItems(status: GroceryListStatus) {
+  return status === "draft" || status === "shopping_started";
 }
 
 function LifecycleAction({
@@ -633,7 +683,11 @@ function parseGroceryListView(value: string | undefined): GroceryListView {
 
 function GroceryListMessage({ message }: { message: string }) {
   return (
-    <p className="rounded-md border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
+    <p
+      aria-live="polite"
+      className="rounded-md border border-border bg-muted px-3 py-2 text-sm text-muted-foreground"
+      role="status"
+    >
       {message}
     </p>
   );
@@ -703,6 +757,14 @@ function formatSourceType(sourceType: string) {
     .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function formatInlineSourceSummary(sources: GroceryListItem["sources"]) {
+  const labels = Array.from(
+    new Set(sources.map((source) => formatSourceType(source.sourceType)))
+  );
+
+  return labels.slice(0, 3).join(", ");
 }
 
 function formatSourceQuantity(source: GroceryListItem["sources"][number]) {

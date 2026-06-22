@@ -106,7 +106,7 @@ export async function getWeeklyPlanItems(
   const { data, error } = await supabase
     .from("weekly_plan_items")
     .select(
-      "id, weekly_plan_id, meal_profile_id, plan_date, meal_type, component_type, recipe_id, display_name, scale_factor, is_locked, is_approved, is_try_this, is_backup, reason_labels, why_this, notes, estimated_calories, estimated_protein_grams, sort_order, meal_profiles(name, profile_type), recipes(name)"
+      "id, weekly_plan_id, meal_profile_id, plan_date, meal_type, component_type, baby_plan_slot, food_id, recipe_id, display_name, scale_factor, is_locked, is_approved, is_try_this, is_backup, reason_labels, why_this, notes, estimated_calories, estimated_protein_grams, sort_order, meal_profiles(name, profile_type), recipes(name)"
     )
     .eq("household_id", householdId)
     .eq("weekly_plan_id", weeklyPlanId)
@@ -130,6 +130,8 @@ export async function getWeeklyPlanItems(
       plan_date: row.plan_date,
       meal_type: row.meal_type,
       component_type: row.component_type,
+      baby_plan_slot: row.baby_plan_slot,
+      food_id: row.food_id,
       recipe_id: row.recipe_id,
       recipe_name: getJoinedValue(row.recipes)?.name ?? null,
       display_name: row.display_name,

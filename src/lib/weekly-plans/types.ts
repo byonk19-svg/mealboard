@@ -31,6 +31,7 @@ export type MealComponentType =
   | "sauce"
   | "topping"
   | "other";
+export type BabyPlanSlot = "baby_meal_1" | "baby_meal_2";
 
 export type WeeklyPlan = {
   id: string;
@@ -72,6 +73,8 @@ export type WeeklyPlanItem = {
   plan_date: string;
   meal_type: MealType;
   component_type: MealComponentType;
+  baby_plan_slot: BabyPlanSlot | null;
+  food_id: string | null;
   recipe_id: string | null;
   recipe_name: string | null;
   display_name: string;

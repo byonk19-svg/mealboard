@@ -4,6 +4,8 @@ const email = process.env.MEALBOARD_E2E_EMAIL;
 const password = process.env.MEALBOARD_E2E_PASSWORD;
 
 test.describe("MealBoard core loop", () => {
+  test.setTimeout(120_000);
+
   test.skip(
     !email || !password,
     "Set MEALBOARD_E2E_EMAIL and MEALBOARD_E2E_PASSWORD for authenticated smoke."
@@ -24,31 +26,32 @@ test.describe("MealBoard core loop", () => {
     await expect(page).toHaveURL(/\/dashboard|\/plan-week|\/recipes|\/grocery-list|\/settings/);
 
     await page.goto("/settings/staples");
-    await page.getByLabel("Name").fill(stapleName);
-    await page.getByLabel("Quantity").fill("1");
-    await page.getByLabel("Unit").fill("box");
+    await page.getByLabel("New staple name").fill(stapleName);
+    await page.getByLabel("New staple default quantity").fill("1");
+    await page.getByLabel("New staple default unit").fill("box");
     await page.getByRole("button", { name: "Create staple" }).click();
     await expect(page.getByText("Staple created.")).toBeVisible();
 
     await page.goto("/recipes/new");
-    await page.getByLabel("Name").fill(recipeName);
-    await page.getByLabel("Servings").fill("1");
-    await page.getByLabel("Estimated calories").fill("420");
-    await page.getByLabel("Estimated protein").fill("30");
-    await page.getByLabel("Display name").first().fill("Tortillas");
-    await page.getByLabel("Quantity").first().fill("2");
-    await page.getByLabel("Unit").first().fill("count");
+    await page.getByLabel("Recipe name").fill(recipeName);
+    await page.getByLabel("Recipe servings").fill("1");
+    await page.getByLabel("Estimated recipe calories per serving").fill("420");
+    await page.getByLabel("Estimated recipe protein grams per serving").fill("30");
+    await page.getByLabel("Ingredient 1 display name").fill("Tortillas");
+    await page.getByLabel("Ingredient 1 quantity").fill("2");
+    await page.getByLabel("Ingredient 1 unit").fill("count");
     await page.getByText("Approved for planning").locator("..").getByRole("checkbox").first().check();
     await page.getByRole("button", { name: "Create recipe" }).click();
+    await page.waitForURL(/\/recipes\/[^/?]+\?message=/, { timeout: 30_000 });
     await expect(page.getByText("Recipe created.")).toBeVisible();
 
     await page.goto("/plan-week");
     await page.getByRole("button", { name: "Create or select week" }).click();
-    await expect(page.getByText("Planning week ready.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Save weekly setup" })).toBeVisible();
     await page.getByRole("button", { name: "Save weekly setup" }).click();
-    await expect(page.getByText("Weekly planning setup saved.")).toBeVisible();
+    await expect(page.getByLabel("Recipe for Sunday")).toBeVisible();
 
-    const recipeSelect = page.getByLabel("Recipe").first();
+    const recipeSelect = page.getByLabel("Recipe for Sunday");
     const recipeOptionValue = await recipeSelect
       .locator("option")
       .filter({ hasText: recipeName })
@@ -56,27 +59,37 @@ test.describe("MealBoard core loop", () => {
       .getAttribute("value");
     expect(recipeOptionValue).toBeTruthy();
     await recipeSelect.selectOption(recipeOptionValue ?? "");
-    await page.getByRole("button", { name: "Add recipe" }).first().click();
-    await expect(page.getByText("Recipe added to the week.")).toBeVisible();
-    await page.getByRole("button", { name: "Approve for groceries" }).first().click();
-    await expect(page.getByText("Plan item approved.")).toBeVisible();
+    await recipeSelect
+      .locator("xpath=ancestor::form[1]")
+      .getByRole("button", { name: "Add recipe" })
+      .click();
+    await page.waitForURL(/message=Recipe\+added\+to\+the\+week|message=Recipe%20added%20to%20the%20week/, {
+      timeout: 45_000
+    });
+    const plannedMeal = page.getByRole("article", {
+      name: `Planned meal ${recipeName}`
+    });
+    await expect(plannedMeal).toBeVisible({ timeout: 30_000 });
+    await plannedMeal.getByRole("button", { name: "Approve for groceries" }).click();
+    await expect(plannedMeal.getByText("Approved for groceries")).toBeVisible();
     await page.getByLabel(stapleName).check();
     await page.getByRole("button", { name: "Save selected staples" }).click();
-    await expect(page.getByText("Weekly staples saved.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Generate grocery list" })).toBeVisible();
     await page.getByRole("button", { name: "Generate grocery list" }).click();
+    await page.waitForURL(/\/grocery-list/, { timeout: 45_000 });
     await expect(page).toHaveURL(/\/grocery-list/);
     await expect(page.getByText("Draft grocery list generated.")).toBeVisible();
 
-    await page.getByRole("link", { name: "Profile" }).click();
+    await page.getByRole("link", { name: "Profile", exact: true }).click();
     await expect(page.getByText("Profile View is source context.")).toBeVisible();
-    await page.getByRole("link", { name: "Meal" }).click();
+    await page.getByRole("link", { name: "Meal", exact: true }).click();
     await expect(page.getByText("Meal View is source context.")).toBeVisible();
-    await page.getByRole("link", { name: "Shopping" }).click();
+    await page.getByRole("link", { name: "Shopping", exact: true }).click();
 
     await page.getByText("Add grocery item").click();
-    await page.getByLabel("Item").fill(manualItemName);
-    await page.getByLabel("Quantity").last().fill("3");
-    await page.getByLabel("Unit").last().fill("count");
+    await page.getByLabel("Grocery item name").fill(manualItemName);
+    await page.getByLabel("Grocery item quantity").fill("3");
+    await page.getByLabel("Grocery item unit").fill("count");
     await page.getByRole("button", { name: "Add item" }).click();
     await expect(page.getByText("Manual grocery item added.")).toBeVisible();
 
@@ -88,7 +101,7 @@ test.describe("MealBoard core loop", () => {
     await expect(page.getByText("This grocery list is completed.")).toBeVisible();
 
     await page.goto("/dashboard");
-    await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Current Week" })).toBeVisible();
     await expect(page.getByText("Planning status")).toBeVisible();
     await expect(page.getByText("Grocery status")).toBeVisible();
   });

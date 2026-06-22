@@ -66,6 +66,7 @@ export default async function StaplesPage({
         <StapleForm
           foods={foods}
           groceryCategories={groceryCategories}
+          labelPrefix="New staple"
           mealProfiles={profiles}
           submitLabel="Create staple"
         />
@@ -176,6 +177,7 @@ function StapleCard({
       <StapleForm
         foods={foods}
         groceryCategories={groceryCategories}
+        labelPrefix={`${staple.display_name} staple`}
         mealProfiles={mealProfiles}
         staple={staple}
         submitLabel="Save staple"
@@ -187,12 +189,14 @@ function StapleCard({
 function StapleForm({
   foods,
   groceryCategories,
+  labelPrefix,
   mealProfiles,
   staple,
   submitLabel
 }: {
   foods: Food[];
   groceryCategories: GroceryCategory[];
+  labelPrefix: string;
   mealProfiles: MealProfile[];
   staple?: Staple;
   submitLabel: string;
@@ -202,7 +206,7 @@ function StapleForm({
       {staple ? <input name="stapleId" type="hidden" value={staple.id} /> : null}
       <div className="grid gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(0,0.5fr)_minmax(0,0.6fr)]">
         <label className="block text-sm font-medium">
-          Name
+          {labelPrefix} name
           <input
             className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
             defaultValue={staple?.display_name ?? ""}
@@ -212,7 +216,7 @@ function StapleForm({
           />
         </label>
         <label className="block text-sm font-medium">
-          Quantity
+          {labelPrefix} default quantity
           <input
             className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
             defaultValue={staple?.default_quantity ?? ""}
@@ -223,7 +227,7 @@ function StapleForm({
           />
         </label>
         <label className="block text-sm font-medium">
-          Unit
+          {labelPrefix} default unit
           <input
             className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
             defaultValue={staple?.default_unit ?? ""}
@@ -235,7 +239,7 @@ function StapleForm({
 
       <div className="grid gap-3 md:grid-cols-2">
         <label className="block text-sm font-medium">
-          Context
+          {labelPrefix} context
           <select
             className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
             defaultValue={staple?.meal_profile_id ?? ""}
@@ -250,7 +254,7 @@ function StapleForm({
           </select>
         </label>
         <label className="block text-sm font-medium">
-          Frequency
+          {labelPrefix} frequency
           <select
             className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
             defaultValue={staple?.frequency ?? "as_needed"}
@@ -267,7 +271,7 @@ function StapleForm({
 
       <div className="grid gap-3 md:grid-cols-2">
         <label className="block text-sm font-medium">
-          Food link
+          {labelPrefix} food link
           <select
             className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
             defaultValue={staple?.food_id ?? ""}
@@ -282,7 +286,7 @@ function StapleForm({
           </select>
         </label>
         <label className="block text-sm font-medium">
-          Grocery category
+          {labelPrefix} grocery category
           <select
             className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
             defaultValue={staple?.grocery_category_id ?? ""}
@@ -299,7 +303,7 @@ function StapleForm({
       </div>
 
       <label className="block text-sm font-medium">
-        Preferred quantity text
+        {labelPrefix} preferred grocery quantity
         <input
           className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
           defaultValue={staple?.preferred_quantity_text ?? ""}
@@ -310,7 +314,7 @@ function StapleForm({
       </label>
 
       <label className="block text-sm font-medium">
-        Notes
+        {labelPrefix} notes
         <textarea
           className="mt-1 min-h-20 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
           defaultValue={staple?.notes ?? ""}

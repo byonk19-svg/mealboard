@@ -1,34 +1,55 @@
 import Link from "next/link";
+import { applyBabyRoutineToWeek } from "@/app/(app)/plan-week/actions";
 import type { BabyMealSuggestionSummary } from "@/lib/baby/generate-baby-meals";
 
 type BabyRoutinePreviewSectionProps = {
   stageLabel: string;
   summary: BabyMealSuggestionSummary;
+  weekStartDate: string;
+  weeklyPlanId: string;
 };
 
 export function BabyRoutinePreviewSection({
   stageLabel,
-  summary
+  summary,
+  weekStartDate,
+  weeklyPlanId
 }: BabyRoutinePreviewSectionProps) {
+  const canApplyRoutine = summary.slots.some((slot) => slot.foodId);
+
   return (
     <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-xl font-semibold">Baby routine suggestions</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Read-only Baby Meal 1 and Baby Meal 2 ideas from tried or liked
-            baby foods. Weekly plan writes and grocery behavior stay separate.
+            Baby Meal 1 and Baby Meal 2 ideas from tried or liked baby foods.
+            Apply them as unapproved weekly plan items, then approve only the
+            baby foods that should enter groceries.
           </p>
           <p className="mt-2 text-sm font-medium text-muted-foreground">
             Stage context: {stageLabel}
           </p>
         </div>
-        <Link
-          className="w-fit rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors hover:bg-muted"
-          href="/settings/baby"
-        >
-          Edit baby foods
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            className="w-fit rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors hover:bg-muted"
+            href="/settings/baby"
+          >
+            Edit baby foods
+          </Link>
+          <form action={applyBabyRoutineToWeek}>
+            <input name="weekStartDate" type="hidden" value={weekStartDate} />
+            <input name="weeklyPlanId" type="hidden" value={weeklyPlanId} />
+            <button
+              className="w-fit rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={!canApplyRoutine}
+              type="submit"
+            >
+              Apply to week
+            </button>
+          </form>
+        </div>
       </div>
 
       {summary.warnings.length > 0 ? (

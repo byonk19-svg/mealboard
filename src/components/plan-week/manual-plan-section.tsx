@@ -1,9 +1,13 @@
 import {
+  confirmWeeklyPlanItemSwap,
   addWeeklyPlanItem,
   approveWeeklyPlanItem,
   removeWeeklyPlanItem,
   toggleWeeklyPlanItemLock
 } from "@/app/(app)/plan-week/actions";
+import Link from "next/link";
+import type { SwapGroceryImpact } from "@/lib/grocery/data";
+import type { RuleBasedSwapSuggestion } from "@/lib/meal-planning/rule-based-suggestions";
 import { formatMealType, type MealType } from "@/lib/recipes/types";
 import type { MealProfile } from "@/lib/settings/types";
 import type {
@@ -20,7 +24,6 @@ const planMealTypes = [
   "dinner",
   "snack",
   "side",
-  "baby_meal",
   "other"
 ] as const satisfies readonly MealType[];
 
@@ -28,6 +31,9 @@ export function ManualPlanSection({
   planItemsByDate,
   profiles,
   recipeOptions,
+  selectedSwapItemId,
+  swapGroceryImpacts,
+  swapSuggestions,
   weekDates,
   weekStartDate,
   weeklyPlanId
@@ -35,6 +41,9 @@ export function ManualPlanSection({
   planItemsByDate: Map<string, WeeklyPlanItem[]>;
   profiles: MealProfile[];
   recipeOptions: PlanRecipeOption[];
+  selectedSwapItemId: string | null;
+  swapGroceryImpacts: SwapGroceryImpact[];
+  swapSuggestions: RuleBasedSwapSuggestion[];
   weekDates: WeekDate[];
   weekStartDate: string;
   weeklyPlanId: string;
@@ -78,6 +87,9 @@ export function ManualPlanSection({
                   <PlanItemCard
                     item={item}
                     key={item.id}
+                    selectedSwapItemId={selectedSwapItemId}
+                    swapGroceryImpacts={swapGroceryImpacts}
+                    swapSuggestions={swapSuggestions}
                     weekStartDate={weekStartDate}
                   />
                 ))
@@ -127,7 +139,7 @@ function AddPlanItemForm({
       <input name="weeklyPlanId" type="hidden" value={weeklyPlanId} />
 
       <label className="text-sm font-medium">
-        Profile
+        Profile for {date.dayLabel}
         <select
           className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           name="mealProfileId"
@@ -142,7 +154,7 @@ function AddPlanItemForm({
       </label>
 
       <label className="text-sm font-medium">
-        Meal slot
+        Meal slot for {date.dayLabel}
         <select
           className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           name="mealType"
@@ -157,7 +169,7 @@ function AddPlanItemForm({
       </label>
 
       <label className="text-sm font-medium">
-        Recipe
+        Recipe for {date.dayLabel}
         <select
           className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           name="recipeId"
@@ -183,13 +195,25 @@ function AddPlanItemForm({
 
 function PlanItemCard({
   item,
+  selectedSwapItemId,
+  swapGroceryImpacts,
+  swapSuggestions,
   weekStartDate
 }: {
   item: WeeklyPlanItem;
+  selectedSwapItemId: string | null;
+  swapGroceryImpacts: SwapGroceryImpact[];
+  swapSuggestions: RuleBasedSwapSuggestion[];
   weekStartDate: string;
 }) {
+  const canSwap = canSwapPlanItem(item);
+  const isSwapOpen = selectedSwapItemId === item.id;
+
   return (
-    <div className="rounded-md border border-border bg-card p-3">
+    <article
+      aria-label={`Planned meal ${item.display_name}`}
+      className="rounded-md border border-border bg-card p-3"
+    >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
@@ -251,6 +275,14 @@ function PlanItemCard({
             itemId={item.id}
             weekStartDate={weekStartDate}
           />
+          {canSwap ? (
+            <Link
+              className="rounded-md border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              href={`/plan-week?weekStartDate=${encodeURIComponent(weekStartDate)}&swapItemId=${encodeURIComponent(item.id)}`}
+            >
+              Swap
+            </Link>
+          ) : null}
           <PlanItemActionForm
             action={removeWeeklyPlanItem}
             buttonLabel="Remove"
@@ -260,6 +292,153 @@ function PlanItemCard({
           />
         </div>
       </div>
+
+      {isSwapOpen ? (
+        <MealSwapPanel
+          item={item}
+          swapGroceryImpacts={swapGroceryImpacts}
+          suggestions={swapSuggestions}
+          weekStartDate={weekStartDate}
+        />
+      ) : null}
+    </article>
+  );
+}
+
+function MealSwapPanel({
+  item,
+  swapGroceryImpacts,
+  suggestions,
+  weekStartDate
+}: {
+  item: WeeklyPlanItem;
+  swapGroceryImpacts: SwapGroceryImpact[];
+  suggestions: RuleBasedSwapSuggestion[];
+  weekStartDate: string;
+}) {
+  const groceryImpactByRecipeId = new Map(
+    swapGroceryImpacts.map((impact) => [impact.recipeId, impact])
+  );
+
+  return (
+    <section className="mt-4 rounded-md border border-border bg-muted/30 p-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h4 className="text-sm font-semibold">Swap {item.display_name}</h4>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">
+            Pick a reviewed replacement. Existing finalized or shopping lists
+            are not changed automatically.
+          </p>
+        </div>
+        <Link
+          className="text-sm font-medium text-muted-foreground underline-offset-4 hover:underline"
+          href={`/plan-week?weekStartDate=${encodeURIComponent(weekStartDate)}`}
+        >
+          Cancel
+        </Link>
+      </div>
+
+      {suggestions.length === 0 ? (
+        <p className="mt-4 rounded-md border border-border bg-card px-3 py-2 text-sm text-muted-foreground">
+          No eligible swaps are available for this meal right now.
+        </p>
+      ) : (
+        <div className="mt-4 grid gap-3">
+          {suggestions.map((suggestion) => (
+            <article
+              className="rounded-md border border-border bg-card p-3"
+              key={suggestion.recipeId}
+            >
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h5 className="font-medium">{suggestion.recipeName}</h5>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Score {suggestion.score}
+                    {suggestion.warningCount > 0
+                      ? ` - ${suggestion.warningCount} preference warning${suggestion.warningCount === 1 ? "" : "s"}`
+                      : ""}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {suggestion.reasonLabels.map((reason) => (
+                      <span
+                        className="rounded-full border border-border bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground"
+                        key={reason}
+                      >
+                        {reason}
+                      </span>
+                    ))}
+                  </div>
+                  <SwapGroceryImpactSummary
+                    impact={groceryImpactByRecipeId.get(suggestion.recipeId) ?? null}
+                  />
+                </div>
+                <form action={confirmWeeklyPlanItemSwap}>
+                  <input name="weekStartDate" type="hidden" value={weekStartDate} />
+                  <input name="weeklyPlanItemId" type="hidden" value={item.id} />
+                  <input name="recipeId" type="hidden" value={suggestion.recipeId} />
+                  <button
+                    className="rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                    type="submit"
+                  >
+                    Confirm swap
+                  </button>
+                </form>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function SwapGroceryImpactSummary({
+  impact
+}: {
+  impact: SwapGroceryImpact | null;
+}) {
+  if (!impact) {
+    return (
+      <p className="mt-3 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+        Grocery impact could not be previewed. Confirming still updates only
+        the meal plan.
+      </p>
+    );
+  }
+
+  if (!impact.hasGroceryList) {
+    return (
+      <p className="mt-3 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+        No grocery list exists for this week yet. This swap affects the next
+        generated list.
+      </p>
+    );
+  }
+
+  if (!impact.appliesToApprovedItem) {
+    return (
+      <p className="mt-3 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+        This meal is not approved for groceries yet, so the swap has no grocery
+        impact until approval.
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-3 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+      <p className="font-medium text-foreground">Grocery impact</p>
+      <p className="mt-1">
+        {impact.hasChanges
+          ? `${formatImpactCount(impact.addedCount, "add")} · ${formatImpactCount(impact.removedCount, "remove")} · ${formatImpactCount(impact.keptCount, "keep")}`
+          : "No item changes compared with the current grocery list."}
+      </p>
+      {impact.listStatus === "finalized" ||
+      impact.listStatus === "shopping_started" ? (
+        <p className="mt-1">
+          Current {formatGroceryListStatus(impact.listStatus)} list stays
+          unchanged until you review pending changes.
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -278,9 +457,32 @@ function formatPlanItemSupportText(item: WeeklyPlanItem) {
   return `${approvalText} ${lockText} ${nutritionText}`;
 }
 
+function formatImpactCount(
+  count: number,
+  verb: "add" | "keep" | "remove"
+) {
+  return `${count} ${verb}`;
+}
+
+function formatGroceryListStatus(status: string) {
+  return status
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 function hasMissingEstimate(item: WeeklyPlanItem) {
   return (
     item.estimated_calories === null || item.estimated_protein_grams === null
+  );
+}
+
+function canSwapPlanItem(item: WeeklyPlanItem) {
+  return (
+    !item.is_locked &&
+    !item.is_try_this &&
+    item.meal_profile_type === "adult" &&
+    Boolean(item.recipe_id)
   );
 }
 

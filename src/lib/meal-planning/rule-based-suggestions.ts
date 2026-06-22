@@ -42,6 +42,17 @@ export type RuleBasedMealSuggestion = {
   score: number;
 };
 
+export type RuleBasedSwapSuggestion = {
+  estimatedCalories: number | null;
+  estimatedProteinGrams: number | null;
+  reasonLabels: string[];
+  recipeId: string;
+  recipeName: string;
+  score: number;
+  warningCount: number;
+  whyThis: string;
+};
+
 type ScoreRecipeInput = {
   adultDayType?: AdultDayType | null;
   goals: WeeklyGoalType[];
@@ -57,6 +68,14 @@ type BuildSuggestionsInput = {
   profiles: SuggestionProfile[];
   recipes: RecipeWithDetails[];
   weekDateKeys: string[];
+};
+
+type BuildSwapSuggestionsInput = {
+  goals: WeeklyGoalType[];
+  planItems: WeeklyPlanItem[];
+  profileDays: WeeklyPlanProfileDay[];
+  recipes: RecipeWithDetails[];
+  targetItem: WeeklyPlanItem;
 };
 
 const mealTypeRank: Record<MealType, number> = {
@@ -212,6 +231,75 @@ export function buildRuleBasedMealSuggestions({
   return suggestions;
 }
 
+export function buildRuleBasedSwapSuggestions({
+  goals,
+  planItems,
+  profileDays,
+  recipes,
+  targetItem
+}: BuildSwapSuggestionsInput): RuleBasedSwapSuggestion[] {
+  if (
+    targetItem.is_locked ||
+    targetItem.is_try_this ||
+    targetItem.meal_profile_type !== "adult" ||
+    !targetItem.meal_profile_id ||
+    !targetItem.recipe_id
+  ) {
+    return [];
+  }
+
+  const adultDayType =
+    profileDays.find(
+      (day) =>
+        day.meal_profile_id === targetItem.meal_profile_id &&
+        day.plan_date === targetItem.plan_date
+    )?.adult_day_type ?? null;
+  const siblingRecipeIds = new Set(
+    planItems
+      .filter(
+        (item) =>
+          item.id !== targetItem.id &&
+          item.meal_profile_id === targetItem.meal_profile_id &&
+          item.plan_date === targetItem.plan_date &&
+          item.meal_type === targetItem.meal_type &&
+          item.recipe_id
+      )
+      .map((item) => item.recipe_id)
+  );
+
+  return recipes
+    .filter(
+      (recipe) =>
+        recipe.id !== targetItem.recipe_id && !siblingRecipeIds.has(recipe.id)
+    )
+    .map((recipe) => ({
+      recipe,
+      score: scoreRecipeForMealSlot({
+        adultDayType,
+        goals,
+        profileId: targetItem.meal_profile_id ?? "",
+        recipe,
+        requestedMealType: targetItem.meal_type
+      })
+    }))
+    .filter(
+      (entry): entry is { recipe: RecipeWithDetails; score: Extract<MealSuggestionScore, { eligible: true }> } =>
+        entry.score.eligible
+    )
+    .sort(compareScoredRecipes)
+    .slice(0, 3)
+    .map(({ recipe, score }) => ({
+      estimatedCalories: recipe.estimated_calories_per_serving,
+      estimatedProteinGrams: recipe.estimated_protein_grams_per_serving,
+      reasonLabels: score.reasonLabels,
+      recipeId: recipe.id,
+      recipeName: recipe.name,
+      score: score.score,
+      warningCount: score.warningCount,
+      whyThis: `Suggested swap: ${score.reasonLabels.join(", ")}.`
+    }));
+}
+
 function getBestSuggestionForSlot({
   adultDayType,
   dateKey,
@@ -242,30 +330,7 @@ function getBestSuggestionForSlot({
       (entry): entry is { recipe: RecipeWithDetails; score: Extract<MealSuggestionScore, { eligible: true }> } =>
         entry.score.eligible
     )
-    .sort((a, b) => {
-      if (a.score.score !== b.score.score) {
-        return b.score.score - a.score.score;
-      }
-
-      if (a.score.warningCount !== b.score.warningCount) {
-        return a.score.warningCount - b.score.warningCount;
-      }
-
-      if (
-        (a.recipe.estimated_protein_grams_per_serving ?? 0) !==
-        (b.recipe.estimated_protein_grams_per_serving ?? 0)
-      ) {
-        return (
-          (b.recipe.estimated_protein_grams_per_serving ?? 0) -
-          (a.recipe.estimated_protein_grams_per_serving ?? 0)
-        );
-      }
-
-      return (
-        a.recipe.name.localeCompare(b.recipe.name) ||
-        a.recipe.id.localeCompare(b.recipe.id)
-      );
-    });
+    .sort(compareScoredRecipes);
 
   const best = scored[0];
 
@@ -286,6 +351,34 @@ function getBestSuggestionForSlot({
     recipeName: best.recipe.name,
     score: best.score.score
   } satisfies RuleBasedMealSuggestion;
+}
+
+function compareScoredRecipes(
+  a: { recipe: RecipeWithDetails; score: Extract<MealSuggestionScore, { eligible: true }> },
+  b: { recipe: RecipeWithDetails; score: Extract<MealSuggestionScore, { eligible: true }> }
+) {
+  if (a.score.score !== b.score.score) {
+    return b.score.score - a.score.score;
+  }
+
+  if (a.score.warningCount !== b.score.warningCount) {
+    return a.score.warningCount - b.score.warningCount;
+  }
+
+  if (
+    (a.recipe.estimated_protein_grams_per_serving ?? 0) !==
+    (b.recipe.estimated_protein_grams_per_serving ?? 0)
+  ) {
+    return (
+      (b.recipe.estimated_protein_grams_per_serving ?? 0) -
+      (a.recipe.estimated_protein_grams_per_serving ?? 0)
+    );
+  }
+
+  return (
+    a.recipe.name.localeCompare(b.recipe.name) ||
+    a.recipe.id.localeCompare(b.recipe.id)
+  );
 }
 
 function getSuggestionMealTypes(

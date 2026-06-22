@@ -198,7 +198,7 @@ function IngredientRow({
 
       <div className="mt-3 grid gap-3 md:grid-cols-6">
         <label className="block text-sm font-medium md:col-span-2">
-          Display name
+          Ingredient {index + 1} display name
           <input
             className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             name="ingredientDisplayName"
@@ -216,7 +216,7 @@ function IngredientRow({
           />
         </label>
         <label className="block text-sm font-medium md:col-span-2">
-          Matched food
+          Ingredient {index + 1} matched food
           <select
             className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             name="ingredientFoodId"
@@ -242,7 +242,7 @@ function IngredientRow({
           </select>
         </label>
         <label className="block text-sm font-medium">
-          Quantity
+          Ingredient {index + 1} quantity
           <input
             className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             min="0.01"
@@ -258,7 +258,7 @@ function IngredientRow({
           />
         </label>
         <label className="block text-sm font-medium">
-          Unit
+          Ingredient {index + 1} unit
           <input
             className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             name="ingredientUnit"
@@ -268,7 +268,7 @@ function IngredientRow({
           />
         </label>
         <label className="block text-sm font-medium md:col-span-2">
-          Category
+          Ingredient {index + 1} category
           <select
             className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             name="ingredientCategoryId"
@@ -286,7 +286,7 @@ function IngredientRow({
           </select>
         </label>
         <label className="block text-sm font-medium md:col-span-2">
-          Create food
+          Ingredient {index + 1} food to create
           <input
             className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             list={foodOptionsId}
@@ -295,7 +295,7 @@ function IngredientRow({
           />
         </label>
         <label className="block text-sm font-medium md:col-span-2">
-          Preparation
+          Ingredient {index + 1} preparation
           <input
             className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             name="ingredientPreparation"
@@ -307,7 +307,7 @@ function IngredientRow({
           />
         </label>
         <label className="block text-sm font-medium md:col-span-2">
-          Notes
+          Ingredient {index + 1} notes
           <input
             className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             name="ingredientNotes"

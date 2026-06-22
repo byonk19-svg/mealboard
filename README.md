@@ -102,7 +102,26 @@ http://localhost:3000/login
 
 Main app routes are protected. Unauthenticated users are redirected to `/login`.
 
-For local development, create an auth user through the login page or Supabase Studio. Then link that user to the seeded household by running this SQL in local Supabase Studio after replacing the email:
+For local smoke tests, seed a repeatable local auth user and membership:
+
+```bash
+npm run e2e:seed-local-user
+```
+
+By default this creates or reuses:
+
+```txt
+MEALBOARD_E2E_EMAIL=mealboard-e2e-local@example.test
+MEALBOARD_E2E_PASSWORD=Mealboard-e2e-local-12345!
+```
+
+Run the authenticated smoke with those values in your shell environment:
+
+```bash
+npm run e2e:smoke
+```
+
+For ad hoc local development, create an auth user through the login page or Supabase Studio. Then link that user to the seeded household by running this SQL in local Supabase Studio after replacing the email:
 
 ```sql
 insert into public.household_memberships (household_id, user_id, role)

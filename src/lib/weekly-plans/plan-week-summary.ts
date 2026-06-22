@@ -1,6 +1,7 @@
 export type PlanWeekSummaryItem = {
   estimated_calories: number | null;
   estimated_protein_grams: number | null;
+  food_id?: string | null;
   is_approved: boolean;
   is_locked: boolean;
   plan_date: string;
@@ -36,7 +37,7 @@ export function buildPlanWeekSummary({
   weekDateKeys: string[];
 }): PlanWeekSummary {
   const approvedItemCount = planItems.filter(
-    (item) => item.is_approved && item.recipe_id
+    (item) => item.is_approved && (item.recipe_id || item.food_id)
   ).length;
   const unapprovedItemCount = planItems.filter(
     (item) => !item.is_approved
@@ -44,7 +45,9 @@ export function buildPlanWeekSummary({
   const lockedItemCount = planItems.filter((item) => item.is_locked).length;
   const missingEstimateItemCount = planItems.filter(
     (item) =>
-      item.estimated_calories === null || item.estimated_protein_grams === null
+      item.recipe_id &&
+      (item.estimated_calories === null ||
+        item.estimated_protein_grams === null)
   ).length;
   const plannedDateKeys = new Set(planItems.map((item) => item.plan_date));
   const readyForGroceryCount = approvedItemCount + selectedStapleCount;
@@ -108,14 +111,14 @@ function getPrimaryAttention({
   if (readyForGroceryCount > 0) {
     return {
       description:
-        "Approved recipes or selected staples are ready for the grocery list.",
+        "Approved meals or selected staples are ready for the grocery list.",
       label: "Ready for grocery generation",
       tone: "success"
     };
   }
 
   return {
-    description: "Select a staple or approve a recipe before groceries.",
+    description: "Select a staple or approve a planned meal before groceries.",
     label: "Review weekly plan",
     tone: "attention"
   };

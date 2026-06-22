@@ -351,6 +351,80 @@ describe("generateGroceryList", () => {
     ]);
   });
 
+  it("includes approved baby foods as direct grocery items", () => {
+    const generated = generateGroceryList({
+      recipeIngredients: [],
+      weeklyPlanItems: [
+        {
+          babyPlanSlot: "baby_meal_1",
+          componentType: "baby_food",
+          displayName: "Banana",
+          foodId: "food-banana",
+          foodName: "Banana",
+          groceryCategoryId: "cat-produce",
+          id: "baby-plan-item-1",
+          isApproved: true,
+          mealProfileId: "profile-baby",
+          mealProfileName: "Baby",
+          mealType: "baby_meal",
+          planDate: "2026-05-24",
+          recipeId: null,
+          recipeName: null,
+          scaleFactor: 1
+        },
+        {
+          babyPlanSlot: "baby_meal_2",
+          componentType: "baby_food",
+          displayName: "Unapproved avocado",
+          foodId: "food-avocado",
+          foodName: "Avocado",
+          groceryCategoryId: "cat-produce",
+          id: "baby-plan-item-2",
+          isApproved: false,
+          mealProfileId: "profile-baby",
+          mealProfileName: "Baby",
+          mealType: "baby_meal",
+          planDate: "2026-05-24",
+          recipeId: null,
+          recipeName: null,
+          scaleFactor: 1
+        }
+      ]
+    });
+
+    expect(generated.items).toEqual([
+      {
+        categoryId: "cat-produce",
+        displayName: "Banana",
+        foodId: "food-banana",
+        needsReview: true,
+        preferredQuantityText: null,
+        quantity: null,
+        reviewReason: "Quantity or unit is missing.",
+        unit: null
+      }
+    ]);
+    expect(generated.sources).toEqual([
+      {
+        groceryItemIndex: 0,
+        ingredientId: null,
+        label: "Banana for Baby baby_meal on 2026-05-24",
+        mealProfileId: "profile-baby",
+        mealProfileName: "Baby",
+        mealType: "baby_meal",
+        notes: "baby_meal_1",
+        planDate: "2026-05-24",
+        quantity: null,
+        recipeId: null,
+        recipeName: null,
+        sourceId: "baby-plan-item-1",
+        sourceType: "baby_item",
+        unit: null,
+        weeklyPlanItemId: "baby-plan-item-1"
+      }
+    ]);
+  });
+
   it("combines selected staples with recipe items using existing safe consolidation rules", () => {
     const generated = generateGroceryList({
       recipeIngredients: [

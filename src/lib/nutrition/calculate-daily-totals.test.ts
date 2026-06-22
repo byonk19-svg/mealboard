@@ -152,6 +152,7 @@ describe("calculateDailyNutritionTotals", () => {
 
 function planItem(overrides: Partial<WeeklyPlanItem>): WeeklyPlanItem {
   return {
+    baby_plan_slot: null,
     component_type: "main",
     display_name: "Planned item",
     estimated_calories: 100,
@@ -161,6 +162,7 @@ function planItem(overrides: Partial<WeeklyPlanItem>): WeeklyPlanItem {
     is_backup: false,
     is_locked: false,
     is_try_this: false,
+    food_id: null,
     meal_profile_id: "profile-brianna",
     meal_profile_name: "Brianna",
     meal_profile_type: "adult",

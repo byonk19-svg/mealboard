@@ -27,7 +27,7 @@ export function calculateDailyNutritionTotals(
   const summariesByProfileDay = new Map<string, MutableDailyNutritionSummary>();
 
   for (const item of items) {
-    if (!item.meal_profile_id) {
+    if (!item.meal_profile_id || item.component_type === "baby_food") {
       continue;
     }
 

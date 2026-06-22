@@ -50,6 +50,10 @@ export async function signInWithPassword(formData: FormData) {
 }
 
 export async function signUpWithPassword(formData: FormData) {
+  if (process.env.MEALBOARD_ENABLE_PUBLIC_SIGNUP !== "true") {
+    loginRedirect("/login", "Account creation is disabled for this private MVP.");
+  }
+
   const credentials = getCredentials(formData);
 
   if ("error" in credentials) {

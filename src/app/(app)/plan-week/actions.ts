@@ -3,11 +3,17 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { mealTypes, type MealType } from "@/lib/recipes/types";
+import { buildBabyRoutineWeekItems } from "@/lib/baby/build-baby-routine-week-items";
+import { generateBabyMeals } from "@/lib/baby/generate-baby-meals";
 import { getRecipes } from "@/lib/recipes/data";
-import { buildRuleBasedMealSuggestions } from "@/lib/meal-planning/rule-based-suggestions";
+import {
+  buildRuleBasedMealSuggestions,
+  buildRuleBasedSwapSuggestions
+} from "@/lib/meal-planning/rule-based-suggestions";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
-import { getMealProfiles } from "@/lib/settings/data";
+import { getBabyFoodStatuses, getMealProfiles } from "@/lib/settings/data";
+import { getBabyProfile } from "@/lib/settings/baby-settings";
 import {
   getWeeklyPlanGoals,
   getWeeklyPlanItems,
@@ -345,6 +351,166 @@ export async function removeWeeklyPlanItem(formData: FormData) {
   planWeekRedirect(weekStartDate, "Plan item removed.");
 }
 
+export async function confirmWeeklyPlanItemSwap(formData: FormData) {
+  const weekStartDate =
+    textOrNull(formData.get("weekStartDate")) ?? getWeekStartDate(new Date());
+  const itemId = textOrNull(formData.get("weeklyPlanItemId"));
+  const recipeId = textOrNull(formData.get("recipeId"));
+
+  if (!itemId || !recipeId) {
+    planWeekRedirect(weekStartDate, "Choose a meal and swap recipe first.");
+  }
+
+  const household = await requireHousehold(weekStartDate);
+  const supabase = await createClient();
+  const { data: itemRow, error: itemError } = await supabase
+    .from("weekly_plan_items")
+    .select("id, weekly_plan_id")
+    .eq("household_id", household.id)
+    .eq("id", itemId)
+    .maybeSingle();
+
+  if (itemError) {
+    planWeekRedirect(weekStartDate, itemError.message);
+  }
+
+  if (!itemRow) {
+    planWeekRedirect(weekStartDate, "That meal is no longer in the plan.");
+  }
+
+  const [profileDays, goals, planItems, recipes] = await Promise.all([
+    getWeeklyPlanProfileDays(household.id, itemRow.weekly_plan_id),
+    getWeeklyPlanGoals(household.id, itemRow.weekly_plan_id),
+    getWeeklyPlanItems(household.id, itemRow.weekly_plan_id),
+    getRecipes(household.id)
+  ]);
+  const targetItem = planItems.find((item) => item.id === itemId);
+
+  if (!targetItem) {
+    planWeekRedirect(weekStartDate, "That meal is no longer in the plan.");
+  }
+
+  const selectedSuggestion = buildRuleBasedSwapSuggestions({
+    goals: goals.map((goal) => goal.goal),
+    planItems,
+    profileDays,
+    recipes,
+    targetItem
+  }).find((suggestion) => suggestion.recipeId === recipeId);
+
+  if (!selectedSuggestion) {
+    planWeekRedirect(
+      weekStartDate,
+      targetItem.is_locked
+        ? "Unlock this meal before swapping it."
+        : "That swap is no longer available."
+    );
+  }
+
+  const { data: updatedItem, error } = await supabase
+    .from("weekly_plan_items")
+    .update({
+      display_name: selectedSuggestion.recipeName,
+      estimated_calories: selectedSuggestion.estimatedCalories,
+      estimated_protein_grams: selectedSuggestion.estimatedProteinGrams,
+      reason_labels: selectedSuggestion.reasonLabels,
+      recipe_id: selectedSuggestion.recipeId,
+      why_this: selectedSuggestion.whyThis
+    })
+    .eq("household_id", household.id)
+    .eq("id", targetItem.id)
+    .eq("is_locked", false)
+    .eq("recipe_id", targetItem.recipe_id)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    planWeekRedirect(weekStartDate, error.message);
+  }
+
+  if (!updatedItem) {
+    planWeekRedirect(
+      weekStartDate,
+      "That meal changed while you were swapping it. Reload and try again."
+    );
+  }
+
+  revalidatePath("/plan-week");
+  planWeekRedirect(weekStartDate, "Meal swapped. Review groceries before regenerating.");
+}
+
+export async function applyBabyRoutineToWeek(formData: FormData) {
+  const weekStartDate =
+    textOrNull(formData.get("weekStartDate")) ?? getWeekStartDate(new Date());
+  const weeklyPlanId = textOrNull(formData.get("weeklyPlanId"));
+
+  if (!weeklyPlanId) {
+    planWeekRedirect(weekStartDate, "Create the planning week before adding baby meals.");
+  }
+
+  const household = await requireHousehold(weekStartDate);
+  const supabase = await createClient();
+  const [weeklyPlan, profiles] = await Promise.all([
+    getScopedWeeklyPlan(supabase, household.id, weeklyPlanId),
+    getMealProfiles(household.id)
+  ]);
+
+  if (!weeklyPlan) {
+    planWeekRedirect(weekStartDate, "That planning week is no longer available.");
+  }
+
+  const babyProfile = getBabyProfile(profiles);
+
+  if (!babyProfile) {
+    planWeekRedirect(weekStartDate, "Add a Baby profile before applying baby meals.");
+  }
+
+  const [babyFoodStatuses, existingRows] = await Promise.all([
+    getBabyFoodStatuses(household.id, babyProfile.id),
+    getExistingBabyRoutineRows({
+      householdId: household.id,
+      supabase,
+      weeklyPlanId: weeklyPlan.id
+    })
+  ]);
+  const routine = generateBabyMeals(babyFoodStatuses);
+  const weekItems = buildBabyRoutineWeekItems({
+    existingItems: existingRows,
+    routine,
+    weekDateKeys: getWeekDates(weekStartDate).map((date) => date.dateKey)
+  });
+
+  if (weekItems.length === 0) {
+    planWeekRedirect(
+      weekStartDate,
+      "Add tried or liked baby foods before applying baby meals."
+    );
+  }
+
+  const { error } = await supabase.rpc("replace_weekly_plan_baby_routine_items", {
+    p_baby_profile_id: babyProfile.id,
+    p_household_id: household.id,
+    p_items: weekItems.map((item, index) => ({
+      baby_plan_slot: item.babyPlanSlot,
+      display_name: item.displayName,
+      food_id: item.foodId,
+      notes: item.notes,
+      plan_date: item.planDate,
+      reason_labels: item.reasonLabels,
+      sort_order: 200 + index,
+      why_this: item.whyThis
+    })),
+    p_weekly_plan_id: weeklyPlan.id
+  });
+
+  if (error) {
+    planWeekRedirect(weekStartDate, error.message);
+  }
+
+  revalidatePath("/plan-week");
+  planWeekRedirect(weekStartDate, "Baby routine added to the week for review.");
+}
+
 export async function addRuleBasedMealSuggestions(formData: FormData) {
   const weekStartDate =
     textOrNull(formData.get("weekStartDate")) ?? getWeekStartDate(new Date());
@@ -516,6 +682,33 @@ async function getScopedWeeklyPlan(
   }
 
   return data;
+}
+
+async function getExistingBabyRoutineRows({
+  householdId,
+  supabase,
+  weeklyPlanId
+}: {
+  householdId: string;
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  weeklyPlanId: string;
+}) {
+  const { data, error } = await supabase
+    .from("weekly_plan_items")
+    .select("baby_plan_slot, is_locked, plan_date")
+    .eq("household_id", householdId)
+    .eq("weekly_plan_id", weeklyPlanId)
+    .not("baby_plan_slot", "is", null);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []) as Array<{
+    baby_plan_slot: "baby_meal_1" | "baby_meal_2" | null;
+    is_locked: boolean;
+    plan_date: string;
+  }>;
 }
 
 async function getScopedMealProfile(

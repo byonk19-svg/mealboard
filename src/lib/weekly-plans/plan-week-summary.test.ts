@@ -138,7 +138,7 @@ describe("buildPlanWeekSummary", () => {
     });
 
     expect(summary.primaryAttention).toEqual({
-      description: "Approved recipes or selected staples are ready for the grocery list.",
+      description: "Approved meals or selected staples are ready for the grocery list.",
       label: "Ready for grocery generation",
       tone: "success"
     });
@@ -152,7 +152,7 @@ describe("buildPlanWeekSummary", () => {
     });
 
     expect(summary.primaryAttention).toEqual({
-      description: "Approved recipes or selected staples are ready for the grocery list.",
+      description: "Approved meals or selected staples are ready for the grocery list.",
       label: "Ready for grocery generation",
       tone: "success"
     });

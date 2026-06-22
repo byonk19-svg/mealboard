@@ -69,7 +69,14 @@ type WeeklyPlanRow = {
 };
 
 type WeeklyPlanItemRow = {
+  baby_plan_slot: string | null;
+  component_type: string;
   display_name: string;
+  food_id: string | null;
+  foods:
+    | { name: string; default_grocery_category_id: string | null }
+    | Array<{ name: string; default_grocery_category_id: string | null }>
+    | null;
   id: string;
   is_approved: boolean;
   meal_profile_id: string | null;
@@ -160,6 +167,11 @@ type GroceryListItemRow = {
   unit: string | null;
 };
 
+type SwapCandidateRecipeRow = {
+  id: string;
+  name: string;
+};
+
 export type WeeklyPlanPendingGroceryChanges = {
   changes: PendingGroceryChanges;
   groceryList: {
@@ -168,6 +180,17 @@ export type WeeklyPlanPendingGroceryChanges = {
     name: string | null;
     status: GroceryListStatus;
   };
+};
+
+export type SwapGroceryImpact = {
+  addedCount: number;
+  appliesToApprovedItem: boolean;
+  hasChanges: boolean;
+  hasGroceryList: boolean;
+  keptCount: number;
+  listStatus: GroceryListStatus | null;
+  recipeId: string;
+  removedCount: number;
 };
 
 type GroceryListItemSourceRow = {
@@ -206,6 +229,17 @@ export async function generateAndPersistGroceryList({
     supabase,
     weeklyPlan
   });
+  const protectedList = await getProtectedGroceryListForWeeklyPlan(
+    supabase,
+    householdId,
+    weeklyPlan.id
+  );
+
+  if (protectedList) {
+    throw new Error(
+      "This grocery list is already protected. Review pending changes before replacing it."
+    );
+  }
 
   const { error: deleteDraftError } = await supabase
     .from("grocery_lists")
@@ -352,6 +386,136 @@ export async function getPendingGroceryChangesForWeeklyPlan({
   };
 }
 
+export async function getSwapGroceryImpactsForWeeklyPlanItem({
+  householdId,
+  recipeIds,
+  targetItemId,
+  weeklyPlanId
+}: {
+  householdId: string;
+  recipeIds: string[];
+  targetItemId: string;
+  weeklyPlanId: string;
+}): Promise<SwapGroceryImpact[]> {
+  const uniqueRecipeIds = Array.from(new Set(recipeIds));
+
+  if (uniqueRecipeIds.length === 0) {
+    return [];
+  }
+
+  const supabase = await createClient();
+  const weeklyPlan = await getScopedWeeklyPlan(
+    supabase,
+    householdId,
+    weeklyPlanId
+  );
+
+  if (!weeklyPlan) {
+    throw new Error("That weekly plan is no longer available.");
+  }
+
+  const [latestList, approvedPlanItems, selectedStaples, candidateRecipes] =
+    await Promise.all([
+      getLatestGroceryListForWeeklyPlan(supabase, householdId, weeklyPlan.id),
+      getApprovedWeeklyPlanItems(supabase, householdId, weeklyPlan.id),
+      getSelectedWeeklyPlanStaples(supabase, householdId, weeklyPlan.id),
+      getSwapCandidateRecipes(supabase, householdId, uniqueRecipeIds)
+    ]);
+  const targetPlanItem = approvedPlanItems.find(
+    (item) => item.id === targetItemId
+  );
+
+  if (!latestList || !targetPlanItem) {
+    return uniqueRecipeIds.map((recipeId) => ({
+      addedCount: 0,
+      appliesToApprovedItem: Boolean(targetPlanItem),
+      hasChanges: false,
+      hasGroceryList: Boolean(latestList),
+      keptCount: 0,
+      listStatus: latestList?.status ?? null,
+      recipeId,
+      removedCount: 0
+    }));
+  }
+
+  const recipeIdsForPreview = Array.from(
+    new Set([
+      ...approvedPlanItems
+        .map((item) => item.recipe_id)
+        .filter((recipeId): recipeId is string => Boolean(recipeId)),
+      ...uniqueRecipeIds
+    ])
+  );
+  const [currentItems, recipeIngredients] = await Promise.all([
+    getGroceryListItems(supabase, householdId, latestList.id),
+    getRecipeIngredients(supabase, householdId, recipeIdsForPreview)
+  ]);
+  const preferredQuantityByFoodId = await getPreferredQuantityByFoodId(
+    supabase,
+    householdId,
+    recipeIngredients
+      .map((ingredient) => ingredient.food_id)
+      .filter((foodId): foodId is string => Boolean(foodId))
+  );
+  const candidateRecipeById = new Map(
+    candidateRecipes.map((recipe) => [recipe.id, recipe])
+  );
+  const recipeIngredientInputs = recipeIngredients.map((ingredient) => ({
+    displayName: ingredient.display_name,
+    foodId: ingredient.food_id,
+    groceryCategoryId: ingredient.grocery_category_id,
+    id: ingredient.id,
+    preferredQuantityText: ingredient.food_id
+      ? (preferredQuantityByFoodId.get(ingredient.food_id) ?? null)
+      : null,
+    quantity: toNullableNumber(ingredient.quantity),
+    recipeId: ingredient.recipe_id,
+    unit: ingredient.unit
+  }));
+  const currentComparableItems = currentItems.map((item) => ({
+    displayName: item.displayName,
+    foodId: item.foodId,
+    manualItem: item.manualItem,
+    preferredQuantityText: item.preferredQuantityText,
+    quantity: item.quantity,
+    unit: item.unit
+  }));
+
+  return uniqueRecipeIds.map((recipeId) => {
+    const candidateRecipe = candidateRecipeById.get(recipeId);
+    const hypotheticalPlanItems = approvedPlanItems.map((item) =>
+      item.id === targetItemId && candidateRecipe
+        ? ({
+            ...item,
+            display_name: candidateRecipe.name,
+            recipe_id: candidateRecipe.id,
+            recipes: { name: candidateRecipe.name }
+          } satisfies WeeklyPlanItemRow)
+        : item
+    );
+    const generated = generateGroceryList({
+      recipeIngredients: recipeIngredientInputs,
+      selectedStaples: selectedStaples.map(toGenerationSelectedStaple),
+      weeklyPlanItems: hypotheticalPlanItems.map(toGenerationPlanItem)
+    });
+    const changes = buildPendingGroceryChanges({
+      currentItems: currentComparableItems,
+      generatedItems: generated.items
+    });
+
+    return {
+      addedCount: changes.addedCount,
+      appliesToApprovedItem: true,
+      hasChanges: changes.hasChanges,
+      hasGroceryList: true,
+      keptCount: changes.keptCount,
+      listStatus: latestList.status,
+      recipeId,
+      removedCount: changes.removedCount
+    };
+  });
+}
+
 export async function updateGroceryListItemState({
   alreadyHave,
   checked,
@@ -378,6 +542,20 @@ export async function updateGroceryListItemState({
   }
 
   const supabase = await createClient();
+  const listStatus = await getGroceryListStatusForItem(
+    supabase,
+    householdId,
+    itemId
+  );
+
+  if (!listStatus) {
+    throw new Error("That grocery item is no longer available.");
+  }
+
+  if (!canToggleGroceryItemState(listStatus)) {
+    throw new Error("This grocery list is no longer editable.");
+  }
+
   const { data, error } = await supabase
     .from("grocery_list_items")
     .update(updates)
@@ -409,6 +587,20 @@ export async function addManualGroceryItem({
   mealProfileId: string | null;
 }) {
   const supabase = await createClient();
+  const listStatus = await getGroceryListStatus(
+    supabase,
+    householdId,
+    groceryListId
+  );
+
+  if (!listStatus) {
+    throw new Error("That grocery list is no longer available.");
+  }
+
+  if (!canAddManualItem(listStatus)) {
+    throw new Error("Manual items can only be added before the list is finalized or while shopping.");
+  }
+
   const mealProfileName = mealProfileId
     ? await getScopedMealProfileName(supabase, householdId, mealProfileId)
     : null;
@@ -462,6 +654,99 @@ export async function addManualGroceryItem({
       .eq("id", insertedItem.id);
     throw new Error(sourceError.message);
   }
+}
+
+async function getProtectedGroceryListForWeeklyPlan(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  householdId: string,
+  weeklyPlanId: string
+) {
+  const { data, error } = await supabase
+    .from("grocery_lists")
+    .select("id")
+    .eq("household_id", householdId)
+    .eq("weekly_plan_id", weeklyPlanId)
+    .in("status", ["finalized", "shopping_started"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
+}
+
+async function getLatestGroceryListForWeeklyPlan(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  householdId: string,
+  weeklyPlanId: string
+) {
+  const { data, error } = await supabase
+    .from("grocery_lists")
+    .select("id, status")
+    .eq("household_id", householdId)
+    .eq("weekly_plan_id", weeklyPlanId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data as { id: string; status: GroceryListStatus } | null;
+}
+
+async function getGroceryListStatus(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  householdId: string,
+  groceryListId: string
+) {
+  const { data, error } = await supabase
+    .from("grocery_lists")
+    .select("status")
+    .eq("household_id", householdId)
+    .eq("id", groceryListId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data?.status as GroceryListStatus | undefined;
+}
+
+async function getGroceryListStatusForItem(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  householdId: string,
+  itemId: string
+) {
+  const { data, error } = await supabase
+    .from("grocery_list_items")
+    .select("grocery_lists(status)")
+    .eq("household_id", householdId)
+    .eq("id", itemId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const joinedList = getJoinedValue(
+    data?.grocery_lists as { status: GroceryListStatus } | Array<{ status: GroceryListStatus }> | null | undefined
+  );
+
+  return joinedList?.status;
+}
+
+function canToggleGroceryItemState(status: GroceryListStatus) {
+  return status === "draft" || status === "shopping_started";
+}
+
+function canAddManualItem(status: GroceryListStatus) {
+  return status === "draft" || status === "shopping_started";
 }
 
 export async function advanceGroceryListLifecycle({
@@ -623,7 +908,11 @@ async function buildGeneratedGroceryListForWeeklyPlan({
     recipeIds
   );
 
-  if (!allowEmpty && weeklyPlanItems.length > 0 && recipeIngredients.length === 0) {
+  const recipeBackedItemCount = weeklyPlanItems.filter(
+    (item) => item.recipe_id
+  ).length;
+
+  if (!allowEmpty && recipeBackedItemCount > 0 && recipeIngredients.length === 0) {
     throw new Error("Approved recipes need ingredients before generating groceries.");
   }
 
@@ -666,12 +955,11 @@ async function getApprovedWeeklyPlanItems(
   const { data, error } = await supabase
     .from("weekly_plan_items")
     .select(
-      "id, display_name, is_approved, meal_profile_id, meal_type, plan_date, recipe_id, scale_factor, meal_profiles(name), recipes(name)"
+      "id, baby_plan_slot, component_type, display_name, food_id, is_approved, meal_profile_id, meal_type, plan_date, recipe_id, scale_factor, foods(name, default_grocery_category_id), meal_profiles(name), recipes(name)"
     )
     .eq("household_id", householdId)
     .eq("weekly_plan_id", weeklyPlanId)
     .eq("is_approved", true)
-    .not("recipe_id", "is", null)
     .order("plan_date", { ascending: true })
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
@@ -707,6 +995,29 @@ async function getRecipeIngredients(
   }
 
   return (data ?? []) as RecipeIngredientRow[];
+}
+
+async function getSwapCandidateRecipes(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  householdId: string,
+  recipeIds: string[]
+) {
+  if (recipeIds.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from("recipes")
+    .select("id, name")
+    .eq("household_id", householdId)
+    .in("id", recipeIds)
+    .is("archived_at", null);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []) as SwapCandidateRecipeRow[];
 }
 
 async function getSelectedWeeklyPlanStaples(
@@ -984,7 +1295,13 @@ function toGenerationPlanItem(
   row: WeeklyPlanItemRow
 ): GroceryGenerationPlanItem {
   return {
+    babyPlanSlot: row.baby_plan_slot,
+    componentType: row.component_type,
     displayName: row.display_name,
+    foodId: row.food_id,
+    foodName: getJoinedValue(row.foods)?.name ?? null,
+    groceryCategoryId:
+      getJoinedValue(row.foods)?.default_grocery_category_id ?? null,
     id: row.id,
     isApproved: row.is_approved,
     mealProfileId: row.meal_profile_id,

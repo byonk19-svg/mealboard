@@ -8,12 +8,17 @@ import { ManualPlanSection } from "@/components/plan-week/manual-plan-section";
 import { NutritionSummarySection } from "@/components/plan-week/nutrition-summary-section";
 import { RuleBasedSuggestionsSection } from "@/components/plan-week/rule-based-suggestions-section";
 import { StaplesReviewSection } from "@/components/plan-week/staples-review-section";
+import { SetupCallout } from "@/components/shared/setup-callout";
 import {
   getPendingGroceryChangesForWeeklyPlan,
+  getSwapGroceryImpactsForWeeklyPlanItem,
   type WeeklyPlanPendingGroceryChanges
 } from "@/lib/grocery/data";
 import { generateBabyMeals } from "@/lib/baby/generate-baby-meals";
-import { buildRuleBasedMealSuggestions } from "@/lib/meal-planning/rule-based-suggestions";
+import {
+  buildRuleBasedMealSuggestions,
+  buildRuleBasedSwapSuggestions
+} from "@/lib/meal-planning/rule-based-suggestions";
 import { calculateCalorieTargetGuidance } from "@/lib/nutrition/calculate-calorie-target-guidance";
 import { calculateDailyNutritionTotals } from "@/lib/nutrition/calculate-daily-totals";
 import { getRecipes } from "@/lib/recipes/data";
@@ -26,6 +31,11 @@ import {
   buildBabySettingsSummary,
   getBabyProfile
 } from "@/lib/settings/baby-settings";
+import {
+  getBabySetupWarning,
+  getProtectedGroceryWarning,
+  getRecipeSetupWarning
+} from "@/lib/setup/setup-warnings";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 import {
   getPlanRecipeOptions,
@@ -51,6 +61,7 @@ import { getWeekDates, getWeekStartDate } from "@/lib/weekly-plans/week-dates";
 type PlanWeekPageProps = {
   searchParams: Promise<{
     message?: string;
+    swapItemId?: string;
     weekStartDate?: string;
   }>;
 };
@@ -59,7 +70,11 @@ export default async function PlanWeekPage({
   searchParams
 }: PlanWeekPageProps) {
   const householdContext = await getCurrentHouseholdContext();
-  const { message, weekStartDate: requestedWeekStartDate } = await searchParams;
+  const {
+    message,
+    swapItemId,
+    weekStartDate: requestedWeekStartDate
+  } = await searchParams;
 
   if (!householdContext.household) {
     return null;
@@ -141,6 +156,25 @@ export default async function PlanWeekPage({
         weekDateKeys: weekDates.map((date) => date.dateKey)
       })
     : [];
+  const selectedSwapItem = planItems.find((item) => item.id === swapItemId) ?? null;
+  const swapSuggestions = selectedSwapItem
+    ? buildRuleBasedSwapSuggestions({
+        goals: goals.map((goal) => goal.goal),
+        planItems,
+        profileDays,
+        recipes,
+        targetItem: selectedSwapItem
+      })
+    : [];
+  const swapGroceryImpacts =
+    weeklyPlan && selectedSwapItem && swapSuggestions.length > 0
+      ? await getSwapGroceryImpactsForWeeklyPlanItem({
+          householdId: householdContext.household.id,
+          recipeIds: swapSuggestions.map((suggestion) => suggestion.recipeId),
+          targetItemId: selectedSwapItem.id,
+          weeklyPlanId: weeklyPlan.id
+        })
+      : [];
   const babySummary = buildBabySettingsSummary(babyProfile, new Date());
   const babyFoodStatuses = babyProfile
     ? await getBabyFoodStatuses(householdContext.household.id, babyProfile.id)
@@ -150,6 +184,22 @@ export default async function PlanWeekPage({
         stageName: babySummary.resolution?.stageName
       })
     : null;
+  const setupWarnings = [
+    getRecipeSetupWarning({
+      approvedRecipeCount: recipes.filter((recipe) =>
+        recipe.approvals.some((approval) => approval.approved_for_planning)
+      ).length,
+      totalRecipeCount: recipes.length
+    }),
+    getBabySetupWarning({
+      hasBabyProfile: Boolean(babyProfile),
+      setupWarning: babySummary.resolution?.setupWarning ?? null
+    }),
+    getProtectedGroceryWarning({
+      hasChanges: pendingGroceryChanges?.changes.hasChanges ?? false,
+      status: pendingGroceryChanges?.groceryList.status ?? null
+    })
+  ].filter((warning): warning is NonNullable<typeof warning> => warning !== null);
 
   planItems.forEach((item) => {
     const existingItems = planItemsByDate.get(item.plan_date) ?? [];
@@ -171,6 +221,21 @@ export default async function PlanWeekPage({
       </div>
 
       {message ? <PlanWeekMessage message={message} /> : null}
+
+      {setupWarnings.length > 0 ? (
+        <div className="grid gap-3">
+          {setupWarnings.map((warning) => (
+            <SetupCallout
+              body={warning.body}
+              ctaHref={warning.ctaHref}
+              ctaLabel={warning.ctaLabel}
+              key={warning.title}
+              title={warning.title}
+              tone={warning.tone}
+            />
+          ))}
+        </div>
+      ) : null}
 
       <form
         action={createOrSelectWeeklyPlan}
@@ -314,6 +379,8 @@ export default async function PlanWeekPage({
             <BabyRoutinePreviewSection
               stageLabel={babySummary.statusLabel}
               summary={babyRoutineSuggestions}
+              weekStartDate={weekStartDate}
+              weeklyPlanId={weeklyPlan.id}
             />
           ) : null}
 
@@ -321,6 +388,9 @@ export default async function PlanWeekPage({
             planItemsByDate={planItemsByDate}
             profiles={planningProfiles}
             recipeOptions={recipeOptions}
+            selectedSwapItemId={selectedSwapItem?.id ?? null}
+            swapGroceryImpacts={swapGroceryImpacts}
+            swapSuggestions={swapSuggestions}
             weekDates={weekDates}
             weekStartDate={weekStartDate}
             weeklyPlanId={weeklyPlan.id}

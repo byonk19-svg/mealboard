@@ -9,6 +9,11 @@ export type GroceryGenerationPlanItem = {
   displayName: string;
   id: string;
   isApproved: boolean;
+  babyPlanSlot?: string | null;
+  componentType?: string | null;
+  foodId?: string | null;
+  foodName?: string | null;
+  groceryCategoryId?: string | null;
   mealProfileId: string | null;
   mealProfileName: string | null;
   mealType: string;
@@ -66,7 +71,7 @@ export type GeneratedGroceryItemSource = {
   recipeId: string | null;
   recipeName: string | null;
   sourceId: string;
-  sourceType: "meal_generated" | "staple";
+  sourceType: "baby_item" | "meal_generated" | "staple";
   unit: string | null;
   weeklyPlanItemId: string | null;
 };
@@ -86,7 +91,7 @@ type GroceryGenerationSource = GroceryItemSource & {
   quantity: number | null;
   recipeId: string | null;
   recipeName: string | null;
-  sourceType: "meal_generated" | "staple";
+  sourceType: "baby_item" | "meal_generated" | "staple";
   unit: string | null;
   weeklyPlanItemId: string | null;
 };
@@ -108,8 +113,17 @@ export function generateGroceryList({
         toRecipeGroceryInput(item, ingredient)
       )
     );
+  const babyInputs = weeklyPlanItems
+    .filter(
+      (item) =>
+        item.isApproved &&
+        item.componentType === "baby_food" &&
+        item.foodId &&
+        item.babyPlanSlot
+    )
+    .map(toBabyFoodGroceryInput);
   const stapleInputs = selectedStaples.map(toStapleGroceryInput);
-  const groceryInputs = [...recipeInputs, ...stapleInputs];
+  const groceryInputs = [...recipeInputs, ...babyInputs, ...stapleInputs];
   const categoryConflictsByItemKey = getCategoryConflictsByItemKey(
     groceryInputs
   );
@@ -144,6 +158,35 @@ export function generateGroceryList({
   });
 
   return { items, sources };
+}
+
+function toBabyFoodGroceryInput(item: GroceryGenerationPlanItem): GroceryItemInput {
+  return {
+    displayName: item.foodName ?? item.displayName,
+    foodId: item.foodId ?? null,
+    preferredQuantityText: null,
+    quantity: null,
+    sources: [
+      {
+        groceryCategoryId: item.groceryCategoryId ?? null,
+        ingredientId: undefined,
+        label: formatSourceLabel(item),
+        mealProfileId: item.mealProfileId,
+        mealProfileName: item.mealProfileName,
+        mealType: item.mealType,
+        notes: item.babyPlanSlot ?? null,
+        planDate: item.planDate,
+        quantity: null,
+        recipeId: null,
+        recipeName: null,
+        sourceId: item.id,
+        sourceType: "baby_item",
+        unit: null,
+        weeklyPlanItemId: item.id
+      }
+    ],
+    unit: null
+  };
 }
 
 function groupIngredientsByRecipeId(

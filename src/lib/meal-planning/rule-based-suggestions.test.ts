@@ -6,6 +6,7 @@ import type {
 } from "@/lib/weekly-plans/types";
 import {
   buildRuleBasedMealSuggestions,
+  buildRuleBasedSwapSuggestions,
   scoreRecipeForMealSlot
 } from "./rule-based-suggestions";
 
@@ -127,6 +128,95 @@ describe("scoreRecipeForMealSlot", () => {
 
     expect(clean.eligible && warning.eligible && clean.score > warning.score).toBe(true);
     expect(warning.reasonLabels).toContain("Preference warning");
+  });
+});
+
+describe("buildRuleBasedSwapSuggestions", () => {
+  it("returns ranked alternatives for the selected unlocked adult item", () => {
+    const target = planItem({
+      id: "target",
+      recipe_id: "current-recipe"
+    });
+    const suggestions = buildRuleBasedSwapSuggestions({
+      goals: ["high_protein"],
+      planItems: [target],
+      profileDays: [
+        profileDay({
+          adult_day_type: "work_day",
+          meal_profile_id: "profile-brianna",
+          plan_date: "2026-06-22"
+        })
+      ],
+      recipes: [
+        recipe({ id: "current-recipe", name: "Current Wrap" }),
+        recipe({
+          id: "protein",
+          name: "Protein Bowl",
+          estimated_protein_grams_per_serving: 40
+        }),
+        recipe({
+          id: "alpha",
+          name: "Alpha Wrap",
+          estimated_protein_grams_per_serving: 25
+        })
+      ],
+      targetItem: target
+    });
+
+    expect(suggestions.map((suggestion) => suggestion.recipeId)).toEqual([
+      "protein",
+      "alpha"
+    ]);
+    expect(suggestions[0]?.reasonLabels).toContain("High protein");
+  });
+
+  it("returns no suggestions for locked, try-this, baby, or recipe-less items", () => {
+    const recipes = [recipe({ id: "alternative" })];
+
+    for (const targetItem of [
+      planItem({ is_locked: true }),
+      planItem({ is_try_this: true }),
+      planItem({ meal_profile_type: "baby" }),
+      planItem({ recipe_id: null })
+    ]) {
+      expect(
+        buildRuleBasedSwapSuggestions({
+          goals: [],
+          planItems: [targetItem],
+          profileDays: [],
+          recipes,
+          targetItem
+        })
+      ).toEqual([]);
+    }
+  });
+
+  it("excludes the current recipe and sibling duplicate recipes for the same slot", () => {
+    const target = planItem({
+      id: "target",
+      recipe_id: "current-recipe"
+    });
+    const suggestions = buildRuleBasedSwapSuggestions({
+      goals: [],
+      planItems: [
+        target,
+        planItem({
+          id: "sibling",
+          recipe_id: "sibling-recipe"
+        })
+      ],
+      profileDays: [],
+      recipes: [
+        recipe({ id: "current-recipe", name: "Current" }),
+        recipe({ id: "sibling-recipe", name: "Sibling" }),
+        recipe({ id: "other-recipe", name: "Other" })
+      ],
+      targetItem: target
+    });
+
+    expect(suggestions.map((suggestion) => suggestion.recipeId)).toEqual([
+      "other-recipe"
+    ]);
   });
 });
 
@@ -297,6 +387,7 @@ function profileDay(
 
 function planItem(overrides: Partial<WeeklyPlanItem>): WeeklyPlanItem {
   return {
+    baby_plan_slot: null,
     component_type: "main",
     display_name: "Existing",
     estimated_calories: 400,
@@ -306,6 +397,7 @@ function planItem(overrides: Partial<WeeklyPlanItem>): WeeklyPlanItem {
     is_backup: false,
     is_locked: false,
     is_try_this: false,
+    food_id: null,
     meal_profile_id: "profile-brianna",
     meal_profile_name: "Brianna",
     meal_profile_type: "adult",

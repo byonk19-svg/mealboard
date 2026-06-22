@@ -52,7 +52,7 @@ export function RecipeForm({
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <TextField
             defaultValue={recipe?.name ?? ""}
-            label="Name"
+            label="Recipe name"
             name="name"
             required
           />
@@ -76,7 +76,7 @@ export function RecipeForm({
           />
           <TextField
             defaultValue={recipe?.servings ?? ""}
-            label="Servings"
+            label="Recipe servings"
             min="0.01"
             name="servings"
             step="0.01"
@@ -140,14 +140,14 @@ export function RecipeForm({
         <div className="mt-4 grid gap-4 md:grid-cols-3">
           <TextField
             defaultValue={recipe?.estimated_calories_per_serving ?? ""}
-            label="Estimated calories per serving"
+            label="Estimated recipe calories per serving"
             min="1"
             name="estimatedCaloriesPerServing"
             type="number"
           />
           <TextField
             defaultValue={recipe?.estimated_protein_grams_per_serving ?? ""}
-            label="Estimated protein grams per serving"
+            label="Estimated recipe protein grams per serving"
             min="0"
             name="estimatedProteinGramsPerServing"
             type="number"
