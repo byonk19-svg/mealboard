@@ -472,5 +472,9 @@ describe("generateGroceryList", () => {
       "meal_generated",
       "staple"
     ]);
+    expect(generated.sources.map((source) => source.sourceId)).toEqual([
+      "plan-item-1",
+      "staple-1"
+    ]);
   });
 });

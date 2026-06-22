@@ -26,7 +26,22 @@ export type DashboardWeeklyWrapUpSummary = {
   status: "open" | "dismissed" | "completed";
 } | null;
 
+export type DashboardSetupSummary = {
+  adultProfileCount: number;
+  adultProfilesMissingCalorieTargets: number;
+  approvedRecipeCount: number;
+  babyFoodStatusCount: number;
+  babyProfileReady: boolean;
+  calorieGuidanceOverDayCount?: number;
+  calorieGuidanceUnderDayCount?: number;
+  calorieGuidanceUnknownDayCount?: number;
+  lowConfidenceRecipeCount: number;
+  recipeCount: number;
+  stapleCount: number;
+} | null;
+
 export type DashboardAttentionItem = {
+  actionLabel: string;
   description: string;
   href: string;
   id: string;
@@ -35,30 +50,35 @@ export type DashboardAttentionItem = {
 
 export function buildDashboardAttentionItems({
   groceryList,
+  setup,
   weeklyPlan,
   weeklyWrapUp,
   weeklyWrapUpHref
 }: {
   groceryList: DashboardGroceryListSummary | null;
+  setup?: DashboardSetupSummary;
   weeklyPlan: DashboardWeeklyPlanSummary | null;
   weeklyWrapUp: DashboardWeeklyWrapUpSummary;
   weeklyWrapUpHref?: string;
 }): DashboardAttentionItem[] {
   const items: DashboardAttentionItem[] = [];
+  items.push(...buildSetupAttentionItems(setup ?? null));
 
   if (!weeklyPlan) {
-    return [
-      {
-        description: "Create this week before adding meals, staples, or groceries.",
-        href: "/plan-week",
-        id: "start-plan",
-        label: "Start this week's plan"
-      }
-    ];
+    items.push({
+      actionLabel: "Start plan",
+      description: "Create this week before adding meals, staples, or groceries.",
+      href: "/plan-week",
+      id: "start-plan",
+      label: "Start this week's plan"
+    });
+
+    return items;
   }
 
   if (weeklyPlan.totalPlanItemCount === 0 && weeklyPlan.selectedStapleCount === 0) {
     items.push({
+      actionLabel: "Open Plan Week",
       description: "Add saved recipes or select staples before generating groceries.",
       href: "/plan-week",
       id: "empty-plan",
@@ -68,6 +88,7 @@ export function buildDashboardAttentionItems({
 
   if (weeklyPlan.unapprovedPlanItemCount > 0) {
     items.push({
+      actionLabel: "Review plan",
       description: `${weeklyPlan.unapprovedPlanItemCount} planned ${weeklyPlan.unapprovedPlanItemCount === 1 ? "item needs" : "items need"} approval before it counts for groceries.`,
       href: "/plan-week",
       id: "unapproved-plan-items",
@@ -80,6 +101,7 @@ export function buildDashboardAttentionItems({
     weeklyPlan.approvedGroceryInputItemCount + weeklyPlan.selectedStapleCount === 0
   ) {
     items.push({
+      actionLabel: "Open Plan Week",
       description: "Approve at least one recipe or staple so grocery generation has inputs.",
       href: "/plan-week",
       id: "no-grocery-inputs",
@@ -89,6 +111,7 @@ export function buildDashboardAttentionItems({
 
   if (groceryList?.status === "draft") {
     items.push({
+      actionLabel: "Open list",
       description: "Review the generated list and finalize it before shopping.",
       href: "/grocery-list",
       id: "draft-grocery-list",
@@ -98,6 +121,7 @@ export function buildDashboardAttentionItems({
 
   if (groceryList?.status === "finalized") {
     items.push({
+      actionLabel: "Open list",
       description: "Start shopping when you are ready to check items off.",
       href: "/grocery-list",
       id: "finalized-grocery-list",
@@ -107,6 +131,7 @@ export function buildDashboardAttentionItems({
 
   if (groceryList?.status === "shopping_started") {
     items.push({
+      actionLabel: "Open list",
       description: `${groceryList.checkedItemCount} of ${groceryList.itemCount} items are checked.`,
       href: "/grocery-list",
       id: "shopping-in-progress",
@@ -121,10 +146,115 @@ export function buildDashboardAttentionItems({
     weeklyWrapUp?.status !== "dismissed"
   ) {
     items.push({
+      actionLabel: "Open wrap-up",
       description: "Capture made/skipped meals, leftovers, and unused grocery notes.",
       href: weeklyWrapUpHref ?? "/dashboard",
       id: "weekly-wrap-up",
       label: "Review this week"
+    });
+  }
+
+  return items;
+}
+
+function buildSetupAttentionItems(
+  setup: DashboardSetupSummary
+): DashboardAttentionItem[] {
+  if (!setup) {
+    return [];
+  }
+
+  const items: DashboardAttentionItem[] = [];
+
+  if (setup.approvedRecipeCount === 0) {
+    items.push({
+      actionLabel: "Open recipes",
+      description:
+        setup.recipeCount > 0
+          ? "Mark at least one saved recipe as approved so suggestions and planning have safe options."
+          : "Add and approve a few reliable recipes before planning the week.",
+      href: "/recipes",
+      id: "no-approved-recipes",
+      label: "Approve recipes"
+    });
+  }
+
+  if (!setup.babyProfileReady) {
+    items.push({
+      actionLabel: "Open Baby settings",
+      description:
+        "Add Baby's birthdate or stage override so solids planning can use the right routine context.",
+      href: "/settings/baby",
+      id: "baby-setup-needed",
+      label: "Finish Baby setup"
+    });
+  }
+
+  if (setup.babyProfileReady && setup.babyFoodStatusCount === 0) {
+    items.push({
+      actionLabel: "Open Baby settings",
+      description:
+        "Add tried, liked, or disliked baby foods so Baby Meal 1/2 suggestions are useful.",
+      href: "/settings/baby",
+      id: "no-baby-food-statuses",
+      label: "Add Baby foods"
+    });
+  }
+
+  if (setup.adultProfilesMissingCalorieTargets > 0) {
+    items.push({
+      actionLabel: "Open profiles",
+      description: `${setup.adultProfilesMissingCalorieTargets} adult ${setup.adultProfilesMissingCalorieTargets === 1 ? "profile is" : "profiles are"} missing calorie targets for gentle planning guidance.`,
+      href: "/settings/profiles",
+      id: "missing-calorie-targets",
+      label: "Add calorie targets"
+    });
+  }
+
+  if (setup.lowConfidenceRecipeCount > 0) {
+    items.push({
+      actionLabel: "Open recipes",
+      description: `${setup.lowConfidenceRecipeCount} approved ${setup.lowConfidenceRecipeCount === 1 ? "recipe has" : "recipes have"} low-confidence nutrition estimates.`,
+      href: "/recipes",
+      id: "low-confidence-recipes",
+      label: "Review nutrition estimates"
+    });
+  }
+
+  if ((setup.calorieGuidanceUnknownDayCount ?? 0) > 0) {
+    items.push({
+      actionLabel: "Open Plan Week",
+      description: `${setup.calorieGuidanceUnknownDayCount} planned ${setup.calorieGuidanceUnknownDayCount === 1 ? "day has" : "days have"} calorie targets but incomplete meal estimates.`,
+      href: "/plan-week",
+      id: "unknown-calorie-estimates",
+      label: "Review meal estimates"
+    });
+  }
+
+  if (
+    (setup.calorieGuidanceOverDayCount ?? 0) > 0 ||
+    (setup.calorieGuidanceUnderDayCount ?? 0) > 0
+  ) {
+    const issueCount =
+      (setup.calorieGuidanceOverDayCount ?? 0) +
+      (setup.calorieGuidanceUnderDayCount ?? 0);
+    items.push({
+      actionLabel: "Open Plan Week",
+      description: `${issueCount} planned ${issueCount === 1 ? "day is" : "days are"} outside the selected calorie guidance range.`,
+      href: "/plan-week",
+      id: "calorie-target-mismatch",
+      label: "Review calorie guidance"
+    });
+  }
+
+  if (setup.stapleCount === 0) {
+    items.push({
+      actionLabel: "Open staples",
+      description:
+        "Create reusable staples for recurring groceries before building a full weekly list.",
+      href: "/settings/staples",
+      id: "no-staples",
+      label: "Add staples"
     });
   }
 

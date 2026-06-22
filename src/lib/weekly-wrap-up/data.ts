@@ -1,7 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import {
   buildWeeklyWrapUpCandidates,
+  toUnusedGroceryCandidate,
   type WrapUpGroceryItem,
+  type WrapUpGroceryItemSource,
   type WrapUpPlanItem
 } from "./build-wrap-up-items";
 
@@ -28,6 +30,19 @@ type GroceryItemRow = {
   checked: boolean;
   display_name: string;
   id: string;
+  manual_item: boolean;
+};
+
+type GroceryItemSourceRow = {
+  grocery_list_item_id: string;
+  meal_profiles: JoinedValue<{ name: string }>;
+  notes: string | null;
+  quantity: number | string | null;
+  recipes: JoinedValue<{ name: string }>;
+  source_id: string | null;
+  source_label: string | null;
+  source_type: string;
+  unit: string | null;
 };
 
 type RecipeReviewRow = {
@@ -43,7 +58,7 @@ type WrapUpRow = {
 
 type WrapUpItemRow = {
   grocery_list_item_id: string | null;
-  grocery_list_items: JoinedValue<{ display_name: string }>;
+  grocery_list_items: JoinedValue<{ display_name: string; manual_item: boolean }>;
   id: string;
   prompt_type: WrapUpPromptType;
   response: Record<string, unknown>;
@@ -61,6 +76,9 @@ type WrapUpItemRow = {
 };
 
 export type WeeklyWrapUpItem = {
+  actionHref: string | null;
+  actionLabel: string | null;
+  classification: string | null;
   displayName: string;
   groceryListItemId: string | null;
   id: string;
@@ -72,6 +90,8 @@ export type WeeklyWrapUpItem = {
   recipeId: string | null;
   recipeName: string | null;
   response: Record<string, unknown>;
+  sourceKinds: string[];
+  sources: WrapUpGroceryItemSource[];
   status: WrapUpItemStatus;
   weeklyPlanItemId: string | null;
 };
@@ -290,7 +310,7 @@ async function getWrapUpGroceryItems(
 ) {
   const { data, error } = await supabase
     .from("grocery_list_items")
-    .select("id, display_name, checked, already_have")
+    .select("id, display_name, checked, already_have, manual_item")
     .eq("household_id", householdId)
     .eq("grocery_list_id", groceryListId);
 
@@ -298,14 +318,65 @@ async function getWrapUpGroceryItems(
     throw new Error(error.message);
   }
 
+  const rows = (data ?? []) as GroceryItemRow[];
+  const sourcesByItemId = await getWrapUpGroceryItemSources(
+    supabase,
+    householdId,
+    rows.map((item) => item.id)
+  );
+
   return ((data ?? []) as GroceryItemRow[]).map(
     (item): WrapUpGroceryItem => ({
       alreadyHave: item.already_have,
       checked: item.checked,
       displayName: item.display_name,
-      groceryListItemId: item.id
+      groceryListItemId: item.id,
+      manualItem: item.manual_item,
+      sources: sourcesByItemId.get(item.id) ?? []
     })
   );
+}
+
+async function getWrapUpGroceryItemSources(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  householdId: string,
+  groceryListItemIds: string[]
+) {
+  const sourcesByItemId = new Map<string, WrapUpGroceryItemSource[]>();
+
+  if (groceryListItemIds.length === 0) {
+    return sourcesByItemId;
+  }
+
+  const { data, error } = await supabase
+    .from("grocery_item_sources")
+    .select(
+      "grocery_list_item_id, source_type, source_id, source_label, notes, quantity, unit, meal_profiles(name), recipes(name)"
+    )
+    .eq("household_id", householdId)
+    .in("grocery_list_item_id", groceryListItemIds)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  for (const source of (data ?? []) as GroceryItemSourceRow[]) {
+    const sources = sourcesByItemId.get(source.grocery_list_item_id) ?? [];
+    sources.push({
+      label: source.source_label,
+      mealProfileName: getJoinedValue(source.meal_profiles)?.name ?? null,
+      notes: source.notes,
+      quantity: toNullableNumber(source.quantity),
+      recipeName: getJoinedValue(source.recipes)?.name ?? null,
+      sourceId: source.source_id,
+      sourceType: source.source_type,
+      unit: source.unit
+    });
+    sourcesByItemId.set(source.grocery_list_item_id, sources);
+  }
+
+  return sourcesByItemId;
 }
 
 async function getReviewedPlanItemIds(
@@ -368,7 +439,7 @@ async function getWeeklyWrapUpItems(
   const { data, error } = await supabase
     .from("weekly_wrap_up_items")
     .select(
-      "id, prompt_type, status, response, weekly_plan_item_id, grocery_list_item_id, weekly_plan_items(display_name, meal_profile_id, meal_type, plan_date, recipe_id, meal_profiles(name), recipes(name, status)), grocery_list_items(display_name)"
+      "id, prompt_type, status, response, weekly_plan_item_id, grocery_list_item_id, weekly_plan_items(display_name, meal_profile_id, meal_type, plan_date, recipe_id, meal_profiles(name), recipes(name, status)), grocery_list_items(display_name, manual_item)"
     )
     .eq("household_id", householdId)
     .eq("weekly_wrap_up_id", wrapUpId)
@@ -379,12 +450,36 @@ async function getWeeklyWrapUpItems(
     throw new Error(error.message);
   }
 
-  return ((data ?? []) as WrapUpItemRow[]).map((item) => {
+  const rows = (data ?? []) as WrapUpItemRow[];
+  const groceryItemIds = rows
+    .map((item) => item.grocery_list_item_id)
+    .filter((id): id is string => Boolean(id));
+  const grocerySourcesByItemId = await getWrapUpGroceryItemSources(
+    supabase,
+    householdId,
+    groceryItemIds
+  );
+
+  return rows.map((item) => {
     const planItem = getJoinedValue(item.weekly_plan_items);
     const groceryItem = getJoinedValue(item.grocery_list_items);
     const recipe = getJoinedValue(planItem?.recipes ?? null);
+    const sourceAware =
+      item.prompt_type === "unused_grocery_item" && item.grocery_list_item_id
+        ? toUnusedGroceryCandidate({
+            alreadyHave: false,
+            checked: false,
+            displayName: groceryItem?.display_name ?? "Wrap-up item",
+            groceryListItemId: item.grocery_list_item_id,
+            manualItem: groceryItem?.manual_item ?? false,
+            sources: grocerySourcesByItemId.get(item.grocery_list_item_id) ?? []
+          })
+        : null;
 
     return {
+      actionHref: sourceAware?.actionHref ?? null,
+      actionLabel: sourceAware?.actionLabel ?? null,
+      classification: sourceAware?.classification ?? null,
       displayName: planItem?.display_name ?? groceryItem?.display_name ?? "Wrap-up item",
       groceryListItemId: item.grocery_list_item_id,
       id: item.id,
@@ -396,6 +491,8 @@ async function getWeeklyWrapUpItems(
       recipeId: planItem?.recipe_id ?? null,
       recipeName: recipe?.name ?? null,
       response: item.response,
+      sourceKinds: sourceAware?.sourceKinds ?? [],
+      sources: sourceAware?.sources ?? [],
       status: item.status,
       weeklyPlanItemId: item.weekly_plan_item_id
     } satisfies WeeklyWrapUpItem;
@@ -430,4 +527,14 @@ function getJoinedValue<T>(value: T | T[] | null | undefined) {
   }
 
   return value ?? null;
+}
+
+function toNullableNumber(value: number | string | null) {
+  if (value === null || value === "") {
+    return null;
+  }
+
+  const numberValue = typeof value === "number" ? value : Number(value);
+
+  return Number.isFinite(numberValue) ? numberValue : null;
 }

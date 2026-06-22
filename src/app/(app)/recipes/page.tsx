@@ -2,9 +2,16 @@ import Link from "next/link";
 import {
   formatMealType,
   formatRecipeStatus,
+  recipeStatuses,
   type RecipeWithDetails
 } from "@/lib/recipes/types";
 import { getRecipes } from "@/lib/recipes/data";
+import {
+  filterRecipes,
+  type RecipeFilters,
+  type RecipeNutritionFilter,
+  type RecipePlanningFilter
+} from "@/lib/recipes/filter-recipes";
 import {
   getRecipeApprovalDisplay,
   getRecipeNutritionDisplay
@@ -14,18 +21,30 @@ import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 type RecipesPageProps = {
   searchParams: Promise<{
     message?: string;
+    nutrition?: string;
+    planning?: string;
+    q?: string;
+    status?: string;
   }>;
 };
 
 export default async function RecipesPage({ searchParams }: RecipesPageProps) {
   const householdContext = await getCurrentHouseholdContext();
-  const { message } = await searchParams;
+  const params = await searchParams;
+  const { message } = params;
 
   if (!householdContext.household) {
     return null;
   }
 
   const recipes = await getRecipes(householdContext.household.id);
+  const filters = normalizeRecipeFilters(params);
+  const filteredRecipes = filterRecipes(recipes, filters);
+  const hasActiveFilters =
+    Boolean(filters.q) ||
+    filters.status !== "all" ||
+    filters.planning !== "all" ||
+    filters.nutrition !== "all";
 
   return (
     <section className="space-y-6">
@@ -53,11 +72,35 @@ export default async function RecipesPage({ searchParams }: RecipesPageProps) {
       {message ? <RecipeMessage message={message} /> : null}
 
       {recipes.length > 0 ? (
+        <RecipeFiltersForm
+          filters={filters}
+          filteredCount={filteredRecipes.length}
+          totalCount={recipes.length}
+        />
+      ) : null}
+
+      {filteredRecipes.length > 0 ? (
         <div className="grid gap-4 lg:grid-cols-2">
-          {recipes.map((recipe) => (
+          {filteredRecipes.map((recipe) => (
             <RecipeCard key={recipe.id} recipe={recipe} />
           ))}
         </div>
+      ) : hasActiveFilters ? (
+        <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
+          <p className="text-sm font-medium text-muted-foreground">
+            No matching recipes
+          </p>
+          <h2 className="mt-3 text-2xl font-semibold">Adjust filters</h2>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
+            Clear one or more filters to see more saved recipes.
+          </p>
+          <Link
+            className="mt-4 inline-flex rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors hover:bg-muted"
+            href="/recipes"
+          >
+            Clear filters
+          </Link>
+        </section>
       ) : (
         <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
           <p className="text-sm font-medium text-muted-foreground">
@@ -71,6 +114,89 @@ export default async function RecipesPage({ searchParams }: RecipesPageProps) {
         </section>
       )}
     </section>
+  );
+}
+
+function RecipeFiltersForm({
+  filteredCount,
+  filters,
+  totalCount
+}: {
+  filteredCount: number;
+  filters: Required<RecipeFilters>;
+  totalCount: number;
+}) {
+  return (
+    <form className="rounded-lg border border-border bg-card p-4 shadow-sm">
+      <div className="grid gap-3 md:grid-cols-4">
+        <label className="text-sm font-medium">
+          Search recipes
+          <input
+            className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2"
+            defaultValue={filters.q}
+            name="q"
+            placeholder="Name or tag"
+            type="search"
+          />
+        </label>
+        <label className="text-sm font-medium">
+          Status
+          <select
+            className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2"
+            defaultValue={filters.status}
+            name="status"
+          >
+            <option value="all">All statuses</option>
+            {recipeStatuses.map((status) => (
+              <option key={status} value={status}>
+                {formatRecipeStatus(status)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-sm font-medium">
+          Planning
+          <select
+            className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2"
+            defaultValue={filters.planning}
+            name="planning"
+          >
+            <option value="all">All recipes</option>
+            <option value="approved">Approved for planning</option>
+          </select>
+        </label>
+        <label className="text-sm font-medium">
+          Nutrition
+          <select
+            className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2"
+            defaultValue={filters.nutrition}
+            name="nutrition"
+          >
+            <option value="all">All estimates</option>
+            <option value="needs_review">Needs review</option>
+          </select>
+        </label>
+      </div>
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-muted-foreground">
+          Showing {filteredCount} of {totalCount} recipes
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <button
+            className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+            type="submit"
+          >
+            Apply filters
+          </button>
+          <Link
+            className="rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors hover:bg-muted"
+            href="/recipes"
+          >
+            Clear filters
+          </Link>
+        </div>
+      </div>
+    </form>
   );
 }
 
@@ -195,4 +321,36 @@ function RecipeMessage({ message }: { message: string }) {
       {message}
     </p>
   );
+}
+
+function normalizeRecipeFilters(params: {
+  nutrition?: string;
+  planning?: string;
+  q?: string;
+  status?: string;
+}): Required<RecipeFilters> {
+  return {
+    nutrition: isRecipeNutritionFilter(params.nutrition)
+      ? params.nutrition
+      : "all",
+    planning: isRecipePlanningFilter(params.planning)
+      ? params.planning
+      : "all",
+    q: params.q?.trim() ?? "",
+    status: recipeStatuses.includes(params.status as (typeof recipeStatuses)[number])
+      ? (params.status as (typeof recipeStatuses)[number])
+      : "all"
+  };
+}
+
+function isRecipePlanningFilter(
+  value: string | undefined
+): value is RecipePlanningFilter {
+  return value === "all" || value === "approved";
+}
+
+function isRecipeNutritionFilter(
+  value: string | undefined
+): value is RecipeNutritionFilter {
+  return value === "all" || value === "needs_review";
 }

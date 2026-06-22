@@ -31,6 +31,7 @@ export type GroceryListItemSource = {
   notes: string | null;
   quantity: number | null;
   recipeName: string | null;
+  sourceId: string | null;
   sourceType: string;
   unit: string | null;
 };
@@ -201,6 +202,7 @@ type GroceryListItemSourceRow = {
   quantity: number | string | null;
   recipes: { name: string } | Array<{ name: string }> | null;
   source_label: string | null;
+  source_id: string | null;
   source_type: string;
   unit: string | null;
 };
@@ -642,6 +644,7 @@ export async function addManualGroceryItem({
       notes: item.note,
       quantity: item.quantity,
       source_label: buildManualGrocerySourceLabel(mealProfileName),
+      source_id: null,
       source_type: "manual_add",
       unit: item.unit
     });
@@ -1181,6 +1184,7 @@ async function createGroceryItemSources(
       recipe_id: source.recipeId,
       recipe_ingredient_id: source.ingredientId,
       source_label: source.label,
+      source_id: source.sourceId,
       source_type: source.sourceType,
       unit: source.unit,
       weekly_plan_item_id: source.weeklyPlanItemId
@@ -1261,7 +1265,7 @@ async function getGroceryItemSources(
   const { data, error } = await supabase
     .from("grocery_item_sources")
     .select(
-      "id, grocery_list_item_id, source_type, source_label, notes, quantity, unit, meal_profiles(name), recipes(name)"
+      "id, grocery_list_item_id, source_type, source_id, source_label, notes, quantity, unit, meal_profiles(name), recipes(name)"
     )
     .eq("household_id", householdId)
     .in("grocery_list_item_id", groceryListItemIds)
@@ -1282,6 +1286,7 @@ async function getGroceryItemSources(
       notes: source.notes,
       quantity: toNullableNumber(source.quantity),
       recipeName: recipe?.name ?? null,
+      sourceId: source.source_id,
       sourceType: source.source_type,
       unit: source.unit
     });

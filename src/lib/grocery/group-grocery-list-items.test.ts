@@ -180,6 +180,7 @@ function source(
     notes: null,
     quantity: 1,
     recipeName: overrides.recipeName,
+    sourceId: null,
     sourceType: "meal_generated",
     unit: "count"
   };

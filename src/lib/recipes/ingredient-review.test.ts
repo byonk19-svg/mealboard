@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   buildIngredientReviewRows,
   resolveFoodMatch,
-  resolveFoodSelection
+  resolveFoodSelection,
+  updateIngredientFoodSelection,
+  updateIngredientDisplayName
 } from "./ingredient-review";
 import type { ParsedIngredientLine } from "./parse-ingredient-lines";
 import type { Food } from "@/lib/settings/types";
@@ -85,6 +87,46 @@ describe("ingredient review helpers", () => {
       grocery_category_id: null,
       needsReview: true,
       reviewReason: "Quantity or unit needs review."
+    });
+  });
+
+  it("replaces auto-matched food and category when the display name changes", () => {
+    const row = buildIngredientReviewRows({
+      foods,
+      parsedIngredients: [parsedIngredient({ displayName: "rice" })]
+    })[0];
+
+    expect(updateIngredientDisplayName(row, "baby spinach", foods)).toMatchObject({
+      display_name: "baby spinach",
+      food_id: "food-spinach",
+      grocery_category_id: "cat-produce"
+    });
+  });
+
+  it("updates auto-filled category when selected food changes", () => {
+    const row = buildIngredientReviewRows({
+      foods,
+      parsedIngredients: [parsedIngredient({ displayName: "rice" })]
+    })[0];
+
+    expect(updateIngredientFoodSelection(row, "food-spinach", foods)).toMatchObject({
+      food_id: "food-spinach",
+      grocery_category_id: "cat-produce"
+    });
+  });
+
+  it("preserves a manually selected category when selected food changes", () => {
+    const row = {
+      ...buildIngredientReviewRows({
+        foods,
+        parsedIngredients: [parsedIngredient({ displayName: "rice" })]
+      })[0],
+      grocery_category_id: "cat-manual"
+    };
+
+    expect(updateIngredientFoodSelection(row, "food-spinach", foods)).toMatchObject({
+      food_id: "food-spinach",
+      grocery_category_id: "cat-manual"
     });
   });
 });

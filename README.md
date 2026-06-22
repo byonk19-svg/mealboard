@@ -34,8 +34,9 @@ Implemented MVP surfaces include:
 - Pending grocery-change visibility when a finalized or shopping-started list would differ from the current approved plan
 - Mobile-friendly grocery shopping list with Shopping/Profile/Meal views, source context, manual add-ons, checked/already-have state, and Draft -> Finalized -> Shopping Started -> Completed lifecycle
 - Baby settings with stage context, baby food statuses, Baby Meal 1/2 routine preview, Try This preview, and Plan Week Baby Meal 1/2 persistence
-- Dashboard current-week summary with planning status, grocery status, next best action, an actionable needs-attention queue, and optional weekly wrap-up entry after completed shopping
-- Weekly wrap-up capture for made/skipped meals, leftovers, recipe/profile feedback, unused groceries, and future staple/quantity notes
+- Dashboard current-week summary with planning status, grocery status, next best action, setup-aware and calorie-guidance needs-attention items, and optional weekly wrap-up entry after completed shopping
+- Weekly wrap-up capture for made/skipped meals, leftovers, recipe/profile feedback, source-aware unused groceries, and future staple/quantity notes
+- Recipe library filters for search, status, planning approval, and nutrition-review needs
 - Playwright smoke coverage for protected route auth boundaries, plus credential-gated core-loop and mobile grocery smokes
 
 See `docs/MVP_READINESS.md` for the manual smoke checklist, known gaps, deferred features, and local environment notes.
@@ -122,6 +123,7 @@ Run the authenticated smoke with those values in your shell environment:
 ```bash
 npm run e2e:smoke
 npm run e2e:grocery-mobile
+npm run e2e:recipe-import
 ```
 
 For ad hoc local development, create an auth user through the login page or Supabase Studio. Then link that user to the seeded household by running this SQL in local Supabase Studio after replacing the email:

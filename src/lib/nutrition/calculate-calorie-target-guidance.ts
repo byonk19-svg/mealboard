@@ -70,6 +70,43 @@ export function calculateCalorieTargetGuidance({
   });
 }
 
+export type CalorieTargetGuidanceSummary = {
+  guidanceOnlyCount: number;
+  nearCount: number;
+  overCount: number;
+  underCount: number;
+  unknownCount: number;
+};
+
+export function summarizeCalorieTargetGuidance(
+  guidance: CalorieTargetGuidance[]
+): CalorieTargetGuidanceSummary {
+  return guidance.reduce<CalorieTargetGuidanceSummary>(
+    (summary, item) => {
+      if (item.status === "guidance_only") {
+        summary.guidanceOnlyCount += 1;
+      } else if (item.status === "near") {
+        summary.nearCount += 1;
+      } else if (item.status === "over") {
+        summary.overCount += 1;
+      } else if (item.status === "under") {
+        summary.underCount += 1;
+      } else if (item.status === "unknown") {
+        summary.unknownCount += 1;
+      }
+
+      return summary;
+    },
+    {
+      guidanceOnlyCount: 0,
+      nearCount: 0,
+      overCount: 0,
+      underCount: 0,
+      unknownCount: 0
+    }
+  );
+}
+
 export function getCalorieGuidanceKey(mealProfileId: string, date: string) {
   return `${mealProfileId}:${date}`;
 }

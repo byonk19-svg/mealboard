@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 import type { RecipeRating, RecipeStatus } from "@/lib/recipes/types";
+import { toUnusedGroceryCandidate } from "@/lib/weekly-wrap-up/build-wrap-up-items";
 
 type RecipeWrapUpStatus = Extract<
   RecipeStatus,
@@ -24,6 +25,27 @@ const recipeRatings = [
   "dislike",
   "hard_no"
 ] as const satisfies readonly RecipeRating[];
+
+type JoinedValue<T> = T | T[] | null;
+
+type UnusedGrocerySnapshotRow = {
+  grocery_list_item_id: string | null;
+  grocery_list_items: JoinedValue<{
+    display_name: string;
+    manual_item: boolean;
+  }>;
+};
+
+type GroceryItemSourceRow = {
+  meal_profiles: JoinedValue<{ name: string }>;
+  notes: string | null;
+  quantity: number | string | null;
+  recipes: JoinedValue<{ name: string }>;
+  source_id: string | null;
+  source_label: string | null;
+  source_type: string;
+  unit: string | null;
+};
 
 function wrapUpRedirect(weeklyPlanId: string, message: string): never {
   redirect(
@@ -87,10 +109,15 @@ export async function acknowledgeUnusedGroceryItem(formData: FormData) {
 
   const household = await requireHousehold(weeklyPlanId);
   const supabase = await createClient();
+  const unusedGrocery = await loadUnusedGrocerySnapshot({
+    householdId: household.id,
+    supabase,
+    wrapUpItemId
+  });
   const { error } = await supabase
     .from("weekly_wrap_up_items")
     .update({
-      response: { notes, resolution },
+      response: { notes, resolution, unusedGrocery },
       status: "completed"
     })
     .eq("household_id", household.id)
@@ -111,6 +138,77 @@ export async function acknowledgeUnusedGroceryItem(formData: FormData) {
   revalidatePath("/dashboard");
   revalidatePath(`/weekly-wrap-up/${weeklyPlanId}`);
   wrapUpRedirect(weeklyPlanId, "Unused grocery item noted.");
+}
+
+async function loadUnusedGrocerySnapshot({
+  householdId,
+  supabase,
+  wrapUpItemId
+}: {
+  householdId: string;
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  wrapUpItemId: string;
+}) {
+  const { data, error } = await supabase
+    .from("weekly_wrap_up_items")
+    .select("grocery_list_item_id, grocery_list_items(display_name, manual_item)")
+    .eq("household_id", householdId)
+    .eq("id", wrapUpItemId)
+    .eq("prompt_type", "unused_grocery_item")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const row = data as UnusedGrocerySnapshotRow | null;
+  const groceryItem = getJoinedValue(row?.grocery_list_items ?? null);
+
+  if (!row?.grocery_list_item_id || !groceryItem) {
+    return null;
+  }
+
+  const { data: sourceRows, error: sourceError } = await supabase
+    .from("grocery_item_sources")
+    .select(
+      "source_type, source_id, source_label, notes, quantity, unit, meal_profiles(name), recipes(name)"
+    )
+    .eq("household_id", householdId)
+    .eq("grocery_list_item_id", row.grocery_list_item_id)
+    .order("created_at", { ascending: true });
+
+  if (sourceError) {
+    throw new Error(sourceError.message);
+  }
+
+  const candidate = toUnusedGroceryCandidate({
+    alreadyHave: false,
+    checked: false,
+    displayName: groceryItem.display_name,
+    groceryListItemId: row.grocery_list_item_id,
+    manualItem: groceryItem.manual_item,
+    sources: ((sourceRows ?? []) as GroceryItemSourceRow[]).map((source) => ({
+      label: source.source_label,
+      mealProfileName: getJoinedValue(source.meal_profiles)?.name ?? null,
+      notes: source.notes,
+      quantity: toNullableNumber(source.quantity),
+      recipeName: getJoinedValue(source.recipes)?.name ?? null,
+      sourceId: source.source_id,
+      sourceType: source.source_type,
+      unit: source.unit
+    }))
+  });
+
+  return {
+    actionHref: candidate.actionHref,
+    actionLabel: candidate.actionLabel,
+    classification: candidate.classification,
+    displayName: candidate.displayName,
+    groceryListItemId: candidate.groceryListItemId,
+    manualItem: groceryItem.manual_item,
+    sourceKinds: candidate.sourceKinds,
+    sources: candidate.sources
+  };
 }
 
 export async function saveRecipeWrapUpReview(formData: FormData) {
@@ -252,4 +350,22 @@ async function completeWrapUpIfNoPendingItems({
   if (error) {
     wrapUpRedirect(weeklyPlanId, error.message);
   }
+}
+
+function getJoinedValue<T>(value: T | T[] | null | undefined) {
+  if (Array.isArray(value)) {
+    return value[0] ?? null;
+  }
+
+  return value ?? null;
+}
+
+function toNullableNumber(value: number | string | null) {
+  if (value === null || value === "") {
+    return null;
+  }
+
+  const numberValue = typeof value === "number" ? value : Number(value);
+
+  return Number.isFinite(numberValue) ? numberValue : null;
 }

@@ -165,6 +165,7 @@ describe("buildDashboardAttentionItems", () => {
     expect(
       buildDashboardAttentionItems({
         groceryList: null,
+        setup: null,
         weeklyPlan: null,
         weeklyWrapUp: null
       })
@@ -177,9 +178,36 @@ describe("buildDashboardAttentionItems", () => {
     ]);
   });
 
+  it("keeps setup items visible when no current weekly plan exists", () => {
+    const items = buildDashboardAttentionItems({
+      groceryList: null,
+      setup: {
+        adultProfileCount: 2,
+        adultProfilesMissingCalorieTargets: 1,
+        approvedRecipeCount: 0,
+        babyFoodStatusCount: 0,
+        babyProfileReady: false,
+        lowConfidenceRecipeCount: 0,
+        recipeCount: 0,
+        stapleCount: 0
+      },
+      weeklyPlan: null,
+      weeklyWrapUp: null
+    });
+
+    expect(items.map((item) => item.id)).toEqual([
+      "no-approved-recipes",
+      "baby-setup-needed",
+      "missing-calorie-targets",
+      "no-staples",
+      "start-plan"
+    ]);
+  });
+
   it("surfaces unapproved meals and missing grocery inputs", () => {
     const items = buildDashboardAttentionItems({
       groceryList: null,
+      setup: null,
       weeklyPlan: {
         approvedGroceryInputItemCount: 0,
         selectedStapleCount: 0,
@@ -193,6 +221,138 @@ describe("buildDashboardAttentionItems", () => {
     expect(items.map((item) => item.id)).toEqual([
       "unapproved-plan-items",
       "no-grocery-inputs"
+    ]);
+  });
+
+  it("surfaces setup issues before current-week lifecycle work", () => {
+    const items = buildDashboardAttentionItems({
+      groceryList: null,
+      setup: {
+        adultProfileCount: 2,
+        adultProfilesMissingCalorieTargets: 1,
+        approvedRecipeCount: 0,
+        babyFoodStatusCount: 0,
+      babyProfileReady: true,
+        lowConfidenceRecipeCount: 3,
+        recipeCount: 4,
+        stapleCount: 0
+      },
+      weeklyPlan: {
+        approvedGroceryInputItemCount: 0,
+        selectedStapleCount: 0,
+        status: "draft",
+        totalPlanItemCount: 0,
+        unapprovedPlanItemCount: 0
+      },
+      weeklyWrapUp: null
+    });
+
+    expect(items.map((item) => item.id)).toEqual([
+      "no-approved-recipes",
+      "no-baby-food-statuses",
+      "missing-calorie-targets",
+      "low-confidence-recipes",
+      "no-staples",
+      "empty-plan",
+      "no-grocery-inputs"
+    ]);
+    expect(items[0]).toEqual(
+      expect.objectContaining({
+        href: "/recipes",
+        label: "Approve recipes"
+      })
+    );
+  });
+
+  it("suppresses baby food status warnings until baby stage setup is ready", () => {
+    const items = buildDashboardAttentionItems({
+      groceryList: null,
+      setup: {
+        adultProfileCount: 2,
+        adultProfilesMissingCalorieTargets: 0,
+        approvedRecipeCount: 1,
+        babyFoodStatusCount: 0,
+        babyProfileReady: false,
+        lowConfidenceRecipeCount: 0,
+        recipeCount: 1,
+        stapleCount: 1
+      },
+      weeklyPlan: {
+        approvedGroceryInputItemCount: 0,
+        selectedStapleCount: 0,
+        status: "draft",
+        totalPlanItemCount: 0,
+        unapprovedPlanItemCount: 0
+      },
+      weeklyWrapUp: null
+    });
+
+    expect(items.map((item) => item.id)).toContain("baby-setup-needed");
+    expect(items.map((item) => item.id)).not.toContain("no-baby-food-statuses");
+  });
+
+  it("surfaces gentle current-week calorie estimate and target warnings", () => {
+    const items = buildDashboardAttentionItems({
+      groceryList: null,
+      setup: {
+        adultProfileCount: 2,
+        adultProfilesMissingCalorieTargets: 0,
+        approvedRecipeCount: 2,
+        babyFoodStatusCount: 1,
+        babyProfileReady: true,
+        calorieGuidanceOverDayCount: 1,
+        calorieGuidanceUnderDayCount: 2,
+        calorieGuidanceUnknownDayCount: 1,
+        lowConfidenceRecipeCount: 0,
+        recipeCount: 2,
+        stapleCount: 1
+      },
+      weeklyPlan: {
+        approvedGroceryInputItemCount: 1,
+        selectedStapleCount: 1,
+        status: "draft",
+        totalPlanItemCount: 2,
+        unapprovedPlanItemCount: 0
+      },
+      weeklyWrapUp: null
+    });
+
+    expect(items.map((item) => item.id)).toEqual([
+      "unknown-calorie-estimates",
+      "calorie-target-mismatch"
+    ]);
+  });
+
+  it("suppresses resolved setup issues and preserves stable lifecycle ordering", () => {
+    const items = buildDashboardAttentionItems({
+      groceryList: {
+        checkedItemCount: 0,
+        itemCount: 5,
+        status: "draft"
+      },
+      setup: {
+        adultProfileCount: 2,
+        adultProfilesMissingCalorieTargets: 0,
+        approvedRecipeCount: 3,
+        babyFoodStatusCount: 2,
+        babyProfileReady: true,
+        lowConfidenceRecipeCount: 0,
+        recipeCount: 3,
+        stapleCount: 1
+      },
+      weeklyPlan: {
+        approvedGroceryInputItemCount: 1,
+        selectedStapleCount: 1,
+        status: "draft",
+        totalPlanItemCount: 2,
+        unapprovedPlanItemCount: 1
+      },
+      weeklyWrapUp: null
+    });
+
+    expect(items.map((item) => item.id)).toEqual([
+      "unapproved-plan-items",
+      "draft-grocery-list"
     ]);
   });
 

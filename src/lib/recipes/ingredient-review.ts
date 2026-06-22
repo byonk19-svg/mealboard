@@ -84,6 +84,49 @@ export function resolveFoodSelection(
   };
 }
 
+export function updateIngredientDisplayName(
+  row: IngredientReviewRow,
+  displayName: string,
+  foods: Food[]
+): IngredientReviewRow {
+  const previousAutoMatch = resolveFoodMatch(foods, row.display_name);
+  const nextAutoMatch = resolveFoodMatch(foods, displayName);
+  const canReplaceFood =
+    row.food_id === null || row.food_id === previousAutoMatch.foodId;
+  const canReplaceCategory =
+    row.grocery_category_id === null ||
+    row.grocery_category_id === previousAutoMatch.groceryCategoryId;
+
+  return {
+    ...row,
+    display_name: displayName,
+    food_id: canReplaceFood ? nextAutoMatch.foodId : row.food_id,
+    grocery_category_id: canReplaceCategory
+      ? nextAutoMatch.groceryCategoryId
+      : row.grocery_category_id
+  };
+}
+
+export function updateIngredientFoodSelection(
+  row: IngredientReviewRow,
+  foodId: string | null,
+  foods: Food[]
+): IngredientReviewRow {
+  const previousSelection = resolveFoodSelection(foods, row.food_id);
+  const nextSelection = resolveFoodSelection(foods, foodId);
+  const canReplaceCategory =
+    row.grocery_category_id === null ||
+    row.grocery_category_id === previousSelection.groceryCategoryId;
+
+  return {
+    ...row,
+    food_id: nextSelection.foodId,
+    grocery_category_id: canReplaceCategory
+      ? nextSelection.groceryCategoryId
+      : row.grocery_category_id
+  };
+}
+
 function normalizeName(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
 }

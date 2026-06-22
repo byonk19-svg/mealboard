@@ -110,6 +110,72 @@ describe("buildWeeklyWrapUpCandidates", () => {
       "unused"
     ]);
   });
+
+  it("classifies source-aware unused grocery candidates without losing mixed sources", () => {
+    const result = buildWeeklyWrapUpCandidates({
+      existingReviewedPlanItemIds: new Set(),
+      groceryItems: [
+        groceryItem({
+          groceryListItemId: "staple",
+          sources: [
+            grocerySource({ sourceId: "staple-1", sourceType: "staple" })
+          ]
+        }),
+        groceryItem({
+          groceryListItemId: "mixed",
+          sources: [
+            grocerySource({
+              sourceId: "plan-item-1",
+              sourceType: "meal_generated"
+            }),
+            grocerySource({ sourceId: "staple-1", sourceType: "staple" })
+          ]
+        }),
+        groceryItem({
+          groceryListItemId: "manual",
+          manualItem: true,
+          sources: []
+        }),
+        groceryItem({
+          groceryListItemId: "legacy-generated",
+          manualItem: false,
+          sources: []
+        })
+      ],
+      planItems: []
+    });
+
+    expect(result.unusedGroceryCandidates).toEqual([
+      expect.objectContaining({
+        actionHref: "/settings/staples",
+        actionLabel: "Review staples",
+        classification: "staple",
+        groceryListItemId: "staple",
+        sourceKinds: ["staple"]
+      }),
+      expect.objectContaining({
+        actionHref: null,
+        actionLabel: null,
+        classification: "mixed",
+        groceryListItemId: "mixed",
+        sourceKinds: ["meal", "staple"]
+      }),
+      expect.objectContaining({
+        actionHref: "/grocery-list",
+        actionLabel: "Review grocery list",
+        classification: "manual",
+        groceryListItemId: "manual",
+        sourceKinds: ["manual"]
+      }),
+      expect.objectContaining({
+        actionHref: null,
+        actionLabel: null,
+        classification: null,
+        groceryListItemId: "legacy-generated",
+        sourceKinds: []
+      })
+    ]);
+  });
 });
 
 function planItem(overrides: Partial<WrapUpPlanItem> = {}): WrapUpPlanItem {
@@ -136,6 +202,24 @@ function groceryItem(
     checked: false,
     displayName: "Rice",
     groceryListItemId: "grocery-item-1",
+    manualItem: false,
+    sources: [],
+    ...overrides
+  };
+}
+
+function grocerySource(
+  overrides: Partial<WrapUpGroceryItem["sources"][number]> = {}
+): WrapUpGroceryItem["sources"][number] {
+  return {
+    label: "Rice source",
+    mealProfileName: null,
+    notes: null,
+    quantity: 1,
+    recipeName: null,
+    sourceId: null,
+    sourceType: "meal_generated",
+    unit: "count",
     ...overrides
   };
 }

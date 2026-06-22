@@ -29,8 +29,9 @@ The latest verified flow covers:
 - Toggle checked and already-have item states.
 - Advance a grocery list through Draft -> Finalized -> Shopping Started -> Completed.
 - Open the optional weekly wrap-up after completed shopping.
-- Capture made/skipped meal outcomes, leftovers, unused grocery notes, and future buying/staple-adjustment intent in weekly wrap-up.
-- Confirm Dashboard reflects current week planning, grocery status, next best action, actionable needs-attention items, and wrap-up entry when eligible.
+- Capture made/skipped meal outcomes, leftovers, source-aware unused grocery notes, and future buying/staple-adjustment intent in weekly wrap-up.
+- Confirm Dashboard reflects current week planning, grocery status, next best action, setup-aware and calorie-guidance needs-attention items, and wrap-up entry when eligible.
+- Filter the recipe library by search text, recipe status, planning approval, and nutrition-review needs.
 - Run unauthenticated Playwright auth-boundary smoke coverage plus credential-gated core-loop and mobile grocery smokes.
 
 ## Manual Smoke Checklist
@@ -114,10 +115,7 @@ These are intentionally out of scope for the current MVP unless a future task ex
 Good next slices should stay narrow and start from the verified MVP loop. Candidate directions:
 
 - Safe dependency-audit follow-up when a non-breaking Next/PostCSS fix is available
-- Fuller dashboard setup intelligence for baby/nutrition warnings that need more data than the current week snapshot
-- Durable staple-source linkage for future automatic staple quantity/frequency adjustments
-- Calorie target and gentle warning expansion
-- Recipe paste/import usability
+- Review workflow for applying source-aware weekly wrap-up staple suggestions without hidden automatic changes
 - Shared household/member invite preparation
 - PWA/mobile install polish
 

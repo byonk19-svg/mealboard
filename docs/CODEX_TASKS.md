@@ -1289,14 +1289,16 @@ Summarize:
 
 The foundation, core loop, hardening, smart swaps, Plan Week profile view,
 Preferences food creation, dashboard attention queue, mobile grocery polish,
-weekly wrap-up expansion, and Baby Meal 1/2 persistence slices are complete. For
-the current repo state, run focused follow-up slices in this order:
+weekly wrap-up expansion, Baby Meal 1/2 persistence, setup-aware and
+calorie-guidance dashboard signals, durable grocery source linkage,
+source-aware unused-grocery wrap-up, recipe filters, and recipe import smoke
+coverage are complete. For the current repo state, run focused follow-up slices
+in this order:
 
 1. **Safe dependency-audit follow-up** — revisit the Next/PostCSS audit only when Next provides a non-breaking fix path.
-2. **Dashboard setup intelligence** — expand needs-attention items for baby and nutrition setup using real persisted signals, not guesses.
-3. **Durable staple-source linkage** — add the smallest RLS-safe source linkage needed before automatic staple quantity/frequency adjustments.
-4. **Calorie target guidance expansion** — make nutrition warnings gentler and more useful without full macro tracking.
-5. **Recipe import usability** — improve paste/import flow without AI or recipe-photo scope.
+2. **Weekly wrap-up staple suggestion review** — turn source-aware unused-staple responses into an explicit review/apply flow without hidden automatic changes.
+3. **Shared household/member invite preparation** — prepare the next household collaboration step without disrupting the single-user MVP.
+4. **PWA/mobile install polish** — improve home-screen/offline-adjacent ergonomics after the private MVP loop is stable.
 
 Keep H-E-B integration, AI, full pantry inventory, reminders, native apps,
 recipe photos, full macro tracking, and cloud Supabase migration pushes out of

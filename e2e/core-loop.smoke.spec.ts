@@ -72,7 +72,7 @@ test.describe("MealBoard core loop", () => {
     await expect(plannedMeal).toBeVisible({ timeout: 30_000 });
     await page.getByRole("link", { name: "Profile view" }).click();
     await expect(page).toHaveURL(/view=profile/);
-    await expect(page.getByText(recipeName)).toBeVisible();
+    await expect(plannedMeal).toBeVisible();
     await expect(page.getByRole("heading", { exact: true, name: "Baby" })).toBeVisible();
     await plannedMeal.getByRole("button", { name: "Approve for groceries" }).click();
     await expect(page).toHaveURL(/view=profile/);

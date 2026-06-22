@@ -78,7 +78,7 @@ export default async function DashboardPage() {
                     className="w-fit rounded-md border border-border bg-card px-3 py-2 text-sm font-semibold transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                     href={item.href}
                   >
-                    Open
+                    {item.actionLabel}
                   </Link>
                 </div>
               </article>

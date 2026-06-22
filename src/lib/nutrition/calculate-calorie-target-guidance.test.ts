@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   calculateCalorieTargetGuidance,
-  getCalorieGuidanceKey
+  getCalorieGuidanceKey,
+  summarizeCalorieTargetGuidance
 } from "./calculate-calorie-target-guidance";
 import type { DailyNutritionSummary } from "./calculate-daily-totals";
 import type { MealProfile } from "@/lib/settings/types";
@@ -108,6 +109,24 @@ describe("calculateCalorieTargetGuidance", () => {
       "profile-brianna:2026-05-24"
     );
   });
+
+  it("summarizes current-week target guidance into dashboard-safe counts", () => {
+    expect(
+      summarizeCalorieTargetGuidance([
+        guidance({ status: "unknown" }),
+        guidance({ status: "under" }),
+        guidance({ status: "over" }),
+        guidance({ status: "near" }),
+        guidance({ status: "guidance_only" })
+      ])
+    ).toEqual({
+      guidanceOnlyCount: 1,
+      nearCount: 1,
+      overCount: 1,
+      underCount: 1,
+      unknownCount: 1
+    });
+  });
 });
 
 function profile(overrides: Partial<MealProfile>): MealProfile {
@@ -156,6 +175,20 @@ function summary(
     proteinGrams: 80,
     unknownCalorieItems: 0,
     unknownProteinItems: 0,
+    ...overrides
+  };
+}
+
+function guidance(
+  overrides: Partial<ReturnType<typeof calculateCalorieTargetGuidance>[number]>
+): ReturnType<typeof calculateCalorieTargetGuidance>[number] {
+  return {
+    calorieTarget: 1800,
+    date: "2026-05-24",
+    difference: 0,
+    mealProfileId: "profile-brianna",
+    status: "near",
+    tone: "ok",
     ...overrides
   };
 }

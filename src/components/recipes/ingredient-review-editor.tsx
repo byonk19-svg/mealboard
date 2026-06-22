@@ -3,8 +3,8 @@
 import { useId, useState } from "react";
 import {
   buildIngredientReviewRows,
-  resolveFoodMatch,
-  resolveFoodSelection,
+  updateIngredientDisplayName,
+  updateIngredientFoodSelection,
   type IngredientReviewRow
 } from "@/lib/recipes/ingredient-review";
 import { parseIngredientText } from "@/lib/recipes/parse-ingredient-lines";
@@ -203,13 +203,13 @@ function IngredientRow({
             className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             name="ingredientDisplayName"
             onChange={(event) => {
-              const foodMatch = resolveFoodMatch(foods, event.target.value);
-              onUpdate({
-                display_name: event.target.value,
-                food_id: ingredient.food_id ?? foodMatch.foodId,
-                grocery_category_id:
-                  ingredient.grocery_category_id ?? foodMatch.groceryCategoryId
-              });
+              onUpdate(
+                updateIngredientDisplayName(
+                  ingredient,
+                  event.target.value,
+                  foods
+                )
+              );
             }}
             placeholder="Chicken breast"
             value={ingredient.display_name}
@@ -221,15 +221,13 @@ function IngredientRow({
             className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             name="ingredientFoodId"
             onChange={(event) => {
-              const foodMatch = resolveFoodSelection(
-                foods,
-                event.target.value || null
+              onUpdate(
+                updateIngredientFoodSelection(
+                  ingredient,
+                  event.target.value || null,
+                  foods
+                )
               );
-              onUpdate({
-                food_id: foodMatch.foodId,
-                grocery_category_id:
-                  ingredient.grocery_category_id ?? foodMatch.groceryCategoryId
-              });
             }}
             value={ingredient.food_id ?? ""}
           >

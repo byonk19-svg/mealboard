@@ -10,6 +10,7 @@
     "e2e:headed": "playwright test e2e/core-loop.smoke.spec.ts --project=chromium --headed",
     "e2e:install": "playwright install chromium",
     "e2e:grocery-mobile": "playwright test e2e/grocery-mobile.smoke.spec.ts --project=chromium",
+    "e2e:recipe-import": "playwright test e2e/recipe-import.smoke.spec.ts --project=chromium",
     "e2e:seed-local-user": "node scripts/bootstrap-local-e2e-user.mjs",
     "e2e:smoke": "playwright test e2e/core-loop.smoke.spec.ts --project=chromium",
     "start": "next start",

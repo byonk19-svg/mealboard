@@ -240,6 +240,19 @@ function UnusedGrocerySection({
           key={item.id}
         >
           <h3 className="text-lg font-semibold">{item.displayName}</h3>
+          {item.sourceKinds.length > 0 ? (
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Source context: {formatSourceKinds(item.sourceKinds)}
+            </p>
+          ) : null}
+          {item.actionHref && item.actionLabel ? (
+            <Link
+              className="mt-3 inline-flex w-fit rounded-md border border-border px-3 py-2 text-sm font-semibold transition-colors hover:bg-muted"
+              href={item.actionHref}
+            >
+              {item.actionLabel}
+            </Link>
+          ) : null}
           <form action={acknowledgeUnusedGroceryItem} className="mt-4 grid gap-3">
             <input name="weeklyPlanId" type="hidden" value={weeklyPlanId} />
             <input name="wrapUpId" type="hidden" value={wrapUpId} />
@@ -276,6 +289,17 @@ function UnusedGrocerySection({
       ))}
     </section>
   );
+}
+
+function formatSourceKinds(sourceKinds: string[]) {
+  const labels: Record<string, string> = {
+    baby: "Baby item",
+    manual: "Manual add-on",
+    meal: "Planned meal",
+    staple: "Staple"
+  };
+
+  return sourceKinds.map((kind) => labels[kind] ?? kind).join(", ");
 }
 
 function NotEligibleState({ reason }: { reason: string }) {
