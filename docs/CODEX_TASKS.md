@@ -914,11 +914,11 @@ push unless explicitly approved.
 
 # Task 14 — Baby Planning MVP
 
-Status: Mostly complete for read-only MVP surfaces. Baby stage setup, baby food
-statuses, static guidance, Baby Meal 1/2 routine previews, Try This preview,
-and Plan Week read-only baby routine preview exist. Persisted Baby Meal 1/2
-weekly-plan writes, baby grocery generation, baby nutrition, and reaction/milk
-tracking remain out of scope.
+Status: Mostly complete for the solids-only MVP surface. Baby stage setup,
+baby food statuses, static guidance, Baby Meal 1/2 routine previews, Try This
+preview, Plan Week Baby Meal 1/2 persistence, and approved baby grocery source
+behavior exist. Baby nutrition, milk intake, and reaction tracking remain out
+of scope.
 
 ## Goal
 
@@ -964,7 +964,7 @@ Run lint/typecheck/tests and report results.
 
 * Baby profile has birthdate/stage override.
 * Baby food statuses work.
-* Baby Meal 1/2 can appear as a read-only Plan Week preview.
+* Baby Meal 1/2 can appear on Plan Week and be applied as persisted baby slots.
 * Baby guidance displays.
 * New baby foods stay separate in Try This.
 * Baby stage resolver has tests.
@@ -975,7 +975,8 @@ Run lint/typecheck/tests and report results.
 
 Status: Implemented as a first rule-based adult draft-suggestion slice.
 Suggestions fill open adult slots only, persist as unapproved weekly plan items,
-and include reason labels/why-this context. Full swap behavior remains Task 16.
+and include reason labels/why-this context. Smart swap behavior is now covered
+by Task 16.
 
 ## Goal
 
@@ -1014,7 +1015,7 @@ Rules:
 - Favorites and Safe Defaults can repeat more often.
 - Generated plans remain drafts.
 - User can approve, lock, or remove suggestions.
-- Swap suggestions remain Task 16.
+- Swap suggestions are covered by Task 16.
 
 Important boundaries:
 - Do not use AI.
@@ -1035,10 +1036,10 @@ Run lint/typecheck/tests and report results.
 
 # Task 16 — Smart Swaps and Grocery Impact Warning
 
-Status: Partially complete for grocery impact visibility. The app now has an
-on-demand pending grocery-change diff for finalized/shopping-started lists and
-shows add/remove/keep counts in Plan Week. Full smart swap selection and
-confirmation remain pending.
+Status: Complete for MVP. The app now has context-aware swap suggestions,
+reason labels, confirmation UX, and pre-confirmation grocery add/remove/keep
+impact counts. Existing finalized or shopping-started grocery lists are not
+silently changed by swaps.
 
 ## Goal
 
@@ -1084,10 +1085,12 @@ Run lint/typecheck/tests and report results.
 
 # Task 17 — Weekly Wrap-Up MVP
 
-Status: Implemented as an optional MVP route and dashboard entry after completed
-shopping, backed by `weekly_wrap_ups` and `weekly_wrap_up_items`. It can create
-recipe-review and unused-grocery prompts, save recipe feedback, update profile
-approval/status, acknowledge unused groceries, and dismiss the wrap-up.
+Status: Implemented and broadened as an optional route and dashboard entry after
+completed shopping, backed by `weekly_wrap_ups` and `weekly_wrap_up_items`. It
+can create meal-outcome and unused-grocery prompts, save made/skipped feedback,
+capture leftover context, update recipe profile approval/status, capture future
+buying/staple-adjustment intent, acknowledge unused groceries, and dismiss the
+wrap-up.
 
 ## Goal
 
@@ -1134,6 +1137,11 @@ Run lint/typecheck/tests and report results.
 
 # Task 18 — Mobile Grocery Polish
 
+Status: Complete for MVP. `/grocery-list` has phone-friendly tap targets, sticky
+status/summary, collapsible sections, Shopping/Profile/Meal views, source
+details, manual add-ons, checked/already-have controls, and a credential-gated
+mobile Playwright smoke.
+
 ## Goal
 
 Make the grocery list comfortable for real H-E-B shopping.
@@ -1178,6 +1186,11 @@ Run lint/typecheck/tests and, if Playwright exists, add or run a mobile viewport
 ---
 
 # Task 19 — Empty States, Errors, and Onboarding Warnings
+
+Status: Mostly complete for MVP. Core empty states, setup warnings, protected
+grocery-change warnings, dashboard needs-attention actions, and user-facing
+messages are in place. Fuller baby/nutrition setup intelligence can be improved
+later when those domains have richer persisted signals.
 
 ## Goal
 
@@ -1272,19 +1285,22 @@ Summarize:
 
 ---
 
-## Suggested First 5 Tasks to Run
+## Suggested Next Tasks to Run
 
-The foundation tasks are complete. For the current repo state, run focused
-follow-up slices in this order:
+The foundation, core loop, hardening, smart swaps, Plan Week profile view,
+Preferences food creation, dashboard attention queue, mobile grocery polish,
+weekly wrap-up expansion, and Baby Meal 1/2 persistence slices are complete. For
+the current repo state, run focused follow-up slices in this order:
 
-1. **Task 16 completion — Smart swap selection and confirmation UX**
-2. **Task 18 — Mobile Grocery Polish**
-3. **Task 19 — Empty States, Errors, and Onboarding Warnings**
-4. **Task 20 — MVP Hardening Pass**
-5. **Authenticated E2E hardening — stabilize the credential-gated core-loop smoke**
+1. **Safe dependency-audit follow-up** — revisit the Next/PostCSS audit only when Next provides a non-breaking fix path.
+2. **Dashboard setup intelligence** — expand needs-attention items for baby and nutrition setup using real persisted signals, not guesses.
+3. **Durable staple-source linkage** — add the smallest RLS-safe source linkage needed before automatic staple quantity/frequency adjustments.
+4. **Calorie target guidance expansion** — make nutrition warnings gentler and more useful without full macro tracking.
+5. **Recipe import usability** — improve paste/import flow without AI or recipe-photo scope.
 
-Keep baby weekly-plan writes separate until Baby Meal 1/2 slot identity,
-nutrition behavior, and grocery behavior are explicitly designed.
+Keep H-E-B integration, AI, full pantry inventory, reminders, native apps,
+recipe photos, full macro tracking, and cloud Supabase migration pushes out of
+scope unless explicitly approved.
 
 ---
 

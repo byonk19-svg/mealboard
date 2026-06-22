@@ -11,9 +11,9 @@ This repo is separate from RT Scheduler. Product and technical decisions should 
 ## Current MVP Status
 
 MealBoard has reached a private family MVP readiness checkpoint for the
-planning and grocery loop, with newer foundations for rule-based suggestions,
-baby solids previews, pending grocery-change visibility, weekly wrap-up, and
-E2E smoke coverage.
+planning and grocery loop, with rule-based suggestions, smart swaps, baby
+solids planning, an actionable dashboard queue, pending grocery-change
+visibility, weekly wrap-up learning, and E2E smoke coverage.
 
 The current core loop is:
 
@@ -24,17 +24,19 @@ Recipes -> Plan Week -> Staples -> Grocery List -> Dashboard
 Implemented MVP surfaces include:
 
 - Email/password auth and household-scoped app routes
-- Household profiles, preferences, grocery categories, and foods foundation
+- Household profiles, preferences, grocery categories, saved foods, and a Preferences food-create flow
 - Recipe library with structured ingredients, profile approvals, and calorie/protein estimate fields
-- Weekly planning with adult work/off days, planned recipe items, approval/lock/remove actions, staples review, and a small nutrition estimate summary
+- Weekly planning with adult work/off days, Day/Profile views, planned recipe items, approval/lock/remove/swap actions, staples review, and a small nutrition estimate summary
 - Rule-based adult meal suggestion drafts with reason labels and why-this context
+- Smart swap suggestions with confirmation and grocery add/remove/keep impact preview
 - Staples settings CRUD, weekly staple selection, and selected staples flowing into grocery generation
-- Grocery list generation from approved planned meals and selected staples
+- Grocery list generation from approved planned meals, persisted approved baby foods, and selected staples
 - Pending grocery-change visibility when a finalized or shopping-started list would differ from the current approved plan
 - Mobile-friendly grocery shopping list with Shopping/Profile/Meal views, source context, manual add-ons, checked/already-have state, and Draft -> Finalized -> Shopping Started -> Completed lifecycle
-- Baby settings with stage context, baby food statuses, Baby Meal 1/2 routine preview, and Try This preview
-- Dashboard current-week summary with planning status, grocery status, next best action, and optional weekly wrap-up entry after completed shopping
-- Minimal Playwright smoke coverage for protected route auth boundaries, plus a credential-gated core-loop smoke
+- Baby settings with stage context, baby food statuses, Baby Meal 1/2 routine preview, Try This preview, and Plan Week Baby Meal 1/2 persistence
+- Dashboard current-week summary with planning status, grocery status, next best action, an actionable needs-attention queue, and optional weekly wrap-up entry after completed shopping
+- Weekly wrap-up capture for made/skipped meals, leftovers, recipe/profile feedback, unused groceries, and future staple/quantity notes
+- Playwright smoke coverage for protected route auth boundaries, plus credential-gated core-loop and mobile grocery smokes
 
 See `docs/MVP_READINESS.md` for the manual smoke checklist, known gaps, deferred features, and local environment notes.
 
@@ -119,6 +121,7 @@ Run the authenticated smoke with those values in your shell environment:
 
 ```bash
 npm run e2e:smoke
+npm run e2e:grocery-mobile
 ```
 
 For ad hoc local development, create an auth user through the login page or Supabase Studio. Then link that user to the seeded household by running this SQL in local Supabase Studio after replacing the email:
@@ -152,6 +155,11 @@ If the Supabase CLI is installed and Docker is running, also verify the local da
 ```bash
 supabase db reset
 ```
+
+Current dependency-audit note: `npm audit --omit=dev` reports a Next vendored
+PostCSS advisory whose available automated fix is a breaking forced downgrade.
+Do not run `npm audit fix --force` for that item; revisit when Next ships a
+non-breaking stable fix.
 
 ## Project Structure
 

@@ -40,10 +40,21 @@ type DayTypeInput = {
   weekly_plan_id: string;
 };
 
-function planWeekRedirect(weekStartDate: string, message: string): never {
-  redirect(
-    `/plan-week?weekStartDate=${encodeURIComponent(weekStartDate)}&message=${encodeURIComponent(message)}`
-  );
+function planWeekRedirect(
+  weekStartDate: string,
+  message: string,
+  view?: string | null
+): never {
+  const params = new URLSearchParams({
+    message,
+    weekStartDate
+  });
+
+  if (view === "profile") {
+    params.set("view", "profile");
+  }
+
+  redirect(`/plan-week?${params.toString()}`);
 }
 
 function textOrNull(value: FormDataEntryValue | null) {
@@ -262,9 +273,10 @@ export async function approveWeeklyPlanItem(formData: FormData) {
   const weekStartDate =
     textOrNull(formData.get("weekStartDate")) ?? getWeekStartDate(new Date());
   const itemId = textOrNull(formData.get("weeklyPlanItemId"));
+  const view = textOrNull(formData.get("view"));
 
   if (!itemId) {
-    planWeekRedirect(weekStartDate, "Choose a plan item first.");
+    planWeekRedirect(weekStartDate, "Choose a plan item first.", view);
   }
 
   const household = await requireHousehold(weekStartDate);
@@ -276,20 +288,21 @@ export async function approveWeeklyPlanItem(formData: FormData) {
     .eq("id", itemId);
 
   if (error) {
-    planWeekRedirect(weekStartDate, error.message);
+    planWeekRedirect(weekStartDate, error.message, view);
   }
 
   revalidatePath("/plan-week");
-  planWeekRedirect(weekStartDate, "Plan item approved.");
+  planWeekRedirect(weekStartDate, "Plan item approved.", view);
 }
 
 export async function toggleWeeklyPlanItemLock(formData: FormData) {
   const weekStartDate =
     textOrNull(formData.get("weekStartDate")) ?? getWeekStartDate(new Date());
   const itemId = textOrNull(formData.get("weeklyPlanItemId"));
+  const view = textOrNull(formData.get("view"));
 
   if (!itemId) {
-    planWeekRedirect(weekStartDate, "Choose a plan item first.");
+    planWeekRedirect(weekStartDate, "Choose a plan item first.", view);
   }
 
   const household = await requireHousehold(weekStartDate);
@@ -302,11 +315,11 @@ export async function toggleWeeklyPlanItemLock(formData: FormData) {
     .maybeSingle();
 
   if (readError) {
-    planWeekRedirect(weekStartDate, readError.message);
+    planWeekRedirect(weekStartDate, readError.message, view);
   }
 
   if (!data) {
-    planWeekRedirect(weekStartDate, "That plan item is no longer available.");
+    planWeekRedirect(weekStartDate, "That plan item is no longer available.", view);
   }
 
   const { error } = await supabase
@@ -316,13 +329,14 @@ export async function toggleWeeklyPlanItemLock(formData: FormData) {
     .eq("id", itemId);
 
   if (error) {
-    planWeekRedirect(weekStartDate, error.message);
+    planWeekRedirect(weekStartDate, error.message, view);
   }
 
   revalidatePath("/plan-week");
   planWeekRedirect(
     weekStartDate,
-    data.is_locked ? "Plan item unlocked." : "Plan item locked."
+    data.is_locked ? "Plan item unlocked." : "Plan item locked.",
+    view
   );
 }
 
@@ -330,9 +344,10 @@ export async function removeWeeklyPlanItem(formData: FormData) {
   const weekStartDate =
     textOrNull(formData.get("weekStartDate")) ?? getWeekStartDate(new Date());
   const itemId = textOrNull(formData.get("weeklyPlanItemId"));
+  const view = textOrNull(formData.get("view"));
 
   if (!itemId) {
-    planWeekRedirect(weekStartDate, "Choose a plan item first.");
+    planWeekRedirect(weekStartDate, "Choose a plan item first.", view);
   }
 
   const household = await requireHousehold(weekStartDate);
@@ -344,11 +359,11 @@ export async function removeWeeklyPlanItem(formData: FormData) {
     .eq("id", itemId);
 
   if (error) {
-    planWeekRedirect(weekStartDate, error.message);
+    planWeekRedirect(weekStartDate, error.message, view);
   }
 
   revalidatePath("/plan-week");
-  planWeekRedirect(weekStartDate, "Plan item removed.");
+  planWeekRedirect(weekStartDate, "Plan item removed.", view);
 }
 
 export async function confirmWeeklyPlanItemSwap(formData: FormData) {
@@ -356,9 +371,10 @@ export async function confirmWeeklyPlanItemSwap(formData: FormData) {
     textOrNull(formData.get("weekStartDate")) ?? getWeekStartDate(new Date());
   const itemId = textOrNull(formData.get("weeklyPlanItemId"));
   const recipeId = textOrNull(formData.get("recipeId"));
+  const view = textOrNull(formData.get("view"));
 
   if (!itemId || !recipeId) {
-    planWeekRedirect(weekStartDate, "Choose a meal and swap recipe first.");
+    planWeekRedirect(weekStartDate, "Choose a meal and swap recipe first.", view);
   }
 
   const household = await requireHousehold(weekStartDate);
@@ -371,11 +387,11 @@ export async function confirmWeeklyPlanItemSwap(formData: FormData) {
     .maybeSingle();
 
   if (itemError) {
-    planWeekRedirect(weekStartDate, itemError.message);
+    planWeekRedirect(weekStartDate, itemError.message, view);
   }
 
   if (!itemRow) {
-    planWeekRedirect(weekStartDate, "That meal is no longer in the plan.");
+    planWeekRedirect(weekStartDate, "That meal is no longer in the plan.", view);
   }
 
   const [profileDays, goals, planItems, recipes] = await Promise.all([
@@ -387,7 +403,7 @@ export async function confirmWeeklyPlanItemSwap(formData: FormData) {
   const targetItem = planItems.find((item) => item.id === itemId);
 
   if (!targetItem) {
-    planWeekRedirect(weekStartDate, "That meal is no longer in the plan.");
+    planWeekRedirect(weekStartDate, "That meal is no longer in the plan.", view);
   }
 
   const selectedSuggestion = buildRuleBasedSwapSuggestions({
@@ -403,7 +419,8 @@ export async function confirmWeeklyPlanItemSwap(formData: FormData) {
       weekStartDate,
       targetItem.is_locked
         ? "Unlock this meal before swapping it."
-        : "That swap is no longer available."
+        : "That swap is no longer available.",
+      view
     );
   }
 
@@ -425,18 +442,23 @@ export async function confirmWeeklyPlanItemSwap(formData: FormData) {
     .maybeSingle();
 
   if (error) {
-    planWeekRedirect(weekStartDate, error.message);
+    planWeekRedirect(weekStartDate, error.message, view);
   }
 
   if (!updatedItem) {
     planWeekRedirect(
       weekStartDate,
-      "That meal changed while you were swapping it. Reload and try again."
+      "That meal changed while you were swapping it. Reload and try again.",
+      view
     );
   }
 
   revalidatePath("/plan-week");
-  planWeekRedirect(weekStartDate, "Meal swapped. Review groceries before regenerating.");
+  planWeekRedirect(
+    weekStartDate,
+    "Meal swapped. Review groceries before regenerating.",
+    view
+  );
 }
 
 export async function applyBabyRoutineToWeek(formData: FormData) {

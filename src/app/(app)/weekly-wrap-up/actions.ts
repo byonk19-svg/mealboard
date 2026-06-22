@@ -79,6 +79,7 @@ export async function acknowledgeUnusedGroceryItem(formData: FormData) {
   const wrapUpId = textOrNull(formData.get("wrapUpId"));
   const wrapUpItemId = textOrNull(formData.get("wrapUpItemId"));
   const resolution = textOrNull(formData.get("resolution")) ?? "acknowledged";
+  const notes = textOrNull(formData.get("notes"));
 
   if (!weeklyPlanId || !wrapUpId || !wrapUpItemId) {
     redirect("/dashboard");
@@ -89,7 +90,7 @@ export async function acknowledgeUnusedGroceryItem(formData: FormData) {
   const { error } = await supabase
     .from("weekly_wrap_up_items")
     .update({
-      response: { resolution },
+      response: { notes, resolution },
       status: "completed"
     })
     .eq("household_id", household.id)
@@ -122,6 +123,7 @@ export async function saveRecipeWrapUpReview(formData: FormData) {
   const rawStatus = textOrNull(formData.get("profileStatus"));
   const rawRating = textOrNull(formData.get("rating"));
   const outcome = textOrNull(formData.get("outcome")) ?? "made";
+  const leftovers = textOrNull(formData.get("leftovers")) ?? "none";
   const notes = textOrNull(formData.get("notes"));
   const profileStatus = recipeWrapUpStatuses.includes(
     rawStatus as RecipeWrapUpStatus
@@ -139,16 +141,21 @@ export async function saveRecipeWrapUpReview(formData: FormData) {
   const household = await requireHousehold(weeklyPlanId);
   const supabase = await createClient();
   const response = {
+    leftovers,
     notes,
     outcome,
     profileStatus,
     rating
   };
+  const quickTags = [
+    outcome === "skipped" ? "skipped" : null,
+    leftovers !== "none" ? leftovers : null
+  ].filter((tag): tag is string => Boolean(tag));
   const { error: reviewError } = await supabase.from("recipe_reviews").insert({
     household_id: household.id,
     meal_profile_id: mealProfileId,
     notes,
-    quick_tags: outcome === "skipped" ? ["skipped"] : [],
+    quick_tags: quickTags,
     rating,
     recipe_id: recipeId,
     weekly_plan_item_id: weeklyPlanItemId

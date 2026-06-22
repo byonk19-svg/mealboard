@@ -119,7 +119,7 @@ function RecipeReviewSection({
 
   return (
     <section className="space-y-3">
-      <h2 className="text-xl font-semibold">Meal feedback</h2>
+      <h2 className="text-xl font-semibold">Made, skipped, and leftovers</h2>
       {items.map((item) => (
         <article
           className="rounded-lg border border-border bg-card p-5 shadow-sm"
@@ -189,8 +189,21 @@ function RecipeReviewSection({
               <input
                 className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2"
                 name="notes"
+                placeholder="What should change next time?"
                 type="text"
               />
+            </label>
+            <label className="text-sm font-medium">
+              Leftovers
+              <select
+                className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2"
+                name="leftovers"
+              >
+                <option value="none">No leftovers</option>
+                <option value="some">Some leftovers</option>
+                <option value="too_much">Too much leftover</option>
+                <option value="used_leftovers">Used leftovers instead</option>
+              </select>
             </label>
             <button
               className="min-h-11 w-full rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground sm:w-fit"
@@ -220,20 +233,40 @@ function UnusedGrocerySection({
 
   return (
     <section className="space-y-3">
-      <h2 className="text-xl font-semibold">Unused groceries</h2>
+      <h2 className="text-xl font-semibold">Unused groceries and staples</h2>
       {items.map((item) => (
         <article
           className="rounded-lg border border-border bg-card p-5 shadow-sm"
           key={item.id}
         >
           <h3 className="text-lg font-semibold">{item.displayName}</h3>
-          <form action={acknowledgeUnusedGroceryItem} className="mt-4">
+          <form action={acknowledgeUnusedGroceryItem} className="mt-4 grid gap-3">
             <input name="weeklyPlanId" type="hidden" value={weeklyPlanId} />
             <input name="wrapUpId" type="hidden" value={wrapUpId} />
             <input name="wrapUpItemId" type="hidden" value={item.id} />
-            <input name="resolution" type="hidden" value="acknowledged" />
+            <label className="text-sm font-medium">
+              Future adjustment
+              <select
+                className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2"
+                name="resolution"
+              >
+                <option value="acknowledged">Keep as-is</option>
+                <option value="use_later">Use later this week</option>
+                <option value="reduce_future_amount">Buy less next time</option>
+                <option value="pause_future_buy">Pause this for now</option>
+              </select>
+            </label>
+            <label className="text-sm font-medium">
+              Note
+              <input
+                className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2"
+                name="notes"
+                placeholder="Optional staple or quantity note"
+                type="text"
+              />
+            </label>
             <button
-              className="min-h-11 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors hover:bg-muted"
+              className="min-h-11 w-full rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors hover:bg-muted sm:w-fit"
               type="submit"
             >
               Noted

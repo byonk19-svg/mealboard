@@ -46,6 +46,40 @@ describe("buildWeeklyWrapUpCandidates", () => {
     ]);
   });
 
+  it("creates meal outcome candidates for approved planned recipes", () => {
+    const result = buildWeeklyWrapUpCandidates({
+      existingReviewedPlanItemIds: new Set(),
+      groceryItems: [],
+      planItems: [
+        planItem({
+          isTryThis: false,
+          recipeStatus: "approved",
+          weeklyPlanItemId: "approved-recipe-1"
+        })
+      ]
+    });
+
+    expect(result.recipeReviewCandidates.map((item) => item.weeklyPlanItemId)).toEqual([
+      "approved-recipe-1"
+    ]);
+  });
+
+  it("does not create meal outcome candidates for non-recipe plan items", () => {
+    const result = buildWeeklyWrapUpCandidates({
+      existingReviewedPlanItemIds: new Set(),
+      groceryItems: [],
+      planItems: [
+        planItem({
+          recipeId: null,
+          recipeName: null,
+          weeklyPlanItemId: "food-only-1"
+        })
+      ]
+    });
+
+    expect(result.recipeReviewCandidates).toEqual([]);
+  });
+
   it("skips plan items that already have recipe reviews", () => {
     const result = buildWeeklyWrapUpCandidates({
       existingReviewedPlanItemIds: new Set(["plan-item-1"]),

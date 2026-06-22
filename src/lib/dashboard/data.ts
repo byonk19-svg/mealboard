@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import {
+  buildDashboardAttentionItems,
   getDashboardNextAction,
+  type DashboardAttentionItem,
   type DashboardGroceryListSummary,
   type DashboardNextAction,
   type DashboardWeeklyPlanSummary
@@ -9,6 +11,7 @@ import type { GroceryListStatus } from "@/lib/grocery/data";
 import type { WeeklyPlanStatus } from "@/lib/weekly-plans/types";
 
 export type DashboardCurrentWeekSnapshot = {
+  attentionItems: DashboardAttentionItem[];
   groceryList: (DashboardGroceryListSummary & {
     generatedAt: string | null;
     id: string;
@@ -64,6 +67,11 @@ export async function getDashboardCurrentWeekSnapshot({
 
   if (!weeklyPlan) {
     return {
+      attentionItems: buildDashboardAttentionItems({
+        groceryList: null,
+        weeklyPlan: null,
+        weeklyWrapUp: null
+      }),
       groceryList: null,
       nextAction: getDashboardNextAction({
         groceryList: null,
@@ -76,12 +84,12 @@ export async function getDashboardCurrentWeekSnapshot({
   }
 
   const [
-    approvedRecipeItemCount,
+    approvedGroceryInputItemCount,
     selectedStapleCount,
     totalPlanItemCount,
     unapprovedPlanItemCount
   ] = await Promise.all([
-      countApprovedRecipeItems({
+      countApprovedGroceryInputItems({
         householdId,
         supabase,
         weeklyPlanId: weeklyPlan.id
@@ -103,7 +111,7 @@ export async function getDashboardCurrentWeekSnapshot({
       })
     ]);
   const weeklyPlanSummary = {
-    approvedRecipeItemCount,
+    approvedGroceryInputItemCount,
     id: weeklyPlan.id,
     selectedStapleCount,
     status: weeklyPlan.status,
@@ -122,6 +130,12 @@ export async function getDashboardCurrentWeekSnapshot({
   });
 
   return {
+    attentionItems: buildDashboardAttentionItems({
+      groceryList,
+      weeklyPlan: weeklyPlanSummary,
+      weeklyWrapUp,
+      weeklyWrapUpHref: `/weekly-wrap-up/${weeklyPlan.id}`
+    }),
     groceryList,
     nextAction: getDashboardNextAction({
       groceryList,
@@ -178,7 +192,7 @@ async function countWeeklyPlanItems({
   return count ?? 0;
 }
 
-async function countApprovedRecipeItems({
+async function countApprovedGroceryInputItems({
   householdId,
   supabase,
   weeklyPlanId
@@ -193,7 +207,7 @@ async function countApprovedRecipeItems({
     .eq("household_id", householdId)
     .eq("weekly_plan_id", weeklyPlanId)
     .eq("is_approved", true)
-    .not("recipe_id", "is", null);
+    .or("recipe_id.not.is.null,food_id.not.is.null");
 
   if (error) {
     throw new Error(error.message);

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { normalizeBabyFoodStatusInput } from "@/lib/settings/baby-food-statuses";
 import { normalizeBabyProfileInput } from "@/lib/settings/baby-profile";
 import { resolveSettingsReturnPath } from "@/lib/settings/baby-settings";
+import { foodNameKey, normalizeFoodCreateInput } from "@/lib/settings/foods";
 import { normalizeStapleInput } from "@/lib/settings/staples";
 import { preferenceLevels, type FoodPreferenceLevel } from "@/lib/settings/types";
 import { createClient } from "@/lib/supabase/server";
@@ -20,6 +21,26 @@ type ParsedNumber =
 
 function settingsRedirect(path: string, message: string): never {
   redirect(`${path}?message=${encodeURIComponent(message)}`);
+}
+
+function preferenceRedirect(params: {
+  createdFoodId?: string;
+  message: string;
+  q?: string;
+}): never {
+  const searchParams = new URLSearchParams({
+    message: params.message
+  });
+
+  if (params.q) {
+    searchParams.set("q", params.q);
+  }
+
+  if (params.createdFoodId) {
+    searchParams.set("createdFoodId", params.createdFoodId);
+  }
+
+  redirect(`/settings/preferences?${searchParams.toString()}`);
 }
 
 function textOrNull(value: FormDataEntryValue | null) {
@@ -213,6 +234,89 @@ export async function saveFoodPreference(formData: FormData) {
 
   revalidatePath(path);
   settingsRedirect(path, "Food preference saved.");
+}
+
+export async function createPreferenceFood(formData: FormData) {
+  const path = "/settings/preferences";
+  const household = await requireHousehold(path);
+  let input: ReturnType<typeof normalizeFoodCreateInput>;
+
+  try {
+    input = normalizeFoodCreateInput({
+      name: textOrNull(formData.get("name"))
+    });
+  } catch (error) {
+    settingsRedirect(
+      path,
+      error instanceof Error ? error.message : "Food could not be created."
+    );
+  }
+
+  const supabase = await createClient();
+  const { data: existingFoods, error: existingFoodsError } = await supabase
+    .from("foods")
+    .select("id, name")
+    .eq("household_id", household.id)
+    .is("archived_at", null);
+
+  if (existingFoodsError) {
+    settingsRedirect(path, existingFoodsError.message);
+  }
+
+  const existingFood = (existingFoods ?? []).find(
+    (food) => foodNameKey(food.name) === foodNameKey(input.name)
+  );
+
+  if (existingFood) {
+    preferenceRedirect({
+      createdFoodId: existingFood.id,
+      message: "That food already exists. It is ready to select.",
+      q: existingFood.name
+    });
+  }
+
+  const { data: createdFood, error } = await supabase
+    .from("foods")
+    .insert({
+      household_id: household.id,
+      name: input.name
+    })
+    .select("id, name")
+    .maybeSingle();
+
+  if (error) {
+    if (error.code === "23505") {
+      const { data: foodsAfterConflict } = await supabase
+        .from("foods")
+        .select("id, name")
+        .eq("household_id", household.id)
+        .is("archived_at", null);
+      const conflictedFood = (foodsAfterConflict ?? []).find(
+        (food) => foodNameKey(food.name) === foodNameKey(input.name)
+      );
+
+      if (conflictedFood) {
+        preferenceRedirect({
+          createdFoodId: conflictedFood.id,
+          message: "That food already exists. It is ready to select.",
+          q: conflictedFood.name
+        });
+      }
+    }
+
+    settingsRedirect(path, error.message);
+  }
+
+  if (!createdFood) {
+    settingsRedirect(path, "Food could not be created.");
+  }
+
+  revalidatePath(path);
+  preferenceRedirect({
+    createdFoodId: createdFood.id,
+    message: "Food created. Choose a profile and preference level.",
+    q: createdFood.name
+  });
 }
 
 export async function deleteFoodPreference(formData: FormData) {

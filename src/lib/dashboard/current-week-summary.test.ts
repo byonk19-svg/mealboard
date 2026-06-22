@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { getDashboardNextAction } from "./current-week-summary";
+import {
+  buildDashboardAttentionItems,
+  getDashboardNextAction
+} from "./current-week-summary";
 
 describe("getDashboardNextAction", () => {
   it("starts with weekly planning when no current weekly plan exists", () => {
@@ -20,7 +23,7 @@ describe("getDashboardNextAction", () => {
       getDashboardNextAction({
         groceryList: null,
         weeklyPlan: {
-          approvedRecipeItemCount: 0,
+          approvedGroceryInputItemCount: 0,
           selectedStapleCount: 0,
           status: "draft",
           totalPlanItemCount: 2,
@@ -39,7 +42,7 @@ describe("getDashboardNextAction", () => {
       getDashboardNextAction({
         groceryList: null,
         weeklyPlan: {
-          approvedRecipeItemCount: 1,
+          approvedGroceryInputItemCount: 1,
           selectedStapleCount: 0,
           status: "draft",
           totalPlanItemCount: 2,
@@ -53,6 +56,41 @@ describe("getDashboardNextAction", () => {
     });
   });
 
+  it("treats approved food-backed baby items as grocery-ready inputs", () => {
+    expect(
+      getDashboardNextAction({
+        groceryList: null,
+        weeklyPlan: {
+          approvedGroceryInputItemCount: 1,
+          selectedStapleCount: 0,
+          status: "draft",
+          totalPlanItemCount: 1,
+          unapprovedPlanItemCount: 0
+        }
+      })
+    ).toEqual({
+      description: "Approved items are ready to become a draft grocery list.",
+      href: "/plan-week",
+      label: "Generate grocery list"
+    });
+
+    const attentionItems = buildDashboardAttentionItems({
+      groceryList: null,
+      weeklyPlan: {
+        approvedGroceryInputItemCount: 1,
+        selectedStapleCount: 0,
+        status: "draft",
+        totalPlanItemCount: 1,
+        unapprovedPlanItemCount: 0
+      },
+      weeklyWrapUp: null
+    });
+
+    expect(attentionItems.map((item) => item.id)).not.toContain(
+      "no-grocery-inputs"
+    );
+  });
+
   it("uses the grocery lifecycle status once a current week grocery list exists", () => {
     expect(
       getDashboardNextAction({
@@ -62,7 +100,7 @@ describe("getDashboardNextAction", () => {
           status: "draft"
         },
         weeklyPlan: {
-          approvedRecipeItemCount: 1,
+          approvedGroceryInputItemCount: 1,
           selectedStapleCount: 1,
           status: "draft",
           totalPlanItemCount: 2,
@@ -83,7 +121,7 @@ describe("getDashboardNextAction", () => {
           status: "shopping_started"
         },
         weeklyPlan: {
-          approvedRecipeItemCount: 1,
+          approvedGroceryInputItemCount: 1,
           selectedStapleCount: 1,
           status: "draft",
           totalPlanItemCount: 2,
@@ -106,7 +144,7 @@ describe("getDashboardNextAction", () => {
           status: "completed"
         },
         weeklyPlan: {
-          approvedRecipeItemCount: 2,
+          approvedGroceryInputItemCount: 2,
           selectedStapleCount: 1,
           status: "draft",
           totalPlanItemCount: 3,
@@ -119,5 +157,121 @@ describe("getDashboardNextAction", () => {
       href: "/plan-week",
       label: "Review planned meals"
     });
+  });
+});
+
+describe("buildDashboardAttentionItems", () => {
+  it("starts the queue with planning when no current weekly plan exists", () => {
+    expect(
+      buildDashboardAttentionItems({
+        groceryList: null,
+        weeklyPlan: null,
+        weeklyWrapUp: null
+      })
+    ).toEqual([
+      expect.objectContaining({
+        href: "/plan-week",
+        id: "start-plan",
+        label: "Start this week's plan"
+      })
+    ]);
+  });
+
+  it("surfaces unapproved meals and missing grocery inputs", () => {
+    const items = buildDashboardAttentionItems({
+      groceryList: null,
+      weeklyPlan: {
+        approvedGroceryInputItemCount: 0,
+        selectedStapleCount: 0,
+        status: "draft",
+        totalPlanItemCount: 2,
+        unapprovedPlanItemCount: 2
+      },
+      weeklyWrapUp: null
+    });
+
+    expect(items.map((item) => item.id)).toEqual([
+      "unapproved-plan-items",
+      "no-grocery-inputs"
+    ]);
+  });
+
+  it("surfaces active grocery lifecycle work", () => {
+    const items = buildDashboardAttentionItems({
+      groceryList: {
+        checkedItemCount: 2,
+        itemCount: 6,
+        status: "shopping_started"
+      },
+      weeklyPlan: {
+        approvedGroceryInputItemCount: 1,
+        selectedStapleCount: 1,
+        status: "draft",
+        totalPlanItemCount: 2,
+        unapprovedPlanItemCount: 0
+      },
+      weeklyWrapUp: null
+    });
+
+    expect(items).toEqual([
+      expect.objectContaining({
+        href: "/grocery-list",
+        id: "shopping-in-progress",
+        label: "Continue shopping"
+      })
+    ]);
+  });
+
+  it("links completed shopping to weekly wrap-up when it is still open", () => {
+    const items = buildDashboardAttentionItems({
+      groceryList: {
+        checkedItemCount: 6,
+        itemCount: 6,
+        status: "completed"
+      },
+      weeklyPlan: {
+        approvedGroceryInputItemCount: 1,
+        selectedStapleCount: 1,
+        status: "draft",
+        totalPlanItemCount: 2,
+        unapprovedPlanItemCount: 0
+      },
+      weeklyWrapUp: {
+        dismissed: false,
+        status: "open"
+      },
+      weeklyWrapUpHref: "/weekly-wrap-up/week-1"
+    });
+
+    expect(items).toEqual([
+      expect.objectContaining({
+        href: "/weekly-wrap-up/week-1",
+        id: "weekly-wrap-up"
+      })
+    ]);
+  });
+
+  it("suppresses dismissed weekly wrap-up attention", () => {
+    const items = buildDashboardAttentionItems({
+      groceryList: {
+        checkedItemCount: 6,
+        itemCount: 6,
+        status: "completed"
+      },
+      weeklyPlan: {
+        approvedGroceryInputItemCount: 1,
+        selectedStapleCount: 1,
+        status: "draft",
+        totalPlanItemCount: 2,
+        unapprovedPlanItemCount: 0
+      },
+      weeklyWrapUp: {
+        dismissed: true,
+        status: "open"
+      },
+      weeklyWrapUpHref: "/weekly-wrap-up/week-1"
+    });
+
+    expect(items).toEqual([]);
   });
 });

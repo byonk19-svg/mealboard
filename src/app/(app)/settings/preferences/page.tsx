@@ -1,4 +1,5 @@
 import {
+  createPreferenceFood,
   deleteFoodPreference,
   saveFoodPreference
 } from "@/app/(app)/settings/actions";
@@ -18,6 +19,7 @@ import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 
 type PreferencesPageProps = {
   searchParams: Promise<{
+    createdFoodId?: string;
     message?: string;
     q?: string;
   }>;
@@ -27,7 +29,7 @@ export default async function PreferencesPage({
   searchParams
 }: PreferencesPageProps) {
   const householdContext = await getCurrentHouseholdContext();
-  const { message, q } = await searchParams;
+  const { createdFoodId, message, q } = await searchParams;
 
   if (!householdContext.household) {
     return null;
@@ -36,7 +38,7 @@ export default async function PreferencesPage({
   const [profiles, searchedFoods, allFoods, preferences] = await Promise.all([
     getMealProfiles(householdContext.household.id),
     getFoods(householdContext.household.id, q),
-    getFoods(householdContext.household.id),
+    getFoods(householdContext.household.id, undefined, { limit: null }),
     getFoodPreferences(householdContext.household.id)
   ]);
 
@@ -48,8 +50,8 @@ export default async function PreferencesPage({
           Food Preferences
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
-          Add household profile preferences for seeded foods. Dislikes warn
-          during recipe checks; Hard No and Allergy block recipes.
+          Add household profile preferences for saved foods. Create a new food
+          here if it is missing.
         </p>
       </div>
 
@@ -59,7 +61,12 @@ export default async function PreferencesPage({
         <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
           <h2 className="text-xl font-semibold">Add or update preference</h2>
           <FoodSearchForm query={q ?? ""} />
-          <PreferenceForm foods={searchedFoods} profiles={profiles} />
+          <AddFoodForm />
+          <PreferenceForm
+            defaultFoodId={createdFoodId}
+            foods={searchedFoods}
+            profiles={profiles}
+          />
         </section>
 
         <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
@@ -93,7 +100,7 @@ function FoodSearchForm({ query }: { query: string }) {
         className="min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         defaultValue={query}
         name="q"
-        placeholder="Search seeded foods"
+        placeholder="Search household foods"
         type="search"
       />
       <button
@@ -106,17 +113,50 @@ function FoodSearchForm({ query }: { query: string }) {
   );
 }
 
+function AddFoodForm() {
+  return (
+    <form
+      action={createPreferenceFood}
+      className="mt-4 rounded-md border border-dashed border-border p-3"
+    >
+      <h3 className="font-semibold">Add a food</h3>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Create a household food, then assign a preference below.
+      </p>
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+        <label className="min-w-0 flex-1 text-sm font-medium">
+          New food name
+          <input
+            className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            name="name"
+            placeholder="Example: avocado"
+            required
+          />
+        </label>
+        <button
+          className="self-end rounded-md border border-border bg-card px-4 py-2 text-sm font-semibold transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          type="submit"
+        >
+          Add food
+        </button>
+      </div>
+    </form>
+  );
+}
+
 function PreferenceForm({
+  defaultFoodId,
   foods,
   profiles
 }: {
+  defaultFoodId?: string;
   foods: Food[];
   profiles: MealProfile[];
 }) {
   return (
     <form action={saveFoodPreference} className="mt-4 space-y-4">
       <ProfileSelect profiles={profiles} />
-      <FoodSelect foods={foods} />
+      <FoodSelect defaultValue={defaultFoodId} foods={foods} />
       <PreferenceSelect />
       <NotesFields />
       <button

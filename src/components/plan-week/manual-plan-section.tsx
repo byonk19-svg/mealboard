@@ -8,8 +8,13 @@ import {
 import Link from "next/link";
 import type { SwapGroceryImpact } from "@/lib/grocery/data";
 import type { RuleBasedSwapSuggestion } from "@/lib/meal-planning/rule-based-suggestions";
-import { formatMealType, type MealType } from "@/lib/recipes/types";
+import {
+  formatMealType,
+  mealTypes,
+  type MealType
+} from "@/lib/recipes/types";
 import type { MealProfile } from "@/lib/settings/types";
+import type { PlanItemProfileGroup } from "@/lib/weekly-plans/group-plan-items";
 import type {
   PlanRecipeOption,
   WeeklyPlanItem
@@ -28,22 +33,26 @@ const planMealTypes = [
 ] as const satisfies readonly MealType[];
 
 export function ManualPlanSection({
+  planItemsByProfile,
   planItemsByDate,
   profiles,
   recipeOptions,
   selectedSwapItemId,
   swapGroceryImpacts,
   swapSuggestions,
+  view,
   weekDates,
   weekStartDate,
   weeklyPlanId
 }: {
+  planItemsByProfile: PlanItemProfileGroup[];
   planItemsByDate: Map<string, WeeklyPlanItem[]>;
   profiles: MealProfile[];
   recipeOptions: PlanRecipeOption[];
   selectedSwapItemId: string | null;
   swapGroceryImpacts: SwapGroceryImpact[];
   swapSuggestions: RuleBasedSwapSuggestion[];
+  view: "day" | "profile";
   weekDates: WeekDate[];
   weekStartDate: string;
   weeklyPlanId: string;
@@ -52,12 +61,19 @@ export function ManualPlanSection({
 
   return (
     <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
-      <div>
-        <h2 className="text-xl font-semibold">Manual plan</h2>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          Add saved recipes to specific days, profiles, and meal slots. Approve
-          items when they should count toward grocery generation.
-        </p>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold">Manual plan</h2>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Add saved recipes in Day view, or review the full week by profile.
+            Approve items when they should count toward grocery generation.
+          </p>
+        </div>
+        <PlanViewSelector
+          selectedSwapItemId={selectedSwapItemId}
+          view={view}
+          weekStartDate={weekStartDate}
+        />
       </div>
 
       {!canAddItems ? (
@@ -68,51 +84,204 @@ export function ManualPlanSection({
         </div>
       ) : null}
 
-      <div className="mt-5 grid gap-4">
-        {weekDates.map((date) => (
-          <article
-            className="rounded-md border border-border bg-background p-4"
-            key={date.dateKey}
-          >
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
-              <h3 className="text-lg font-semibold">{date.dayLabel}</h3>
-              <p className="text-sm text-muted-foreground">
-                {formatDisplayDate(date.dateKey)}
-              </p>
-            </div>
+      {view === "profile" ? (
+        <ProfilePlanView
+          groups={planItemsByProfile}
+          selectedSwapItemId={selectedSwapItemId}
+          swapGroceryImpacts={swapGroceryImpacts}
+          swapSuggestions={swapSuggestions}
+          weekStartDate={weekStartDate}
+        />
+      ) : (
+        <DayPlanView
+          canAddItems={canAddItems}
+          planItemsByDate={planItemsByDate}
+          profiles={profiles}
+          recipeOptions={recipeOptions}
+          selectedSwapItemId={selectedSwapItemId}
+          swapGroceryImpacts={swapGroceryImpacts}
+          swapSuggestions={swapSuggestions}
+          weekDates={weekDates}
+          weekStartDate={weekStartDate}
+          weeklyPlanId={weeklyPlanId}
+        />
+      )}
+    </section>
+  );
+}
 
-            <div className="mt-4 grid gap-3">
-              {(planItemsByDate.get(date.dateKey) ?? []).length > 0 ? (
-                (planItemsByDate.get(date.dateKey) ?? []).map((item) => (
+function DayPlanView({
+  canAddItems,
+  planItemsByDate,
+  profiles,
+  recipeOptions,
+  selectedSwapItemId,
+  swapGroceryImpacts,
+  swapSuggestions,
+  weekDates,
+  weekStartDate,
+  weeklyPlanId
+}: {
+  canAddItems: boolean;
+  planItemsByDate: Map<string, WeeklyPlanItem[]>;
+  profiles: MealProfile[];
+  recipeOptions: PlanRecipeOption[];
+  selectedSwapItemId: string | null;
+  swapGroceryImpacts: SwapGroceryImpact[];
+  swapSuggestions: RuleBasedSwapSuggestion[];
+  weekDates: WeekDate[];
+  weekStartDate: string;
+  weeklyPlanId: string;
+}) {
+  return (
+    <div className="mt-5 grid gap-4">
+      {weekDates.map((date) => (
+        <article
+          className="rounded-md border border-border bg-background p-4"
+          key={date.dateKey}
+        >
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+            <h3 className="text-lg font-semibold">{date.dayLabel}</h3>
+            <p className="text-sm text-muted-foreground">
+              {formatDisplayDate(date.dateKey)}
+            </p>
+          </div>
+
+          <div className="mt-4 grid gap-3">
+            {(planItemsByDate.get(date.dateKey) ?? []).length > 0 ? (
+              (planItemsByDate.get(date.dateKey) ?? []).map((item) => (
                   <PlanItemCard
                     item={item}
                     key={item.id}
                     selectedSwapItemId={selectedSwapItemId}
                     swapGroceryImpacts={swapGroceryImpacts}
                     swapSuggestions={swapSuggestions}
+                    view="day"
                     weekStartDate={weekStartDate}
                   />
-                ))
-              ) : (
-                <p className="rounded-md border border-dashed border-border bg-muted/30 px-3 py-4 text-sm text-muted-foreground">
-                  Nothing planned for this day yet.
-                </p>
-              )}
-            </div>
+              ))
+            ) : (
+              <p className="rounded-md border border-dashed border-border bg-muted/30 px-3 py-4 text-sm text-muted-foreground">
+                Nothing planned for this day yet.
+              </p>
+            )}
+          </div>
 
-            {canAddItems ? (
-              <AddPlanItemForm
-                date={date}
-                profiles={profiles}
-                recipeOptions={recipeOptions}
-                weekStartDate={weekStartDate}
-                weeklyPlanId={weeklyPlanId}
-              />
-            ) : null}
-          </article>
-        ))}
-      </div>
-    </section>
+          {canAddItems ? (
+            <AddPlanItemForm
+              date={date}
+              profiles={profiles}
+              recipeOptions={recipeOptions}
+              weekStartDate={weekStartDate}
+              weeklyPlanId={weeklyPlanId}
+            />
+          ) : null}
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function ProfilePlanView({
+  groups,
+  selectedSwapItemId,
+  swapGroceryImpacts,
+  swapSuggestions,
+  weekStartDate
+}: {
+  groups: PlanItemProfileGroup[];
+  selectedSwapItemId: string | null;
+  swapGroceryImpacts: SwapGroceryImpact[];
+  swapSuggestions: RuleBasedSwapSuggestion[];
+  weekStartDate: string;
+}) {
+  if (groups.length === 0) {
+    return (
+      <p className="mt-5 rounded-md border border-dashed border-border bg-muted/30 px-3 py-4 text-sm text-muted-foreground">
+        Nothing is planned for any profile yet. Switch to Day view to add saved
+        recipes.
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-5 grid gap-4">
+      {groups.map((group) => (
+        <article
+          className="rounded-md border border-border bg-background p-4"
+          key={group.profileName}
+        >
+          <h3 className="text-lg font-semibold">{group.profileName}</h3>
+          <div className="mt-4 grid gap-3">
+            {group.items.length > 0 ? (
+              group.items.map(({ item, slotLabel }) => (
+                <PlanItemCard
+                  contextLabel={`${formatDisplayDate(item.plan_date)} - ${formatSlotLabel(slotLabel)}`}
+                  item={item}
+                  key={item.id}
+                  selectedSwapItemId={selectedSwapItemId}
+                  swapGroceryImpacts={swapGroceryImpacts}
+                  swapSuggestions={swapSuggestions}
+                  view="profile"
+                  weekStartDate={weekStartDate}
+                />
+              ))
+            ) : (
+              <p className="rounded-md border border-dashed border-border bg-muted/30 px-3 py-4 text-sm text-muted-foreground">
+                {group.profileName.toLowerCase() === "baby"
+                  ? "No Baby Meal 1 or Baby Meal 2 items are planned yet."
+                  : "No meals are planned for this profile yet."}
+              </p>
+            )}
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function PlanViewSelector({
+  selectedSwapItemId,
+  view,
+  weekStartDate
+}: {
+  selectedSwapItemId: string | null;
+  view: "day" | "profile";
+  weekStartDate: string;
+}) {
+  const options = [
+    { label: "Day view", value: "day" },
+    { label: "Profile view", value: "profile" }
+  ] as const;
+
+  return (
+    <nav
+      aria-label="Plan view"
+      className="grid grid-cols-2 gap-1 rounded-md border border-border bg-muted p-1"
+    >
+      {options.map((option) => {
+        const isActive = view === option.value;
+
+        return (
+          <Link
+            aria-current={isActive ? "page" : undefined}
+            className={`rounded px-3 py-2 text-center text-sm font-medium ${
+              isActive
+                ? "bg-card text-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-card/60"
+            }`}
+            href={buildPlanWeekHref({
+              swapItemId: selectedSwapItemId,
+              view: option.value,
+              weekStartDate
+            })}
+            key={option.value}
+          >
+            {option.label}
+          </Link>
+        );
+      })}
+    </nav>
   );
 }
 
@@ -194,16 +363,20 @@ function AddPlanItemForm({
 }
 
 function PlanItemCard({
+  contextLabel,
   item,
   selectedSwapItemId,
   swapGroceryImpacts,
   swapSuggestions,
+  view,
   weekStartDate
 }: {
+  contextLabel?: string;
   item: WeeklyPlanItem;
   selectedSwapItemId: string | null;
   swapGroceryImpacts: SwapGroceryImpact[];
   swapSuggestions: RuleBasedSwapSuggestion[];
+  view: "day" | "profile";
   weekStartDate: string;
 }) {
   const canSwap = canSwapPlanItem(item);
@@ -218,6 +391,7 @@ function PlanItemCard({
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <StatusChip>{item.meal_profile_name ?? "Unassigned"}</StatusChip>
+            {contextLabel ? <StatusChip>{contextLabel}</StatusChip> : null}
             <StatusChip>{formatMealType(item.meal_type)}</StatusChip>
             <StatusChip tone={item.is_approved ? "success" : "muted"}>
               {item.is_approved ? "Approved for groceries" : "Needs approval"}
@@ -266,6 +440,7 @@ function PlanItemCard({
               action={approveWeeklyPlanItem}
               buttonLabel="Approve for groceries"
               itemId={item.id}
+              view={view}
               weekStartDate={weekStartDate}
             />
           ) : null}
@@ -273,12 +448,17 @@ function PlanItemCard({
             action={toggleWeeklyPlanItemLock}
             buttonLabel={item.is_locked ? "Unlock" : "Lock"}
             itemId={item.id}
+            view={view}
             weekStartDate={weekStartDate}
           />
           {canSwap ? (
             <Link
               className="rounded-md border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-              href={`/plan-week?weekStartDate=${encodeURIComponent(weekStartDate)}&swapItemId=${encodeURIComponent(item.id)}`}
+              href={buildPlanWeekHref({
+                swapItemId: item.id,
+                view,
+                weekStartDate
+              })}
             >
               Swap
             </Link>
@@ -288,6 +468,7 @@ function PlanItemCard({
             buttonLabel="Remove"
             itemId={item.id}
             tone="danger"
+            view={view}
             weekStartDate={weekStartDate}
           />
         </div>
@@ -298,6 +479,7 @@ function PlanItemCard({
           item={item}
           swapGroceryImpacts={swapGroceryImpacts}
           suggestions={swapSuggestions}
+          view={view}
           weekStartDate={weekStartDate}
         />
       ) : null}
@@ -309,11 +491,13 @@ function MealSwapPanel({
   item,
   swapGroceryImpacts,
   suggestions,
+  view,
   weekStartDate
 }: {
   item: WeeklyPlanItem;
   swapGroceryImpacts: SwapGroceryImpact[];
   suggestions: RuleBasedSwapSuggestion[];
+  view: "day" | "profile";
   weekStartDate: string;
 }) {
   const groceryImpactByRecipeId = new Map(
@@ -332,7 +516,7 @@ function MealSwapPanel({
         </div>
         <Link
           className="text-sm font-medium text-muted-foreground underline-offset-4 hover:underline"
-          href={`/plan-week?weekStartDate=${encodeURIComponent(weekStartDate)}`}
+          href={buildPlanWeekHref({ view, weekStartDate })}
         >
           Cancel
         </Link>
@@ -376,6 +560,7 @@ function MealSwapPanel({
                   <input name="weekStartDate" type="hidden" value={weekStartDate} />
                   <input name="weeklyPlanItemId" type="hidden" value={item.id} />
                   <input name="recipeId" type="hidden" value={suggestion.recipeId} />
+                  <input name="view" type="hidden" value={view} />
                   <button
                     className="rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                     type="submit"
@@ -429,7 +614,7 @@ function SwapGroceryImpactSummary({
       <p className="font-medium text-foreground">Grocery impact</p>
       <p className="mt-1">
         {impact.hasChanges
-          ? `${formatImpactCount(impact.addedCount, "add")} · ${formatImpactCount(impact.removedCount, "remove")} · ${formatImpactCount(impact.keptCount, "keep")}`
+          ? `${formatImpactCount(impact.addedCount, "add")} - ${formatImpactCount(impact.removedCount, "remove")} - ${formatImpactCount(impact.keptCount, "keep")}`
           : "No item changes compared with the current grocery list."}
       </p>
       {impact.listStatus === "finalized" ||
@@ -471,6 +656,35 @@ function formatGroceryListStatus(status: string) {
     .join(" ");
 }
 
+function formatSlotLabel(slotLabel: string) {
+  if (mealTypes.includes(slotLabel as MealType)) {
+    return formatMealType(slotLabel as MealType);
+  }
+
+  return slotLabel;
+}
+
+function buildPlanWeekHref({
+  swapItemId,
+  view,
+  weekStartDate
+}: {
+  swapItemId?: string | null;
+  view: "day" | "profile";
+  weekStartDate: string;
+}) {
+  const params = new URLSearchParams({
+    view,
+    weekStartDate
+  });
+
+  if (swapItemId) {
+    params.set("swapItemId", swapItemId);
+  }
+
+  return `/plan-week?${params.toString()}`;
+}
+
 function hasMissingEstimate(item: WeeklyPlanItem) {
   return (
     item.estimated_calories === null || item.estimated_protein_grams === null
@@ -491,12 +705,14 @@ function PlanItemActionForm({
   buttonLabel,
   itemId,
   tone = "default",
+  view,
   weekStartDate
 }: {
   action: (formData: FormData) => void | Promise<void>;
   buttonLabel: string;
   itemId: string;
   tone?: "default" | "danger";
+  view: "day" | "profile";
   weekStartDate: string;
 }) {
   const buttonClassName =
@@ -508,6 +724,7 @@ function PlanItemActionForm({
     <form action={action}>
       <input name="weekStartDate" type="hidden" value={weekStartDate} />
       <input name="weeklyPlanItemId" type="hidden" value={itemId} />
+      <input name="view" type="hidden" value={view} />
       <button className={buttonClassName} type="submit">
         {buttonLabel}
       </button>

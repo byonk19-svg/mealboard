@@ -45,6 +45,7 @@ import {
   getWeeklyPlanProfileDays,
   getWeeklyPlanStapleSelections
 } from "@/lib/weekly-plans/data";
+import { buildPlanItemsByProfile } from "@/lib/weekly-plans/group-plan-items";
 import {
   buildPlanWeekSummary,
   type PlanWeekSummary
@@ -62,6 +63,7 @@ type PlanWeekPageProps = {
   searchParams: Promise<{
     message?: string;
     swapItemId?: string;
+    view?: string;
     weekStartDate?: string;
   }>;
 };
@@ -73,6 +75,7 @@ export default async function PlanWeekPage({
   const {
     message,
     swapItemId,
+    view: viewParam,
     weekStartDate: requestedWeekStartDate
   } = await searchParams;
 
@@ -130,6 +133,7 @@ export default async function PlanWeekPage({
   );
   const selectedGoals = new Set(goals.map((goal) => goal.goal));
   const planItemsByDate = new Map<string, WeeklyPlanItem[]>();
+  const planView = viewParam === "profile" ? "profile" : "day";
   const nutritionSummaries = calculateDailyNutritionTotals(planItems);
   const calorieGuidance = weeklyPlan
     ? calculateCalorieTargetGuidance({
@@ -204,6 +208,10 @@ export default async function PlanWeekPage({
   planItems.forEach((item) => {
     const existingItems = planItemsByDate.get(item.plan_date) ?? [];
     planItemsByDate.set(item.plan_date, [...existingItems, item]);
+  });
+  const planItemsByProfile = buildPlanItemsByProfile({
+    planItems,
+    profiles: planningProfiles
   });
 
   return (
@@ -385,12 +393,14 @@ export default async function PlanWeekPage({
           ) : null}
 
           <ManualPlanSection
+            planItemsByProfile={planItemsByProfile}
             planItemsByDate={planItemsByDate}
             profiles={planningProfiles}
             recipeOptions={recipeOptions}
             selectedSwapItemId={selectedSwapItem?.id ?? null}
             swapGroceryImpacts={swapGroceryImpacts}
             swapSuggestions={swapSuggestions}
+            view={planView}
             weekDates={weekDates}
             weekStartDate={weekStartDate}
             weeklyPlanId={weeklyPlan.id}

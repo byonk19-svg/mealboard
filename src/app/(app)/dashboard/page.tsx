@@ -52,6 +52,45 @@ export default async function DashboardPage() {
         </p>
       </section>
 
+      <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+          <h2 className="text-xl font-semibold">Needs attention</h2>
+          <p className="text-sm text-muted-foreground">
+            {snapshot.attentionItems.length}{" "}
+            {snapshot.attentionItems.length === 1 ? "item" : "items"}
+          </p>
+        </div>
+        {snapshot.attentionItems.length > 0 ? (
+          <div className="mt-4 grid gap-3">
+            {snapshot.attentionItems.map((item) => (
+              <article
+                className="rounded-md border border-border bg-background p-4"
+                key={item.id}
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="font-semibold">{item.label}</h3>
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                      {item.description}
+                    </p>
+                  </div>
+                  <Link
+                    className="w-fit rounded-md border border-border bg-card px-3 py-2 text-sm font-semibold transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                    href={item.href}
+                  >
+                    Open
+                  </Link>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-4 rounded-md border border-dashed border-border bg-muted/30 px-3 py-4 text-sm text-muted-foreground">
+            No current week items need action.
+          </p>
+        )}
+      </section>
+
       {snapshot.weeklyPlan &&
       snapshot.groceryList?.status === "completed" &&
       snapshot.weeklyWrapUp?.status !== "dismissed" &&
@@ -98,8 +137,8 @@ export default async function DashboardPage() {
                 value={String(snapshot.weeklyPlan.totalPlanItemCount)}
               />
               <Metric
-                label="Approved recipes"
-                value={String(snapshot.weeklyPlan.approvedRecipeItemCount)}
+                label="Approved grocery inputs"
+                value={String(snapshot.weeklyPlan.approvedGroceryInputItemCount)}
               />
               <Metric
                 label="Needs review"

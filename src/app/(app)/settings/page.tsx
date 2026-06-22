@@ -41,7 +41,7 @@ export default function SettingsPage() {
           <h2 className="mt-2 text-xl font-semibold">Preferences</h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Set Love, Like, Okay, Dislike, Hard No, and Allergy preferences
-            using seeded foods.
+            using saved household foods.
           </p>
         </Link>
 

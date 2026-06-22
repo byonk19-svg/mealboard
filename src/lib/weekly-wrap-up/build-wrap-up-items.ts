@@ -54,7 +54,7 @@ export function buildWeeklyWrapUpCandidates({
 }): WeeklyWrapUpCandidates {
   return {
     recipeReviewCandidates: planItems
-      .filter((item) => item.recipeId && shouldPromptForRecipeReview(item))
+      .filter((item) => item.recipeId)
       .filter((item) => !existingReviewedPlanItemIds.has(item.weeklyPlanItemId))
       .map((item) => ({
         displayName: item.displayName,
@@ -75,8 +75,4 @@ export function buildWeeklyWrapUpCandidates({
         promptType: "unused_grocery_item"
       }))
   };
-}
-
-function shouldPromptForRecipeReview(item: WrapUpPlanItem) {
-  return item.isTryThis || item.recipeStatus === "tried";
 }
