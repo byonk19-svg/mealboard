@@ -7,9 +7,12 @@ import {
   buildBabySettingsSummary,
   getBabyProfile
 } from "@/lib/settings/baby-settings";
+import { getBabyGuidanceForStage } from "@/lib/baby/baby-guidance";
 import { generateBabyMeals } from "@/lib/baby/generate-baby-meals";
+import { suggestBabyTryThis } from "@/lib/baby/suggest-baby-try-this";
 import {
   getBabyFoodStatuses,
+  getFoodPreferences,
   getFoods,
   getMealProfiles
 } from "@/lib/settings/data";
@@ -41,9 +44,10 @@ export default async function BabySettingsPage({
     return null;
   }
 
-  const [profiles, foods] = await Promise.all([
+  const [profiles, foods, foodPreferences] = await Promise.all([
     getMealProfiles(householdContext.household.id),
-    getFoods(householdContext.household.id)
+    getFoods(householdContext.household.id, undefined, { limit: null }),
+    getFoodPreferences(householdContext.household.id)
   ]);
   const babyProfile = getBabyProfile(profiles);
   const summary = buildBabySettingsSummary(babyProfile, new Date());
@@ -52,6 +56,25 @@ export default async function BabySettingsPage({
     : [];
   const babyMealSuggestions = generateBabyMeals(babyFoodStatuses, {
     stageName: summary.resolution?.stageName
+  });
+  const babyGuidance = getBabyGuidanceForStage(
+    summary.resolution?.guidanceStageId ?? null
+  );
+  const blockedBabyFoodIds = babyProfile
+    ? foodPreferences
+        .filter(
+          (preference) =>
+            preference.meal_profile_id === babyProfile.id &&
+            (preference.preference === "hard_no" ||
+              preference.preference === "allergy")
+        )
+        .map((preference) => preference.food_id)
+    : [];
+  const babyTryThis = suggestBabyTryThis({
+    blockedFoodIds: blockedBabyFoodIds,
+    foods,
+    stageReady: Boolean(babyGuidance),
+    statuses: babyFoodStatuses
   });
 
   return (
@@ -112,6 +135,10 @@ export default async function BabySettingsPage({
         </p>
       </section>
 
+      {babyProfile && babyGuidance ? (
+        <BabyGuidancePanel guidance={babyGuidance} />
+      ) : null}
+
       {babyProfile ? <BabyProfileForm profile={babyProfile} /> : null}
 
       {babyProfile ? (
@@ -126,13 +153,69 @@ export default async function BabySettingsPage({
         <BabyMealPreview babyMealSuggestions={babyMealSuggestions} />
       ) : null}
 
+      {babyProfile ? <BabyTryThisPreview tryThis={babyTryThis} /> : null}
+
       <section className="rounded-lg border border-dashed border-border bg-card p-5">
         <h2 className="text-xl font-semibold">Coming later</h2>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          Weekly plan writes, Try This ideas, grocery behavior, nutrition, milk
-          intake, and reaction tracking stay out of this slice.
+          Weekly plan writes, Try This persistence, grocery behavior,
+          nutrition, milk intake, and reaction tracking stay out of this slice.
         </p>
       </section>
+    </section>
+  );
+}
+
+function BabyGuidancePanel({
+  guidance
+}: {
+  guidance: NonNullable<ReturnType<typeof getBabyGuidanceForStage>>;
+}) {
+  return (
+    <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+      <div>
+        <p className="text-sm font-medium text-muted-foreground">
+          Stage guidance
+        </p>
+        <h2 className="mt-2 text-xl font-semibold">
+          {guidance.stageName}
+        </h2>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+          {guidance.summary}
+        </p>
+      </div>
+
+      <div className="mt-5 grid gap-3 md:grid-cols-2">
+        <div className="rounded-md border border-border bg-background p-4">
+          <h3 className="text-base font-semibold">Routine meals</h3>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            {guidance.routineMealFocus}
+          </p>
+        </div>
+        <div className="rounded-md border border-border bg-background p-4">
+          <h3 className="text-base font-semibold">Try This</h3>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            {guidance.tryThisFocus}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-md border border-border bg-background p-4">
+        <h3 className="text-base font-semibold">Texture notes</h3>
+        <ul className="mt-3 grid gap-2 sm:grid-cols-3">
+          {guidance.textureTips.map((tip) => (
+            <li
+              className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground"
+              key={tip}
+            >
+              {tip}
+            </li>
+          ))}
+        </ul>
+        <p className="mt-4 text-sm leading-6 text-muted-foreground">
+          {guidance.safetyNote}
+        </p>
+      </div>
     </section>
   );
 }
@@ -208,6 +291,49 @@ function BabyMealPreview({
           ))}
         </div>
       ) : null}
+    </section>
+  );
+}
+
+function BabyTryThisPreview({
+  tryThis
+}: {
+  tryThis: ReturnType<typeof suggestBabyTryThis>;
+}) {
+  return (
+    <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+      <div>
+        <p className="text-sm font-medium text-muted-foreground">Try This</p>
+        <h2 className="mt-2 text-xl font-semibold">
+          One new food idea at a time
+        </h2>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+          This preview uses foods that are not yet tracked as tried, liked, or
+          disliked. It does not add anything to the weekly plan or grocery list.
+        </p>
+      </div>
+
+      <div className="mt-5 rounded-md border border-border bg-background p-4">
+        {tryThis.candidate ? (
+          <>
+            <h3 className="text-lg font-semibold">
+              {tryThis.candidate.foodName}
+            </h3>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              {tryThis.candidate.reason}
+            </p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {tryThis.availableFoodCount} untracked{" "}
+              {tryThis.availableFoodCount === 1 ? "food" : "foods"} available
+              for future Try This ideas.
+            </p>
+          </>
+        ) : (
+          <p className="text-sm leading-6 text-muted-foreground">
+            {tryThis.warning}
+          </p>
+        )}
+      </div>
     </section>
   );
 }

@@ -51,22 +51,56 @@ export async function getMealProfiles(householdId: string) {
   return (data ?? []) as MealProfile[];
 }
 
-export async function getFoods(householdId: string, search?: string) {
+export async function getFoods(
+  householdId: string,
+  search?: string,
+  options: { limit?: number | null } = {}
+) {
   const supabase = await createClient();
-  let query = supabase
-    .from("foods")
-    .select("id, household_id, name, default_unit, default_grocery_category_id")
-    .eq("household_id", householdId)
-    .is("archived_at", null)
-    .order("name", { ascending: true });
-
   const trimmedSearch = search?.trim();
+  const limit = options.limit === undefined ? 50 : options.limit;
+  const createFoodsQuery = () => {
+    let query = supabase
+      .from("foods")
+      .select(
+        "id, household_id, name, default_unit, default_grocery_category_id"
+      )
+      .eq("household_id", householdId)
+      .is("archived_at", null)
+      .order("name", { ascending: true });
 
-  if (trimmedSearch) {
-    query = query.ilike("name", `%${trimmedSearch}%`);
+    if (trimmedSearch) {
+      query = query.ilike("name", `%${trimmedSearch}%`);
+    }
+
+    return query;
+  };
+
+  if (limit === null) {
+    const pageSize = 1000;
+    const foods: Food[] = [];
+
+    for (let offset = 0; ; offset += pageSize) {
+      const { data, error } = await createFoodsQuery().range(
+        offset,
+        offset + pageSize - 1
+      );
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      foods.push(...((data ?? []) as Food[]));
+
+      if ((data ?? []).length < pageSize) {
+        break;
+      }
+    }
+
+    return foods;
   }
 
-  const { data, error } = await query.limit(50);
+  const { data, error } = await createFoodsQuery().limit(limit);
 
   if (error) {
     throw new Error(error.message);
