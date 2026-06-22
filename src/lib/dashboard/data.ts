@@ -16,6 +16,11 @@ export type DashboardCurrentWeekSnapshot = {
   }) | null;
   nextAction: DashboardNextAction;
   weekStartDate: string;
+  weeklyWrapUp: {
+    dismissed: boolean;
+    id: string;
+    status: "open" | "dismissed" | "completed";
+  } | null;
   weeklyPlan: (DashboardWeeklyPlanSummary & {
     id: string;
   }) | null;
@@ -35,6 +40,12 @@ type GroceryListRow = {
 
 type GroceryListItemRow = {
   checked: boolean;
+};
+
+type WeeklyWrapUpRow = {
+  dismissed: boolean;
+  id: string;
+  status: "open" | "dismissed" | "completed";
 };
 
 export async function getDashboardCurrentWeekSnapshot({
@@ -59,6 +70,7 @@ export async function getDashboardCurrentWeekSnapshot({
         weeklyPlan: null
       }),
       weekStartDate,
+      weeklyWrapUp: null,
       weeklyPlan: null
     };
   }
@@ -103,6 +115,11 @@ export async function getDashboardCurrentWeekSnapshot({
     supabase,
     weeklyPlanId: weeklyPlan.id
   });
+  const weeklyWrapUp = await getCurrentWeekWrapUpSummary({
+    householdId,
+    supabase,
+    weeklyPlanId: weeklyPlan.id
+  });
 
   return {
     groceryList,
@@ -111,6 +128,7 @@ export async function getDashboardCurrentWeekSnapshot({
       weeklyPlan: weeklyPlanSummary
     }),
     weekStartDate,
+    weeklyWrapUp,
     weeklyPlan: weeklyPlanSummary
   };
 }
@@ -276,4 +294,27 @@ async function getCurrentWeekGroceryListSummary({
     name: groceryList.name,
     status: groceryList.status
   };
+}
+
+async function getCurrentWeekWrapUpSummary({
+  householdId,
+  supabase,
+  weeklyPlanId
+}: {
+  householdId: string;
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  weeklyPlanId: string;
+}) {
+  const { data, error } = await supabase
+    .from("weekly_wrap_ups")
+    .select("id, status, dismissed")
+    .eq("household_id", householdId)
+    .eq("weekly_plan_id", weeklyPlanId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data as WeeklyWrapUpRow | null;
 }

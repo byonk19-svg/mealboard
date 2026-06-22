@@ -1,9 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
 import {
   generateGroceryList,
+  type GeneratedGroceryList,
   type GroceryGenerationPlanItem,
   type GroceryGenerationSelectedStaple
 } from "./generate-grocery-list";
+import {
+  buildPendingGroceryChanges,
+  type PendingGroceryChanges
+} from "./pending-grocery-changes";
 import {
   getGroceryLifecycleTimestampField,
   getNextGroceryListStatus
@@ -36,7 +41,9 @@ export type GroceryListItem = {
   categorySortOrder: number | null;
   checked: boolean;
   displayName: string;
+  foodId: string | null;
   id: string;
+  manualItem: boolean;
   needsReview: boolean;
   preferredQuantityText: string | null;
   quantity: number | null;
@@ -138,17 +145,29 @@ type GroceryListItemRow = {
   already_have: boolean;
   checked: boolean;
   display_name: string;
+  food_id: string | null;
   grocery_categories:
     | { name: string; sort_order: number }
     | Array<{ name: string; sort_order: number }>
     | null;
   id: string;
+  manual_item: boolean;
   needs_review: boolean;
   preferred_quantity_text: string | null;
   quantity: number | string | null;
   review_reason: string | null;
   sort_order: number;
   unit: string | null;
+};
+
+export type WeeklyPlanPendingGroceryChanges = {
+  changes: PendingGroceryChanges;
+  groceryList: {
+    createdAt: string;
+    id: string;
+    name: string | null;
+    status: GroceryListStatus;
+  };
 };
 
 type GroceryListItemSourceRow = {
@@ -181,67 +200,12 @@ export async function generateAndPersistGroceryList({
     throw new Error("That weekly plan is no longer available.");
   }
 
-  const weeklyPlanItems = await getApprovedWeeklyPlanItems(
-    supabase,
+  const generated = await buildGeneratedGroceryListForWeeklyPlan({
+    allowEmpty: false,
     householdId,
-    weeklyPlan.id
-  );
-  const selectedStaples = await getSelectedWeeklyPlanStaples(
     supabase,
-    householdId,
-    weeklyPlan.id
-  );
-
-  if (weeklyPlanItems.length === 0 && selectedStaples.length === 0) {
-    throw new Error(
-      "Approve at least one recipe or select one staple before generating groceries."
-    );
-  }
-
-  const recipeIds = Array.from(
-    new Set(
-      weeklyPlanItems
-        .map((item) => item.recipe_id)
-        .filter((recipeId): recipeId is string => Boolean(recipeId))
-    )
-  );
-  const recipeIngredients = await getRecipeIngredients(
-    supabase,
-    householdId,
-    recipeIds
-  );
-
-  if (weeklyPlanItems.length > 0 && recipeIngredients.length === 0) {
-    throw new Error("Approved recipes need ingredients before generating groceries.");
-  }
-
-  const preferredQuantityByFoodId = await getPreferredQuantityByFoodId(
-    supabase,
-    householdId,
-    recipeIngredients
-      .map((ingredient) => ingredient.food_id)
-      .filter((foodId): foodId is string => Boolean(foodId))
-  );
-  const generated = generateGroceryList({
-    recipeIngredients: recipeIngredients.map((ingredient) => ({
-      displayName: ingredient.display_name,
-      foodId: ingredient.food_id,
-      groceryCategoryId: ingredient.grocery_category_id,
-      id: ingredient.id,
-      preferredQuantityText: ingredient.food_id
-        ? (preferredQuantityByFoodId.get(ingredient.food_id) ?? null)
-        : null,
-      quantity: toNullableNumber(ingredient.quantity),
-      recipeId: ingredient.recipe_id,
-      unit: ingredient.unit
-    })),
-    selectedStaples: selectedStaples.map(toGenerationSelectedStaple),
-    weeklyPlanItems: weeklyPlanItems.map(toGenerationPlanItem)
+    weeklyPlan
   });
-
-  if (generated.items.length === 0) {
-    throw new Error("No grocery items were generated from this weekly plan.");
-  }
 
   const { error: deleteDraftError } = await supabase
     .from("grocery_lists")
@@ -319,6 +283,73 @@ export async function getLatestGroceryList(householdId: string) {
     status: groceryList.status,
     weekStartDate
   } satisfies GroceryList;
+}
+
+export async function getPendingGroceryChangesForWeeklyPlan({
+  householdId,
+  weeklyPlanId
+}: {
+  householdId: string;
+  weeklyPlanId: string;
+}): Promise<WeeklyPlanPendingGroceryChanges | null> {
+  const supabase = await createClient();
+  const weeklyPlan = await getScopedWeeklyPlan(
+    supabase,
+    householdId,
+    weeklyPlanId
+  );
+
+  if (!weeklyPlan) {
+    throw new Error("That weekly plan is no longer available.");
+  }
+
+  const { data: protectedList, error } = await supabase
+    .from("grocery_lists")
+    .select("id, name, status, created_at")
+    .eq("household_id", householdId)
+    .eq("weekly_plan_id", weeklyPlan.id)
+    .in("status", ["finalized", "shopping_started"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!protectedList) {
+    return null;
+  }
+
+  const [currentItems, generated] = await Promise.all([
+    getGroceryListItems(supabase, householdId, protectedList.id),
+    buildGeneratedGroceryListForWeeklyPlan({
+      allowEmpty: true,
+      householdId,
+      supabase,
+      weeklyPlan
+    })
+  ]);
+
+  return {
+    changes: buildPendingGroceryChanges({
+      currentItems: currentItems.map((item) => ({
+        displayName: item.displayName,
+        foodId: item.foodId,
+        manualItem: item.manualItem,
+        preferredQuantityText: item.preferredQuantityText,
+        quantity: item.quantity,
+        unit: item.unit
+      })),
+      generatedItems: generated.items
+    }),
+    groceryList: {
+      createdAt: protectedList.created_at,
+      id: protectedList.id,
+      name: protectedList.name,
+      status: protectedList.status as GroceryListStatus
+    }
+  };
 }
 
 export async function updateGroceryListItemState({
@@ -549,6 +580,82 @@ async function getNextGroceryItemSortOrder(
   }
 
   return data ? ((data as LatestGroceryListItemSortOrderRow).sort_order + 1) : 0;
+}
+
+async function buildGeneratedGroceryListForWeeklyPlan({
+  allowEmpty,
+  householdId,
+  supabase,
+  weeklyPlan
+}: {
+  allowEmpty: boolean;
+  householdId: string;
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  weeklyPlan: WeeklyPlanRow;
+}): Promise<GeneratedGroceryList> {
+  const weeklyPlanItems = await getApprovedWeeklyPlanItems(
+    supabase,
+    householdId,
+    weeklyPlan.id
+  );
+  const selectedStaples = await getSelectedWeeklyPlanStaples(
+    supabase,
+    householdId,
+    weeklyPlan.id
+  );
+
+  if (!allowEmpty && weeklyPlanItems.length === 0 && selectedStaples.length === 0) {
+    throw new Error(
+      "Approve at least one recipe or select one staple before generating groceries."
+    );
+  }
+
+  const recipeIds = Array.from(
+    new Set(
+      weeklyPlanItems
+        .map((item) => item.recipe_id)
+        .filter((recipeId): recipeId is string => Boolean(recipeId))
+    )
+  );
+  const recipeIngredients = await getRecipeIngredients(
+    supabase,
+    householdId,
+    recipeIds
+  );
+
+  if (!allowEmpty && weeklyPlanItems.length > 0 && recipeIngredients.length === 0) {
+    throw new Error("Approved recipes need ingredients before generating groceries.");
+  }
+
+  const preferredQuantityByFoodId = await getPreferredQuantityByFoodId(
+    supabase,
+    householdId,
+    recipeIngredients
+      .map((ingredient) => ingredient.food_id)
+      .filter((foodId): foodId is string => Boolean(foodId))
+  );
+  const generated = generateGroceryList({
+    recipeIngredients: recipeIngredients.map((ingredient) => ({
+      displayName: ingredient.display_name,
+      foodId: ingredient.food_id,
+      groceryCategoryId: ingredient.grocery_category_id,
+      id: ingredient.id,
+      preferredQuantityText: ingredient.food_id
+        ? (preferredQuantityByFoodId.get(ingredient.food_id) ?? null)
+        : null,
+      quantity: toNullableNumber(ingredient.quantity),
+      recipeId: ingredient.recipe_id,
+      unit: ingredient.unit
+    })),
+    selectedStaples: selectedStaples.map(toGenerationSelectedStaple),
+    weeklyPlanItems: weeklyPlanItems.map(toGenerationPlanItem)
+  });
+
+  if (!allowEmpty && generated.items.length === 0) {
+    throw new Error("No grocery items were generated from this weekly plan.");
+  }
+
+  return generated;
 }
 
 async function getApprovedWeeklyPlanItems(
@@ -786,7 +893,7 @@ async function getGroceryListItems(
   const { data, error } = await supabase
     .from("grocery_list_items")
     .select(
-      "id, display_name, quantity, unit, preferred_quantity_text, checked, already_have, needs_review, review_reason, sort_order, grocery_categories(name, sort_order)"
+      "id, food_id, display_name, quantity, unit, preferred_quantity_text, checked, already_have, manual_item, needs_review, review_reason, sort_order, grocery_categories(name, sort_order)"
     )
     .eq("household_id", householdId)
     .eq("grocery_list_id", groceryListId)
@@ -805,7 +912,9 @@ async function getGroceryListItems(
       categorySortOrder: category?.sort_order ?? null,
       checked: row.checked,
       displayName: row.display_name,
+      foodId: row.food_id,
       id: row.id,
+      manualItem: row.manual_item,
       needsReview: row.needs_review,
       preferredQuantityText: row.preferred_quantity_text,
       quantity: toNullableNumber(row.quantity),

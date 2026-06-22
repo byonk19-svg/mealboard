@@ -81,6 +81,7 @@ export type WeeklyPlanItem = {
   is_try_this: boolean;
   is_backup: boolean;
   reason_labels: string[];
+  why_this: string | null;
   notes: string | null;
   estimated_calories: number | null;
   estimated_protein_grams: number | null;

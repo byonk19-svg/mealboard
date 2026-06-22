@@ -52,6 +52,34 @@ export default async function DashboardPage() {
         </p>
       </section>
 
+      {snapshot.weeklyPlan &&
+      snapshot.groceryList?.status === "completed" &&
+      snapshot.weeklyWrapUp?.status !== "dismissed" &&
+      snapshot.weeklyWrapUp?.status !== "completed" ? (
+        <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">
+                Optional wrap-up
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold">
+                Review this week
+              </h2>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
+                Capture quick notes only for meals or groceries that need
+                attention.
+              </p>
+            </div>
+            <Link
+              className="w-fit rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+              href={`/weekly-wrap-up/${snapshot.weeklyPlan.id}`}
+            >
+              Open weekly wrap-up
+            </Link>
+          </div>
+        </section>
+      ) : null}
+
       <div className="grid gap-4 lg:grid-cols-2">
         <SummaryCard
           actionHref="/plan-week"

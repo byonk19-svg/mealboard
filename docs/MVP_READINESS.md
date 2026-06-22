@@ -1,6 +1,6 @@
 # MealBoard MVP Readiness
 
-This document captures the current private family MVP state after Task 17. It is a handoff snapshot for future Codex work so the next phase can build from known product truth instead of rediscovering the app.
+This document captures the current private family MVP state after the rule-based suggestions, baby preview, pending grocery-change, weekly wrap-up, and E2E smoke slices. It is a handoff snapshot for future Codex work so the next phase can build from known product truth instead of rediscovering the app.
 
 ## Current Status
 
@@ -14,15 +14,20 @@ The latest verified flow covers:
 
 - Create and edit a recipe with structured ingredients, nutrition estimates, tags, and profile approvals.
 - Configure the active weekly plan with adult work/off days and weekly goals.
+- Review and add rule-based adult meal suggestion drafts.
 - Add saved recipes to specific days, profiles, and meal slots.
 - Approve planned meals for grocery generation.
+- Review read-only Baby Meal 1/2 routine suggestions on Plan Week and `/settings/baby`.
 - Select active staples for the week.
 - Generate a grocery list from approved planned meals plus selected staples.
+- See pending grocery-change counts when a protected grocery list would differ from the current plan.
 - Use Shopping, Profile, and Meal grocery views.
 - Add a manual grocery item with household/profile context and source note.
 - Toggle checked and already-have item states.
 - Advance a grocery list through Draft -> Finalized -> Shopping Started -> Completed.
-- Confirm Dashboard reflects current week planning and grocery status.
+- Open the optional weekly wrap-up after completed shopping.
+- Confirm Dashboard reflects current week planning, grocery status, next best action, and wrap-up entry when eligible.
+- Run unauthenticated Playwright auth-boundary smoke coverage for protected routes.
 
 ## Manual Smoke Checklist
 
@@ -42,21 +47,24 @@ Use a linked local household user. Do not commit `.env.local`, `.env.cloud.local
 5. Select the active week.
 6. Save adult work/off days and one weekly goal.
 7. Add a saved recipe to a day/profile/meal slot.
-8. Approve at least one planned meal for groceries.
-9. Select at least one active staple and save selected staples.
-10. Generate the grocery list.
-11. Open `/grocery-list`.
-12. Confirm generated recipe items and selected staples appear with sensible quantities, categories, and source context.
-13. Add a manual grocery item with a note/context.
-14. Confirm Shopping, Profile, and Meal views still render.
-15. Expand source context and confirm recipe/staple/manual explanations are visible.
-16. Toggle checked and already-have on an item.
-17. Advance lifecycle one step at a time:
+8. If rule-based suggestions are available, add suggested meals and confirm they stay unapproved.
+9. Approve at least one planned meal for groceries.
+10. Confirm Baby routine suggestions are read-only and link back to `/settings/baby`.
+11. Select at least one active staple and save selected staples.
+12. Generate the grocery list.
+13. Open `/grocery-list`.
+14. Confirm generated recipe items and selected staples appear with sensible quantities, categories, and source context.
+15. Add a manual grocery item with a note/context.
+16. Confirm Shopping, Profile, and Meal views still render.
+17. Expand source context and confirm recipe/staple/manual explanations are visible.
+18. Toggle checked and already-have on an item.
+19. Advance lifecycle one step at a time:
     - Draft -> Finalized
     - Finalized -> Shopping Started
     - Shopping Started -> Completed
-18. Open `/dashboard`.
-19. Confirm current week, planning status, grocery status, and next best action are reasonable.
+20. Open `/dashboard`.
+21. Confirm current week, planning status, grocery status, next best action, and wrap-up entry are reasonable.
+22. Open the weekly wrap-up, save one recipe review if prompted, or dismiss it.
 
 ## Known Local Environment Note
 
@@ -82,7 +90,8 @@ These are intentionally out of scope for the current MVP unless a future task ex
 - Full pantry inventory, barcode scanning, expiration tracking, or reminders
 - Recipe photos and full recipe-link import
 - Full macro tracking, calorie targets, strict warnings, or nutrition dashboards
-- Baby-specific planning/nutrition expansion beyond the existing profile foundation
+- Persisted Baby Meal 1/2 weekly-plan writes, baby grocery behavior, baby nutrition, milk intake, and reaction tracking
+- Full smart swap confirmation UX beyond pending grocery-change visibility
 - Multi-user household invitations and shared account workflows
 - PWA install/offline polish
 - Grocery history intelligence
@@ -91,11 +100,10 @@ These are intentionally out of scope for the current MVP unless a future task ex
 
 Good next slices should stay narrow and start from the verified MVP loop. Candidate directions:
 
-- Baby planning foundation
-- Baby food status foundation only: a dedicated tried/liked/disliked data model
-  and `/settings/baby` CRUD, with no Baby Meal 1/2, Try This, grocery, or
-  nutrition behavior yet
-- Calorie target and gentle warning foundation
+- Hardening the authenticated Playwright core-loop smoke with stable local Supabase credentials
+- Smart swap confirmation UX using the pending grocery-change helper
+- Persisted baby routine plan items once slot semantics and grocery/nutrition behavior are defined
+- Calorie target and gentle warning expansion
 - Recipe paste/import usability
 - Shared household/member invite preparation
 - PWA/mobile install polish

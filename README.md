@@ -10,7 +10,10 @@ This repo is separate from RT Scheduler. Product and technical decisions should 
 
 ## Current MVP Status
 
-MealBoard has reached a private family MVP readiness checkpoint through Task 17.
+MealBoard has reached a private family MVP readiness checkpoint for the
+planning and grocery loop, with newer foundations for rule-based suggestions,
+baby solids previews, pending grocery-change visibility, weekly wrap-up, and
+E2E smoke coverage.
 
 The current core loop is:
 
@@ -24,10 +27,14 @@ Implemented MVP surfaces include:
 - Household profiles, preferences, grocery categories, and foods foundation
 - Recipe library with structured ingredients, profile approvals, and calorie/protein estimate fields
 - Weekly planning with adult work/off days, planned recipe items, approval/lock/remove actions, staples review, and a small nutrition estimate summary
+- Rule-based adult meal suggestion drafts with reason labels and why-this context
 - Staples settings CRUD, weekly staple selection, and selected staples flowing into grocery generation
 - Grocery list generation from approved planned meals and selected staples
+- Pending grocery-change visibility when a finalized or shopping-started list would differ from the current approved plan
 - Mobile-friendly grocery shopping list with Shopping/Profile/Meal views, source context, manual add-ons, checked/already-have state, and Draft -> Finalized -> Shopping Started -> Completed lifecycle
-- Dashboard current-week summary with planning status, grocery status, and next best action
+- Baby settings with stage context, baby food statuses, Baby Meal 1/2 routine preview, and Try This preview
+- Dashboard current-week summary with planning status, grocery status, next best action, and optional weekly wrap-up entry after completed shopping
+- Minimal Playwright smoke coverage for protected route auth boundaries, plus a credential-gated core-loop smoke
 
 See `docs/MVP_READINESS.md` for the manual smoke checklist, known gaps, deferred features, and local environment notes.
 

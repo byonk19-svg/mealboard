@@ -201,6 +201,9 @@ function PlanItemCard({
             <StatusChip tone={item.is_locked ? "success" : "muted"}>
               {item.is_locked ? "Locked" : "Unlocked"}
             </StatusChip>
+            {item.is_try_this ? (
+              <StatusChip tone="muted">Try This</StatusChip>
+            ) : null}
             {hasMissingEstimate(item) ? (
               <StatusChip tone="muted">Missing estimate</StatusChip>
             ) : null}
@@ -209,6 +212,23 @@ function PlanItemCard({
           <p className="mt-1 text-sm text-muted-foreground">
             {formatPlanItemSupportText(item)}
           </p>
+          {item.why_this ? (
+            <p className="mt-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+              {item.why_this}
+            </p>
+          ) : null}
+          {item.reason_labels.length > 0 ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {item.reason_labels.map((reason) => (
+                <span
+                  className="rounded-full border border-border bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground"
+                  key={reason}
+                >
+                  {reason}
+                </span>
+              ))}
+            </div>
+          ) : null}
           {item.recipe_name && item.recipe_name !== item.display_name ? (
             <p className="mt-1 text-sm text-muted-foreground">
               Recipe: {item.recipe_name}

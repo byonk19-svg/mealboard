@@ -3,9 +3,20 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { mealTypes, type MealType } from "@/lib/recipes/types";
+import { getRecipes } from "@/lib/recipes/data";
+import { buildRuleBasedMealSuggestions } from "@/lib/meal-planning/rule-based-suggestions";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
-import { getWeekStartDate } from "@/lib/weekly-plans/week-dates";
+import { getMealProfiles } from "@/lib/settings/data";
+import {
+  getWeeklyPlanGoals,
+  getWeeklyPlanItems,
+  getWeeklyPlanProfileDays
+} from "@/lib/weekly-plans/data";
+import {
+  getWeekDates,
+  getWeekStartDate
+} from "@/lib/weekly-plans/week-dates";
 import {
   adultDayTypes,
   type MealComponentType,
@@ -332,6 +343,83 @@ export async function removeWeeklyPlanItem(formData: FormData) {
 
   revalidatePath("/plan-week");
   planWeekRedirect(weekStartDate, "Plan item removed.");
+}
+
+export async function addRuleBasedMealSuggestions(formData: FormData) {
+  const weekStartDate =
+    textOrNull(formData.get("weekStartDate")) ?? getWeekStartDate(new Date());
+  const weeklyPlanId = textOrNull(formData.get("weeklyPlanId"));
+
+  if (!weeklyPlanId) {
+    planWeekRedirect(weekStartDate, "Create the planning week before adding suggestions.");
+  }
+
+  const household = await requireHousehold(weekStartDate);
+  const supabase = await createClient();
+  const weeklyPlan = await getScopedWeeklyPlan(
+    supabase,
+    household.id,
+    weeklyPlanId
+  );
+
+  if (!weeklyPlan) {
+    planWeekRedirect(weekStartDate, "That planning week is no longer available.");
+  }
+
+  const [profiles, profileDays, goals, planItems, recipes] = await Promise.all([
+    getMealProfiles(household.id),
+    getWeeklyPlanProfileDays(household.id, weeklyPlan.id),
+    getWeeklyPlanGoals(household.id, weeklyPlan.id),
+    getWeeklyPlanItems(household.id, weeklyPlan.id),
+    getRecipes(household.id)
+  ]);
+  const suggestions = buildRuleBasedMealSuggestions({
+    goals: goals.map((goal) => goal.goal),
+    planItems,
+    profileDays,
+    profiles,
+    recipes,
+    weekDateKeys: getWeekDates(weekStartDate).map((date) => date.dateKey)
+  });
+
+  if (suggestions.length === 0) {
+    planWeekRedirect(
+      weekStartDate,
+      "No open adult meal slots have approved recipe suggestions right now."
+    );
+  }
+
+  const { error } = await supabase.from("weekly_plan_items").insert(
+    suggestions.map((suggestion, index) => ({
+      component_type: getComponentTypeForMeal(suggestion.mealType),
+      display_name: suggestion.recipeName,
+      estimated_calories: suggestion.estimatedCalories,
+      estimated_protein_grams: suggestion.estimatedProteinGrams,
+      household_id: household.id,
+      is_approved: false,
+      is_locked: false,
+      meal_profile_id: suggestion.mealProfileId,
+      meal_type: suggestion.mealType,
+      notes: suggestion.notes,
+      plan_date: suggestion.planDate,
+      reason_labels: suggestion.reasonLabels,
+      recipe_id: suggestion.recipeId,
+      scale_factor: 1,
+      sort_order: 100 + index,
+      weekly_plan_id: weeklyPlan.id,
+      why_this: suggestion.reasonLabels.join(", ")
+    }))
+  );
+
+  if (error) {
+    planWeekRedirect(weekStartDate, error.message);
+  }
+
+  revalidatePath("/plan-week");
+  planWeekRedirect(
+    weekStartDate,
+    `Added ${suggestions.length} rule-based meal ${suggestions.length === 1 ? "suggestion" : "suggestions"}.`
+  );
 }
 
 function parseDayTypeInputs(

@@ -3,12 +3,29 @@ import {
   saveWeeklyPlanSetup
 } from "@/app/(app)/plan-week/actions";
 import { generateGroceryListForWeek } from "@/app/(app)/grocery-list/actions";
+import { BabyRoutinePreviewSection } from "@/components/plan-week/baby-routine-preview-section";
 import { ManualPlanSection } from "@/components/plan-week/manual-plan-section";
 import { NutritionSummarySection } from "@/components/plan-week/nutrition-summary-section";
+import { RuleBasedSuggestionsSection } from "@/components/plan-week/rule-based-suggestions-section";
 import { StaplesReviewSection } from "@/components/plan-week/staples-review-section";
+import {
+  getPendingGroceryChangesForWeeklyPlan,
+  type WeeklyPlanPendingGroceryChanges
+} from "@/lib/grocery/data";
+import { generateBabyMeals } from "@/lib/baby/generate-baby-meals";
+import { buildRuleBasedMealSuggestions } from "@/lib/meal-planning/rule-based-suggestions";
 import { calculateCalorieTargetGuidance } from "@/lib/nutrition/calculate-calorie-target-guidance";
 import { calculateDailyNutritionTotals } from "@/lib/nutrition/calculate-daily-totals";
-import { getMealProfiles, getStaples } from "@/lib/settings/data";
+import { getRecipes } from "@/lib/recipes/data";
+import {
+  getBabyFoodStatuses,
+  getMealProfiles,
+  getStaples
+} from "@/lib/settings/data";
+import {
+  buildBabySettingsSummary,
+  getBabyProfile
+} from "@/lib/settings/baby-settings";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 import {
   getPlanRecipeOptions,
@@ -61,13 +78,16 @@ export default async function PlanWeekPage({
   const planningProfiles = profiles.filter((profile) =>
     ["adult", "baby", "shared"].includes(profile.profile_type)
   );
+  const babyProfile = getBabyProfile(profiles);
   const weekDates = getWeekDates(weekStartDate);
   const [
     profileDays,
     goals,
     planItems,
     recipeOptions,
+    recipes,
     staples,
+    pendingGroceryChanges,
     stapleSelections
   ] = weeklyPlan
     ? await Promise.all([
@@ -75,13 +95,18 @@ export default async function PlanWeekPage({
         getWeeklyPlanGoals(householdContext.household.id, weeklyPlan.id),
         getWeeklyPlanItems(householdContext.household.id, weeklyPlan.id),
         getPlanRecipeOptions(householdContext.household.id),
+        getRecipes(householdContext.household.id),
         getStaples(householdContext.household.id),
+        getPendingGroceryChangesForWeeklyPlan({
+          householdId: householdContext.household.id,
+          weeklyPlanId: weeklyPlan.id
+        }),
         getWeeklyPlanStapleSelections(
           householdContext.household.id,
           weeklyPlan.id
         )
       ])
-    : [[], [], [], [], [], []];
+    : [[], [], [], [], [], [], null, []];
   const profileDayLookup = new Map(
     profileDays.map((day) => [
       `${day.meal_profile_id}:${day.plan_date}`,
@@ -104,6 +129,25 @@ export default async function PlanWeekPage({
         planItems,
         selectedStapleCount: stapleSelections.length,
         weekDateKeys: weekDates.map((date) => date.dateKey)
+      })
+    : null;
+  const ruleBasedSuggestions = weeklyPlan
+    ? buildRuleBasedMealSuggestions({
+        goals: goals.map((goal) => goal.goal),
+        planItems,
+        profileDays,
+        profiles,
+        recipes,
+        weekDateKeys: weekDates.map((date) => date.dateKey)
+      })
+    : [];
+  const babySummary = buildBabySettingsSummary(babyProfile, new Date());
+  const babyFoodStatuses = babyProfile
+    ? await getBabyFoodStatuses(householdContext.household.id, babyProfile.id)
+    : [];
+  const babyRoutineSuggestions = babyProfile
+    ? generateBabyMeals(babyFoodStatuses, {
+        stageName: babySummary.resolution?.stageName
       })
     : null;
 
@@ -260,6 +304,19 @@ export default async function PlanWeekPage({
             </button>
           </form>
 
+          <RuleBasedSuggestionsSection
+            suggestions={ruleBasedSuggestions}
+            weekStartDate={weekStartDate}
+            weeklyPlanId={weeklyPlan.id}
+          />
+
+          {babyRoutineSuggestions ? (
+            <BabyRoutinePreviewSection
+              stageLabel={babySummary.statusLabel}
+              summary={babyRoutineSuggestions}
+            />
+          ) : null}
+
           <ManualPlanSection
             planItemsByDate={planItemsByDate}
             profiles={planningProfiles}
@@ -290,6 +347,7 @@ export default async function PlanWeekPage({
               planItems.filter((item) => item.is_approved && item.recipe_id)
                 .length
             }
+            pendingChanges={pendingGroceryChanges}
             selectedStapleCount={stapleSelections.length}
             weekStartDate={weekStartDate}
             weeklyPlanId={weeklyPlan.id}
@@ -358,11 +416,13 @@ function SummaryMetric({ label, value }: { label: string; value: number }) {
 
 function GroceryGenerationPanel({
   approvedRecipeItemCount,
+  pendingChanges,
   selectedStapleCount,
   weekStartDate,
   weeklyPlanId
 }: {
   approvedRecipeItemCount: number;
+  pendingChanges: WeeklyPlanPendingGroceryChanges | null;
   selectedStapleCount: number;
   weekStartDate: string;
   weeklyPlanId: string;
@@ -403,6 +463,10 @@ function GroceryGenerationPanel({
         </form>
       </div>
 
+      {pendingChanges ? (
+        <PendingGroceryChangesPanel pendingChanges={pendingChanges} />
+      ) : null}
+
       {!canGenerate ? (
         <p className="mt-4 rounded-md border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
           Nothing is ready for groceries yet. Approve a planned recipe or select
@@ -410,6 +474,37 @@ function GroceryGenerationPanel({
         </p>
       ) : null}
     </section>
+  );
+}
+
+function PendingGroceryChangesPanel({
+  pendingChanges
+}: {
+  pendingChanges: WeeklyPlanPendingGroceryChanges;
+}) {
+  const { changes, groceryList } = pendingChanges;
+
+  return (
+    <div className="mt-5 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+      <p className="font-semibold">
+        Protected grocery list: {formatGroceryStatus(groceryList.status)}
+      </p>
+      <p className="mt-2 leading-6">
+        MealBoard will not silently change this list. Current plan changes would
+        add {changes.addedCount}, remove {changes.removedCount}, and keep{" "}
+        {changes.keptCount} automatic grocery{" "}
+        {changes.keptCount === 1 ? "item" : "items"}.
+        {changes.manualItemCount > 0
+          ? ` ${changes.manualItemCount} manual ${changes.manualItemCount === 1 ? "item stays" : "items stay"} outside automatic updates.`
+          : ""}
+      </p>
+      {!changes.hasChanges ? (
+        <p className="mt-2 leading-6">
+          The protected list still matches the approved plan and selected
+          staples.
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -468,6 +563,13 @@ function formatAttentionTone(tone: PlanWeekSummary["primaryAttention"]["tone"]) 
   }
 
   return "Needs review";
+}
+
+function formatGroceryStatus(status: string) {
+  return status
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function formatDisplayDate(dateKey: string) {

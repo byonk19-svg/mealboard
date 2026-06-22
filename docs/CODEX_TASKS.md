@@ -815,6 +815,9 @@ Run lint/typecheck/tests and report results.
 
 # Task 14A — Baby Food Status Foundation
 
+Status: Complete. Implemented with `baby_food_statuses`, `/settings/baby`
+CRUD, household/Baby-profile scoping, and focused helper tests.
+
 ## Goal
 
 Add the smallest baby-specific food status foundation before broader baby
@@ -836,7 +839,7 @@ Use docs/PRD.md and docs/TECHNICAL_PLAN.md as source of truth.
 Current state:
 - /settings/baby already handles baby birthdate and manual stage override.
 - food_preferences already handles profile-specific preference/allergy rules.
-- There is no baby_food_status enum/table yet.
+- baby_food_status and baby_food_statuses already exist.
 
 Build only the foundation:
 - Add a baby_food_status enum with tried, liked, disliked if it does not already exist.
@@ -903,12 +906,19 @@ push unless explicitly approved.
 * RLS and role grants are explicit for the new table.
 * `/settings/baby` can list, add/update, and delete baby food statuses.
 * Baby status UI does not imply medical or reaction tracking.
-* Baby Meal 1/2, Try This, grocery, and nutrition behavior remain unchanged.
+* Baby Meal 1/2 and Try This preview behavior now exists as read-only adjacent work.
+* Grocery and nutrition behavior remain unchanged.
 * Tests cover the pure status helper behavior.
 
 ---
 
 # Task 14 — Baby Planning MVP
+
+Status: Mostly complete for read-only MVP surfaces. Baby stage setup, baby food
+statuses, static guidance, Baby Meal 1/2 routine previews, Try This preview,
+and Plan Week read-only baby routine preview exist. Persisted Baby Meal 1/2
+weekly-plan writes, baby grocery generation, baby nutrition, and reaction/milk
+tracking remain out of scope.
 
 ## Goal
 
@@ -954,7 +964,7 @@ Run lint/typecheck/tests and report results.
 
 * Baby profile has birthdate/stage override.
 * Baby food statuses work.
-* Baby Meal 1/2 can appear in weekly plan.
+* Baby Meal 1/2 can appear as a read-only Plan Week preview.
 * Baby guidance displays.
 * New baby foods stay separate in Try This.
 * Baby stage resolver has tests.
@@ -962,6 +972,10 @@ Run lint/typecheck/tests and report results.
 ---
 
 # Task 15 — Smart Meal Suggestion Scoring
+
+Status: Implemented as a first rule-based adult draft-suggestion slice.
+Suggestions fill open adult slots only, persist as unapproved weekly plan items,
+and include reason labels/why-this context. Full swap behavior remains Task 16.
 
 ## Goal
 
@@ -999,7 +1013,8 @@ Rules:
 - Dislikes warn, not block.
 - Favorites and Safe Defaults can repeat more often.
 - Generated plans remain drafts.
-- User can approve, lock, remove, or swap suggestions.
+- User can approve, lock, or remove suggestions.
+- Swap suggestions remain Task 16.
 
 Important boundaries:
 - Do not use AI.
@@ -1019,6 +1034,11 @@ Run lint/typecheck/tests and report results.
 ---
 
 # Task 16 — Smart Swaps and Grocery Impact Warning
+
+Status: Partially complete for grocery impact visibility. The app now has an
+on-demand pending grocery-change diff for finalized/shopping-started lists and
+shows add/remove/keep counts in Plan Week. Full smart swap selection and
+confirmation remain pending.
 
 ## Goal
 
@@ -1063,6 +1083,11 @@ Run lint/typecheck/tests and report results.
 ---
 
 # Task 17 — Weekly Wrap-Up MVP
+
+Status: Implemented as an optional MVP route and dashboard entry after completed
+shopping, backed by `weekly_wrap_ups` and `weekly_wrap_up_items`. It can create
+recipe-review and unused-grocery prompts, save recipe feedback, update profile
+approval/status, acknowledge unused groceries, and dismiss the wrap-up.
 
 ## Goal
 
@@ -1249,24 +1274,17 @@ Summarize:
 
 ## Suggested First 5 Tasks to Run
 
-Run in this order:
+The foundation tasks are complete. For the current repo state, run focused
+follow-up slices in this order:
 
-1. **Task 00 — Create Project Guidance Files**
-2. **Task 01 — App Foundation**
-3. **Task 02 — Supabase Database Foundation**
-4. **Task 03 — Supabase Auth and Household Bootstrap**
-5. **Task 05 — Recipe Schema and Recipe Library**
+1. **Task 16 completion — Smart swap selection and confirmation UX**
+2. **Task 18 — Mobile Grocery Polish**
+3. **Task 19 — Empty States, Errors, and Onboarding Warnings**
+4. **Task 20 — MVP Hardening Pass**
+5. **Authenticated E2E hardening — stabilize the credential-gated core-loop smoke**
 
-Then continue:
-
-6. Task 04 — Profiles and Preferences UI
-7. Task 06 — Ingredient Paste Parsing
-8. Task 07 — Grocery Consolidation Utility
-9. Task 08 — Weekly Planning Schema
-10. Task 09 — Manual Weekly Plan Thin Slice
-11. Task 10 — Grocery List Schema and Generation
-
-Note: Task 04 and Task 05 can be swapped depending on whether you want preferences or recipes first. Recipe Library first may feel more exciting visually; Preferences first is cleaner logically.
+Keep baby weekly-plan writes separate until Baby Meal 1/2 slot identity,
+nutrition behavior, and grocery behavior are explicitly designed.
 
 ---
 

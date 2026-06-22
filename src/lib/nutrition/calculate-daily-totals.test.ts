@@ -173,6 +173,7 @@ function planItem(overrides: Partial<WeeklyPlanItem>): WeeklyPlanItem {
     scale_factor: 1,
     sort_order: 0,
     weekly_plan_id: "week-1",
+    why_this: null,
     ...overrides
   };
 }
