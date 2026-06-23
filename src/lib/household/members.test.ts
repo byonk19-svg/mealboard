@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  evaluateHouseholdMemberRemoval,
   evaluateHouseholdMemberLink,
   normalizeHouseholdMemberEmail
 } from "./members";
@@ -93,6 +94,108 @@ describe("household member helpers", () => {
       ok: true,
       role: "member",
       userId: "user-2"
+    });
+  });
+
+  it("allows owners to remove a non-owner member in their household", () => {
+    expect(
+      evaluateHouseholdMemberRemoval({
+        actorRole: "owner",
+        actorUserId: "owner-user",
+        householdId: "household-1",
+        memberships: [
+          {
+            householdId: "household-1",
+            id: "membership-member",
+            role: "member",
+            userId: "member-user"
+          }
+        ],
+        targetMembershipId: "membership-member"
+      })
+    ).toEqual({
+      membershipId: "membership-member",
+      ok: true,
+      userId: "member-user"
+    });
+  });
+
+  it("rejects member removal by non-owners", () => {
+    expect(
+      evaluateHouseholdMemberRemoval({
+        actorRole: "member",
+        actorUserId: "member-user",
+        householdId: "household-1",
+        memberships: [],
+        targetMembershipId: "membership-member"
+      })
+    ).toEqual({
+      ok: false,
+      reason: "Only household owners can remove members."
+    });
+  });
+
+  it("rejects removing yourself or another owner", () => {
+    expect(
+      evaluateHouseholdMemberRemoval({
+        actorRole: "owner",
+        actorUserId: "owner-user",
+        householdId: "household-1",
+        memberships: [
+          {
+            householdId: "household-1",
+            id: "membership-owner",
+            role: "owner",
+            userId: "owner-user"
+          }
+        ],
+        targetMembershipId: "membership-owner"
+      })
+    ).toEqual({
+      ok: false,
+      reason: "Owner transfer must be added before removing an owner."
+    });
+
+    expect(
+      evaluateHouseholdMemberRemoval({
+        actorRole: "owner",
+        actorUserId: "owner-user",
+        householdId: "household-1",
+        memberships: [
+          {
+            householdId: "household-1",
+            id: "membership-owner-2",
+            role: "owner",
+            userId: "other-owner"
+          }
+        ],
+        targetMembershipId: "membership-owner-2"
+      })
+    ).toEqual({
+      ok: false,
+      reason: "Owner transfer must be added before removing an owner."
+    });
+  });
+
+  it("rejects missing or out-of-household member removal targets", () => {
+    expect(
+      evaluateHouseholdMemberRemoval({
+        actorRole: "owner",
+        actorUserId: "owner-user",
+        householdId: "household-1",
+        memberships: [
+          {
+            householdId: "household-2",
+            id: "membership-member",
+            role: "member",
+            userId: "member-user"
+          }
+        ],
+        targetMembershipId: "membership-member"
+      })
+    ).toEqual({
+      ok: false,
+      reason: "That household member is no longer available."
     });
   });
 });

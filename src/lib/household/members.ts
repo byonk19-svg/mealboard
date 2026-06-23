@@ -3,10 +3,26 @@ export type HouseholdMemberLinkMembership = {
   userId: string;
 };
 
+export type HouseholdMemberRemovalMembership = HouseholdMemberLinkMembership & {
+  id: string;
+  role: string;
+};
+
 export type HouseholdMemberLinkDecision =
   | {
       ok: true;
       role: "member";
+      userId: string;
+    }
+  | {
+      ok: false;
+      reason: string;
+    };
+
+export type HouseholdMemberRemovalDecision =
+  | {
+      ok: true;
+      membershipId: string;
       userId: string;
     }
   | {
@@ -78,5 +94,53 @@ export function evaluateHouseholdMemberLink({
     ok: true,
     role: "member",
     userId: targetUserId
+  };
+}
+
+export function evaluateHouseholdMemberRemoval({
+  actorRole,
+  actorUserId,
+  householdId,
+  memberships,
+  targetMembershipId
+}: {
+  actorRole: string | null;
+  actorUserId: string;
+  householdId: string;
+  memberships: HouseholdMemberRemovalMembership[];
+  targetMembershipId: string | null;
+}): HouseholdMemberRemovalDecision {
+  if (actorRole !== "owner") {
+    return {
+      ok: false,
+      reason: "Only household owners can remove members."
+    };
+  }
+
+  const membership =
+    memberships.find(
+      (candidate) =>
+        candidate.householdId === householdId &&
+        candidate.id === targetMembershipId
+    ) ?? null;
+
+  if (!membership) {
+    return {
+      ok: false,
+      reason: "That household member is no longer available."
+    };
+  }
+
+  if (membership.role === "owner" || membership.userId === actorUserId) {
+    return {
+      ok: false,
+      reason: "Owner transfer must be added before removing an owner."
+    };
+  }
+
+  return {
+    membershipId: membership.id,
+    ok: true,
+    userId: membership.userId
   };
 }

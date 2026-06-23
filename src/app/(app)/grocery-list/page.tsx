@@ -5,6 +5,7 @@ import {
   buildGroceryListSummary,
   type GroceryListSummary
 } from "@/lib/grocery/grocery-list-summary";
+import { getGroceryProgressStorageKey } from "@/lib/grocery/mobile-progress";
 import {
   groupGroceryItemsByMeal,
   groupGroceryItemsByProfile,
@@ -18,10 +19,9 @@ import type { MealProfile } from "@/lib/settings/types";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 import {
   addManualGroceryItemAction,
-  advanceGroceryListLifecycleAction,
-  updateGroceryItemAlreadyHave,
-  updateGroceryItemChecked
+  advanceGroceryListLifecycleAction
 } from "./actions";
+import { GroceryItemStateControls } from "./grocery-item-state-controls";
 
 type GroceryListPageProps = {
   searchParams: Promise<{
@@ -64,6 +64,12 @@ export default async function GroceryListPage({
     ? groupGroceryItemsByMeal(groceryList.items)
     : [];
   const groceryListSummary = buildGroceryListSummary(groceryList?.items ?? []);
+  const progressStorageKey = groceryList
+    ? getGroceryProgressStorageKey({
+        generatedAt: groceryList.generatedAt,
+        groceryListId: groceryList.id
+      })
+    : null;
 
   return (
     <section className="space-y-6">
@@ -114,7 +120,7 @@ export default async function GroceryListPage({
             <CategoryGroupList
               groups={categoryGroups}
               listStatus={groceryList.status}
-              view={view}
+              progressStorageKey={progressStorageKey}
             />
           ) : null}
 
@@ -124,7 +130,7 @@ export default async function GroceryListPage({
               groups={profileGroups}
               listStatus={groceryList.status}
               note="Profile View is source context. Consolidated items can appear under more than one profile."
-              view={view}
+              progressStorageKey={progressStorageKey}
             />
           ) : null}
 
@@ -134,7 +140,7 @@ export default async function GroceryListPage({
               groups={mealGroups}
               listStatus={groceryList.status}
               note="Meal View is source context. Consolidated items can appear under more than one meal."
-              view={view}
+              progressStorageKey={progressStorageKey}
             />
           ) : null}
         </>
@@ -399,11 +405,11 @@ function ManualGroceryItemForm({
 function CategoryGroupList({
   groups,
   listStatus,
-  view
+  progressStorageKey
 }: {
   groups: GroceryCategoryGroup[];
   listStatus: GroceryListStatus;
-  view: GroceryListView;
+  progressStorageKey: string | null;
 }) {
   return (
     <>
@@ -433,7 +439,7 @@ function CategoryGroupList({
                   item={item}
                   key={item.id}
                   listStatus={listStatus}
-                  view={view}
+                  progressStorageKey={progressStorageKey}
                 />
               ))}
             </div>
@@ -449,13 +455,13 @@ function ContextGroupList({
   groups,
   listStatus,
   note,
-  view
+  progressStorageKey
 }: {
   emptyMessage: string;
   groups: GroceryItemContextGroup[];
   listStatus: GroceryListStatus;
   note: string;
-  view: GroceryListView;
+  progressStorageKey: string | null;
 }) {
   if (groups.length === 0) {
     return (
@@ -488,7 +494,7 @@ function ContextGroupList({
                 item={item}
                 key={`${group.groupKey}:${item.id}`}
                 listStatus={listStatus}
-                view={view}
+                progressStorageKey={progressStorageKey}
               />
             ))}
           </div>
@@ -501,11 +507,11 @@ function ContextGroupList({
 function GroceryItemRow({
   item,
   listStatus,
-  view
+  progressStorageKey
 }: {
   item: GroceryListItem;
   listStatus: GroceryListStatus;
-  view: GroceryListView;
+  progressStorageKey: string | null;
 }) {
   const canToggleItems = canToggleGroceryItems(listStatus);
 
@@ -554,47 +560,14 @@ function GroceryItemRow({
           ) : null}
         </div>
 
-        <div className="grid grid-cols-2 gap-2 md:min-w-64">
-          <form action={updateGroceryItemChecked}>
-            <input name="itemId" type="hidden" value={item.id} />
-            <input name="view" type="hidden" value={view} />
-            <input
-              name="checked"
-              type="hidden"
-              value={String(!item.checked)}
-            />
-            <button
-              className={`min-h-12 w-full rounded-md border px-4 py-3 text-left text-sm font-medium transition ${
-                item.checked
-                  ? "border-border bg-muted text-muted-foreground"
-                  : "border-primary bg-primary text-primary-foreground"
-              }`}
-              disabled={!canToggleItems}
-              type="submit"
-            >
-              {item.checked ? "Uncheck" : "Check off"}
-            </button>
-          </form>
-          <form action={updateGroceryItemAlreadyHave}>
-            <input name="itemId" type="hidden" value={item.id} />
-            <input name="view" type="hidden" value={view} />
-            <input
-              name="alreadyHave"
-              type="hidden"
-              value={String(!item.alreadyHave)}
-            />
-            <button
-              className={`min-h-12 w-full rounded-md border px-4 py-3 text-left text-sm font-medium transition hover:bg-muted ${
-                item.alreadyHave
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-                  : "border-border bg-card"
-              }`}
-              disabled={!canToggleItems}
-              type="submit"
-            >
-              {item.alreadyHave ? "Need to buy" : "Already have"}
-            </button>
-          </form>
+        <div className="md:min-w-64">
+          <GroceryItemStateControls
+            canEdit={canToggleItems && Boolean(progressStorageKey)}
+            initialAlreadyHave={item.alreadyHave}
+            initialChecked={item.checked}
+            itemId={item.id}
+            storageKey={progressStorageKey ?? "mealboard:grocery-progress:missing"}
+          />
         </div>
       </div>
 

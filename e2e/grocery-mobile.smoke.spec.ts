@@ -56,6 +56,33 @@ test.describe("Mobile grocery list", () => {
     await expect(page.getByLabel("Grocery item name")).toBeVisible();
     await page.keyboard.press("Tab");
 
+    const checkButton = page.getByRole("button", {
+      name: /Check off|Uncheck/
+    }).first();
+
+    if ((await checkButton.count()) > 0 && (await checkButton.isEnabled())) {
+      const stateRoutePattern = "**/api/grocery-list/items/**/state";
+      let failedOnce = false;
+
+      await page.route(stateRoutePattern, async (route) => {
+        if (!failedOnce) {
+          failedOnce = true;
+          await route.abort();
+          return;
+        }
+
+        await route.continue();
+      });
+
+      await checkButton.click();
+      await expect(
+        page.getByText("Saved locally. Retry when service returns.").first()
+      ).toBeVisible();
+      await page.unroute(stateRoutePattern);
+      await page.getByRole("button", { name: "Retry pending changes" }).first().click();
+      await expect(page.getByText("Grocery item updated.").first()).toBeVisible();
+    }
+
     const sourceDetails = page.getByText("Why is this on the list?").first();
     if ((await sourceDetails.count()) > 0) {
       await sourceDetails.click();

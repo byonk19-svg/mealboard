@@ -906,7 +906,7 @@ push unless explicitly approved.
 * RLS and role grants are explicit for the new table.
 * `/settings/baby` can list, add/update, and delete baby food statuses.
 * Baby status UI does not imply medical or reaction tracking.
-* Baby Meal 1/2 and Try This preview behavior now exists as read-only adjacent work.
+* Baby Meal 1/2 preview behavior exists, and Try This can be manually tracked as a normal baby food status.
 * Grocery and nutrition behavior remain unchanged.
 * Tests cover the pure status helper behavior.
 
@@ -916,9 +916,9 @@ push unless explicitly approved.
 
 Status: Mostly complete for the solids-only MVP surface. Baby stage setup,
 baby food statuses, static guidance, Baby Meal 1/2 routine previews, Try This
-preview, Plan Week Baby Meal 1/2 persistence, and approved baby grocery source
-behavior exist. Baby nutrition, milk intake, and reaction tracking remain out
-of scope.
+preview with manual status handoff, Plan Week Baby Meal 1/2 persistence, and
+approved baby grocery source behavior exist. Baby nutrition, milk intake, and
+reaction tracking remain out of scope.
 
 ## Goal
 
@@ -1139,8 +1139,8 @@ Run lint/typecheck/tests and report results.
 
 Status: Complete for MVP. `/grocery-list` has phone-friendly tap targets, sticky
 status/summary, collapsible sections, Shopping/Profile/Meal views, source
-details, manual add-ons, checked/already-have controls, and a credential-gated
-mobile Playwright smoke.
+details, manual add-ons, checked/already-have controls, local retry for failed
+item-state requests, and a credential-gated mobile Playwright smoke.
 
 ## Goal
 
@@ -1293,12 +1293,13 @@ weekly wrap-up expansion, Baby Meal 1/2 persistence, setup-aware and
 calorie-guidance dashboard signals, durable grocery source linkage,
 source-aware unused-grocery wrap-up, pending grocery review/apply handling,
 weekly wrap-up staple review handoff, recipe filters, recipe import smoke
-coverage, owner-only household member linking, ingredient merge/split review
-controls, PWA install metadata, and the Next/PostCSS audit override are complete.
+coverage, owner-only household member linking/removal, grocery item-state retry,
+baby Try This status handoff, ingredient merge/split review controls, PWA
+install metadata, and the Next/PostCSS audit override are complete.
 For the current repo state, run focused follow-up slices in this order:
 
-1. **Household member lifecycle** - add member removal, role editing, owner transfer, and household switching only after the owner-link flow is used successfully.
-2. **PWA/mobile offline resilience** - improve grocery-list behavior under spotty service without adding broad offline sync.
+1. **Household member lifecycle completion** - add role editing, owner transfer, and household switching only after the owner-link/remove flow is used successfully.
+2. **PWA/mobile offline resilience** - improve grocery-list behavior beyond item-state retry without adding broad offline sync.
 3. **Email-delivered invitations** - add invitation delivery only if shared household use becomes frequent enough to justify an email flow.
 4. **Weekly wrap-up review depth** - support richer multi-source staple review only if real household use shows the current single-staple review handoff is too narrow.
 

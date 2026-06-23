@@ -26,8 +26,8 @@ export default function SettingsPage() {
           </p>
           <h2 className="mt-2 text-xl font-semibold">Household</h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Review the current household membership and create copyable
-            invitation links for future shared access.
+            Review current household members, link existing auth users, and
+            remove member access when needed.
           </p>
         </Link>
 

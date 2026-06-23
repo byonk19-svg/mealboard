@@ -11,6 +11,10 @@ import { getBabyGuidanceForStage } from "@/lib/baby/baby-guidance";
 import { generateBabyMeals } from "@/lib/baby/generate-baby-meals";
 import { suggestBabyTryThis } from "@/lib/baby/suggest-baby-try-this";
 import {
+  buildBabyTryThisStatusDefaults,
+  type BabyTryThisStatusDefaults
+} from "@/lib/baby/try-this-handoff";
+import {
   getBabyFoodStatuses,
   getFoodPreferences,
   getFoods,
@@ -44,13 +48,14 @@ export default async function BabySettingsPage({
     return null;
   }
 
+  const today = new Date();
   const [profiles, foods, foodPreferences] = await Promise.all([
     getMealProfiles(householdContext.household.id),
     getFoods(householdContext.household.id, undefined, { limit: null }),
     getFoodPreferences(householdContext.household.id)
   ]);
   const babyProfile = getBabyProfile(profiles);
-  const summary = buildBabySettingsSummary(babyProfile, new Date());
+  const summary = buildBabySettingsSummary(babyProfile, today);
   const babyFoodStatuses = babyProfile
     ? await getBabyFoodStatuses(householdContext.household.id, babyProfile.id)
     : [];
@@ -75,6 +80,10 @@ export default async function BabySettingsPage({
     foods,
     stageReady: Boolean(babyGuidance),
     statuses: babyFoodStatuses
+  });
+  const babyTryThisDefaults = buildBabyTryThisStatusDefaults({
+    candidate: babyTryThis.candidate,
+    today
   });
 
   return (
@@ -153,14 +162,20 @@ export default async function BabySettingsPage({
         <BabyMealPreview babyMealSuggestions={babyMealSuggestions} />
       ) : null}
 
-      {babyProfile ? <BabyTryThisPreview tryThis={babyTryThis} /> : null}
+      {babyProfile ? (
+        <BabyTryThisPreview
+          profile={babyProfile}
+          statusDefaults={babyTryThisDefaults}
+          tryThis={babyTryThis}
+        />
+      ) : null}
 
       <section className="rounded-lg border border-dashed border-border bg-card p-5">
         <h2 className="text-xl font-semibold">Still out of scope</h2>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          Try This persistence, nutrition, milk intake, and reaction tracking
-          stay out of this slice. Routine Baby Meal 1/2 items can be applied to
-          Plan Week, and approved baby food rows can flow into groceries.
+          Nutrition, milk intake, and reaction tracking stay out of this slice.
+          Routine Baby Meal 1/2 items can be applied to Plan Week, and approved
+          baby food rows can flow into groceries.
         </p>
       </section>
     </section>
@@ -297,8 +312,12 @@ function BabyMealPreview({
 }
 
 function BabyTryThisPreview({
+  profile,
+  statusDefaults,
   tryThis
 }: {
+  profile: MealProfile;
+  statusDefaults: BabyTryThisStatusDefaults | null;
   tryThis: ReturnType<typeof suggestBabyTryThis>;
 }) {
   return (
@@ -328,6 +347,52 @@ function BabyTryThisPreview({
               {tryThis.availableFoodCount === 1 ? "food" : "foods"} available
               for future Try This ideas.
             </p>
+            {statusDefaults ? (
+              <form action={saveBabyFoodStatus} className="mt-4 space-y-3">
+                <input name="babyProfileId" type="hidden" value={profile.id} />
+                <input
+                  name="foodId"
+                  type="hidden"
+                  value={statusDefaults.foodId}
+                />
+                <input
+                  name="notes"
+                  type="hidden"
+                  value={statusDefaults.notes}
+                />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block text-sm font-medium">
+                    Try This status
+                    <select
+                      className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                      defaultValue={statusDefaults.status}
+                      name="status"
+                    >
+                      {babyFoodStatusOptions.map((status) => (
+                        <option key={status} value={status}>
+                          {formatBabyFoodStatus(status)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block text-sm font-medium">
+                    Last offered
+                    <input
+                      className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                      defaultValue={statusDefaults.lastOfferedOn}
+                      name="lastOfferedOn"
+                      type="date"
+                    />
+                  </label>
+                </div>
+                <button
+                  className="min-h-11 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                  type="submit"
+                >
+                  Track Try This food
+                </button>
+              </form>
+            ) : null}
           </>
         ) : (
           <p className="text-sm leading-6 text-muted-foreground">

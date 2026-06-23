@@ -1,4 +1,7 @@
-import { linkExistingHouseholdMember } from "@/app/(app)/settings/household/actions";
+import {
+  linkExistingHouseholdMember,
+  removeHouseholdMemberAction
+} from "@/app/(app)/settings/household/actions";
 import {
   getHouseholdMemberSettings,
   type HouseholdMemberForSettings
@@ -21,6 +24,7 @@ export default async function HouseholdSettingsPage({
     return null;
   }
 
+  const user = householdContext.user;
   const memberSettings = await getHouseholdMemberSettings(
     householdContext.household.id
   );
@@ -37,8 +41,8 @@ export default async function HouseholdSettingsPage({
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
           Link existing MealBoard auth users to this household. This preparation
-          slice does not send email, remove members, transfer ownership, or
-          support multiple households per login yet.
+          slice does not send email, transfer ownership, or support multiple
+          households per login yet.
         </p>
       </div>
 
@@ -109,7 +113,12 @@ export default async function HouseholdSettingsPage({
         <h2 className="text-xl font-semibold">Members</h2>
         <div className="mt-4 grid gap-3">
           {memberSettings.members.map((member) => (
-            <MemberCard member={member} key={member.id} />
+            <MemberCard
+              actorUserId={user.id}
+              canManage={isOwner && memberSettings.adminLookupAvailable}
+              member={member}
+              key={member.id}
+            />
           ))}
         </div>
       </section>
@@ -117,10 +126,21 @@ export default async function HouseholdSettingsPage({
   );
 }
 
-function MemberCard({ member }: { member: HouseholdMemberForSettings }) {
+function MemberCard({
+  actorUserId,
+  canManage,
+  member
+}: {
+  actorUserId: string;
+  canManage: boolean;
+  member: HouseholdMemberForSettings;
+}) {
+  const canRemove =
+    canManage && member.role !== "owner" && member.userId !== actorUserId;
+
   return (
     <article className="rounded-md border border-border bg-background p-4 text-sm">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="font-semibold">
             {member.email ?? `User ${member.userId.slice(0, 8)}`}
@@ -129,7 +149,20 @@ function MemberCard({ member }: { member: HouseholdMemberForSettings }) {
             {member.userId}
           </p>
         </div>
-        <p className="capitalize text-muted-foreground">{member.role}</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="capitalize text-muted-foreground">{member.role}</p>
+          {canRemove ? (
+            <form action={removeHouseholdMemberAction}>
+              <input name="membershipId" type="hidden" value={member.id} />
+              <button
+                className="min-h-10 rounded-md border border-border px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-muted"
+                type="submit"
+              >
+                Remove member
+              </button>
+            </form>
+          ) : null}
+        </div>
       </div>
     </article>
   );

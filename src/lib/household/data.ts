@@ -1,5 +1,6 @@
 import type { User } from "@supabase/supabase-js";
 import {
+  evaluateHouseholdMemberRemoval,
   evaluateHouseholdMemberLink,
   normalizeHouseholdMemberEmail
 } from "@/lib/household/members";
@@ -104,6 +105,61 @@ export async function linkExistingUserToHousehold({
 
   if (insertError) {
     throw new Error(insertError.message);
+  }
+}
+
+export async function removeHouseholdMember({
+  actorRole,
+  actorUserId,
+  householdId,
+  membershipId
+}: {
+  actorRole: string | null;
+  actorUserId: string;
+  householdId: string;
+  membershipId: string;
+}) {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("household_memberships")
+    .select("id, household_id, user_id, role")
+    .eq("household_id", householdId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const decision = evaluateHouseholdMemberRemoval({
+    actorRole,
+    actorUserId,
+    householdId,
+    memberships: ((data ?? []) as Array<{
+      household_id: string;
+      id: string;
+      role: string;
+      user_id: string;
+    }>).map((membership) => ({
+      householdId: membership.household_id,
+      id: membership.id,
+      role: membership.role,
+      userId: membership.user_id
+    })),
+    targetMembershipId: membershipId
+  });
+
+  if (!decision.ok) {
+    throw new Error(decision.reason);
+  }
+
+  const { error: deleteError } = await admin
+    .from("household_memberships")
+    .delete()
+    .eq("household_id", householdId)
+    .eq("id", decision.membershipId)
+    .eq("user_id", decision.userId);
+
+  if (deleteError) {
+    throw new Error(deleteError.message);
   }
 }
 
