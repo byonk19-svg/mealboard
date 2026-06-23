@@ -151,6 +151,32 @@ describe("scoreRecipeForMealSlot", () => {
       score: 94
     });
   });
+
+  it("penalizes meals that recently had too much left over", () => {
+    const result = scoreRecipeForMealSlot({
+      goals: [],
+      profileId: "profile-brianna",
+      recipe: recipe(),
+      requestedMealType: "lunch",
+      reviewSignal: {
+        leftoverCount: 0,
+        mealProfileId: "profile-brianna",
+        rating: "like",
+        recipeId: "recipe-1",
+        skippedCount: 0,
+        tooMuchCount: 2
+      }
+    });
+
+    expect(result).toMatchObject({
+      eligible: true,
+      reasonLabels: expect.arrayContaining([
+        "Liked before",
+        "Too much last time"
+      ]),
+      score: 73
+    });
+  });
 });
 
 describe("buildRuleBasedSwapSuggestions", () => {
@@ -243,7 +269,7 @@ describe("buildRuleBasedSwapSuggestions", () => {
 });
 
 describe("buildRuleBasedMealSuggestions", () => {
-  it("creates draft suggestions only for open adult meal slots", () => {
+  it("creates draft suggestions only for open adult meal slots without repeating a non-weekly favorite", () => {
     const suggestions = buildRuleBasedMealSuggestions({
       goals: ["high_protein"],
       planItems: [
@@ -277,7 +303,8 @@ describe("buildRuleBasedMealSuggestions", () => {
           id: "protein",
           meal_type: "dinner",
           name: "Protein Bowl",
-          estimated_protein_grams_per_serving: 42
+          estimated_protein_grams_per_serving: 42,
+          repeat_rule: "monthly"
         }),
         recipe({
           id: "alpha",
@@ -305,7 +332,7 @@ describe("buildRuleBasedMealSuggestions", () => {
         date: "2026-06-23",
         meal: "dinner",
         profile: "profile-brianna",
-        recipe: "protein"
+        recipe: "alpha"
       }
     ]);
   });
@@ -374,6 +401,46 @@ describe("buildRuleBasedMealSuggestions", () => {
 
     expect(suggestions[0]?.recipeId).toBe("beta");
     expect(suggestions[0]?.reasonLabels).not.toContain("Skipped recently");
+  });
+
+  it("does not pick the same non-weekly recipe repeatedly in the same week when a clean alternative is available", () => {
+    const suggestions = buildRuleBasedMealSuggestions({
+      goals: [],
+      planItems: [
+        planItem({
+          meal_profile_id: "profile-brianna",
+          meal_type: "dinner",
+          plan_date: "2026-06-21",
+          recipe_id: "monthly-recipe"
+        })
+      ],
+      profileDays: [
+        profileDay({
+          adult_day_type: "off_day",
+          meal_profile_id: "profile-brianna",
+          plan_date: "2026-06-22"
+        })
+      ],
+      profiles: [
+        {
+          id: "profile-brianna",
+          name: "Brianna",
+          profile_type: "adult"
+        }
+      ],
+      recipes: [
+        recipe({
+          id: "monthly-recipe",
+          meal_type: "dinner",
+          name: "Monthly Dinner",
+          repeat_rule: "monthly"
+        }),
+        recipe({ id: "clean-recipe", meal_type: "dinner", name: "Clean Dinner" })
+      ],
+      weekDateKeys: ["2026-06-22"]
+    });
+
+    expect(suggestions[0]?.recipeId).toBe("clean-recipe");
   });
 });
 

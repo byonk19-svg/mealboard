@@ -25,6 +25,21 @@ export type GroceryListStatus =
   | "shopping_started"
   | "completed";
 
+export type GroceryListItemStateErrorCode =
+  | "invalid_state"
+  | "missing_item"
+  | "not_editable";
+
+export class GroceryListItemStateError extends Error {
+  code: GroceryListItemStateErrorCode;
+
+  constructor(code: GroceryListItemStateErrorCode, message: string) {
+    super(message);
+    this.code = code;
+    this.name = "GroceryListItemStateError";
+  }
+}
+
 export type GroceryListItemSource = {
   id: string;
   label: string | null;
@@ -720,7 +735,10 @@ export async function updateGroceryListItemState({
   }
 
   if (Object.keys(updates).length === 0) {
-    throw new Error("Choose an item state to update.");
+    throw new GroceryListItemStateError(
+      "invalid_state",
+      "Choose an item state to update."
+    );
   }
 
   const supabase = await createClient();
@@ -731,11 +749,17 @@ export async function updateGroceryListItemState({
   );
 
   if (!listStatus) {
-    throw new Error("That grocery item is no longer available.");
+    throw new GroceryListItemStateError(
+      "missing_item",
+      "That grocery item is no longer available."
+    );
   }
 
   if (!canToggleGroceryItemState(listStatus)) {
-    throw new Error("This grocery list is no longer editable.");
+    throw new GroceryListItemStateError(
+      "not_editable",
+      "This grocery list is no longer editable."
+    );
   }
 
   const { data, error } = await supabase
@@ -751,7 +775,10 @@ export async function updateGroceryListItemState({
   }
 
   if (!data) {
-    throw new Error("That grocery item is no longer available.");
+    throw new GroceryListItemStateError(
+      "missing_item",
+      "That grocery item is no longer available."
+    );
   }
 }
 

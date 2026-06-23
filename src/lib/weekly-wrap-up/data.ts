@@ -239,7 +239,8 @@ export async function getRecipeReviewSignals(householdId: string) {
         mealProfileId: row.meal_profile_id,
         rating: null,
         recipeId: row.recipe_id,
-        skippedCount: 0
+        skippedCount: 0,
+        tooMuchCount: 0
       } satisfies RecipeReviewSignal);
 
     if (!signal.rating && row.rating) {
@@ -252,6 +253,10 @@ export async function getRecipeReviewSignals(householdId: string) {
 
     if (row.quick_tags.some(isLeftoverQuickTag)) {
       signal.leftoverCount += 1;
+    }
+
+    if (row.quick_tags.includes("too_much")) {
+      signal.tooMuchCount = (signal.tooMuchCount ?? 0) + 1;
     }
 
     signalsByKey.set(key, signal);

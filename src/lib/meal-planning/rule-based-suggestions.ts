@@ -59,10 +59,12 @@ export type RecipeReviewSignal = {
   rating: "love" | "like" | "okay" | "dislike" | "hard_no" | null;
   recipeId: string;
   skippedCount: number;
+  tooMuchCount?: number;
 };
 
 type ScoreRecipeInput = {
   adultDayType?: AdultDayType | null;
+  currentWeekRecipeCount?: number;
   goals: WeeklyGoalType[];
   profileId: string;
   recipe: RecipeWithDetails;
@@ -102,6 +104,7 @@ const mealTypeRank: Record<MealType, number> = {
 
 export function scoreRecipeForMealSlot({
   adultDayType,
+  currentWeekRecipeCount = 0,
   goals,
   profileId,
   recipe,
@@ -206,6 +209,16 @@ export function scoreRecipeForMealSlot({
     reasonLabels.push("Leftover-friendly");
   }
 
+  if ((reviewSignal?.tooMuchCount ?? 0) > 0) {
+    score -= Math.min(reviewSignal?.tooMuchCount ?? 0, 3) * 6;
+    reasonLabels.push("Too much last time");
+  }
+
+  if (currentWeekRecipeCount > 0) {
+    score -= getCurrentWeekRepeatPenalty(recipe.repeat_rule);
+    reasonLabels.push("Already planned this week");
+  }
+
   return {
     eligible: true,
     reasonLabels,
@@ -239,6 +252,7 @@ export function buildRuleBasedMealSuggestions({
     .sort((a, b) => a.name.localeCompare(b.name));
   const suggestions: RuleBasedMealSuggestion[] = [];
   const reviewSignalByRecipeProfile = buildReviewSignalLookup(reviewSignals);
+  const currentWeekRecipeCounts = buildCurrentWeekRecipeCounts(planItems);
 
   for (const dateKey of weekDateKeys) {
     for (const profile of adultProfiles) {
@@ -257,11 +271,16 @@ export function buildRuleBasedMealSuggestions({
           mealType,
           profile,
           recipes,
+          currentWeekRecipeCounts,
           reviewSignalByRecipeProfile
         });
 
         if (suggestion) {
           suggestions.push(suggestion);
+          currentWeekRecipeCounts.set(
+            suggestion.recipeId,
+            (currentWeekRecipeCounts.get(suggestion.recipeId) ?? 0) + 1
+          );
         }
       }
     }
@@ -307,6 +326,10 @@ export function buildRuleBasedSwapSuggestions({
       .map((item) => item.recipe_id)
   );
   const reviewSignalByRecipeProfile = buildReviewSignalLookup(reviewSignals);
+  const currentWeekRecipeCounts = buildCurrentWeekRecipeCounts(
+    planItems,
+    targetItem.id
+  );
 
   return recipes
     .filter(
@@ -317,6 +340,7 @@ export function buildRuleBasedSwapSuggestions({
       recipe,
       score: scoreRecipeForMealSlot({
         adultDayType,
+        currentWeekRecipeCount: currentWeekRecipeCounts.get(recipe.id) ?? 0,
         goals,
         profileId: targetItem.meal_profile_id ?? "",
         recipe,
@@ -348,6 +372,7 @@ export function buildRuleBasedSwapSuggestions({
 
 function getBestSuggestionForSlot({
   adultDayType,
+  currentWeekRecipeCounts,
   dateKey,
   goals,
   mealType,
@@ -356,6 +381,7 @@ function getBestSuggestionForSlot({
   reviewSignalByRecipeProfile
 }: {
   adultDayType: AdultDayType | null;
+  currentWeekRecipeCounts: Map<string, number>;
   dateKey: string;
   goals: WeeklyGoalType[];
   mealType: MealType;
@@ -368,6 +394,7 @@ function getBestSuggestionForSlot({
       recipe,
       score: scoreRecipeForMealSlot({
         adultDayType,
+        currentWeekRecipeCount: currentWeekRecipeCounts.get(recipe.id) ?? 0,
         goals,
         profileId: profile.id,
         recipe,
@@ -404,6 +431,45 @@ function getBestSuggestionForSlot({
     recipeName: best.recipe.name,
     score: best.score.score
   } satisfies RuleBasedMealSuggestion;
+}
+
+function buildCurrentWeekRecipeCounts(
+  planItems: WeeklyPlanItem[],
+  excludedItemId?: string
+) {
+  const counts = new Map<string, number>();
+
+  for (const item of planItems) {
+    if (!item.recipe_id || item.id === excludedItemId) {
+      continue;
+    }
+
+    counts.set(item.recipe_id, (counts.get(item.recipe_id) ?? 0) + 1);
+  }
+
+  return counts;
+}
+
+function getCurrentWeekRepeatPenalty(
+  repeatRule: RecipeWithDetails["repeat_rule"]
+) {
+  if (repeatRule === "weekly") {
+    return 8;
+  }
+
+  if (repeatRule === "every_two_weeks") {
+    return 18;
+  }
+
+  if (repeatRule === "monthly") {
+    return 25;
+  }
+
+  if (repeatRule === "rarely") {
+    return 35;
+  }
+
+  return 20;
 }
 
 function buildReviewSignalLookup(reviewSignals: RecipeReviewSignal[]) {

@@ -45,6 +45,11 @@ test.describe("Mobile grocery list", () => {
     }
 
     await expect(page.getByText("Total items")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Copy list" })).toBeVisible();
+    await page.getByRole("button", { name: "Copy list" }).click();
+    await expect(
+      page.getByText(/Copied grocery list\.|Copy failed\./)
+    ).toBeVisible();
     await page.getByRole("link", { name: "Profile", exact: true }).click();
     await expect(page.getByText("Profile View is source context.")).toBeVisible();
     await page.getByRole("link", { name: "Meal", exact: true }).click();
@@ -76,11 +81,12 @@ test.describe("Mobile grocery list", () => {
 
       await checkButton.click();
       await expect(
-        page.getByText("Saved locally. Retry when service returns.").first()
+        page.getByText("Saved locally. Will retry when service returns.").first()
       ).toBeVisible();
       await page.unroute(stateRoutePattern);
-      await page.evaluate(() => window.dispatchEvent(new Event("online")));
-      await expect(page.getByText("Grocery item updated.").first()).toBeVisible();
+      await expect(page.getByText("Grocery item updated.").first()).toBeVisible({
+        timeout: 15_000
+      });
     }
 
     const sourceDetails = page.getByText("Why is this on the list?").first();

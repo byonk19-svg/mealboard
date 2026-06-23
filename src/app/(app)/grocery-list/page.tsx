@@ -5,6 +5,7 @@ import {
   buildGroceryListSummary,
   type GroceryListSummary
 } from "@/lib/grocery/grocery-list-summary";
+import { buildGroceryListCopyText } from "@/lib/grocery/copy-grocery-list";
 import { getGroceryProgressStorageKey } from "@/lib/grocery/mobile-progress";
 import {
   groupGroceryItemsByMeal,
@@ -21,6 +22,7 @@ import {
   addManualGroceryItemAction,
   advanceGroceryListLifecycleAction
 } from "./actions";
+import { CopyGroceryListButton } from "./copy-grocery-list-button";
 import { GroceryItemStateControls } from "./grocery-item-state-controls";
 
 type GroceryListPageProps = {
@@ -64,6 +66,13 @@ export default async function GroceryListPage({
     ? groupGroceryItemsByMeal(groceryList.items)
     : [];
   const groceryListSummary = buildGroceryListSummary(groceryList?.items ?? []);
+  const copyText = groceryList
+    ? buildGroceryListCopyText({
+        items: groceryList.items,
+        title: groceryList.name ?? "MealBoard grocery list",
+        weekStartDate: groceryList.weekStartDate
+      })
+    : "";
   const progressStorageKey = groceryList
     ? getGroceryProgressStorageKey({
         generatedAt: groceryList.generatedAt,
@@ -94,6 +103,7 @@ export default async function GroceryListPage({
       ) : (
         <>
           <GroceryListOverview
+            copyText={copyText}
             groceryListId={groceryList.id}
             name={groceryList.name}
             status={groceryList.status}
@@ -150,6 +160,7 @@ export default async function GroceryListPage({
 }
 
 function GroceryListOverview({
+  copyText,
   groceryListId,
   name,
   status,
@@ -157,6 +168,7 @@ function GroceryListOverview({
   view,
   weekStartDate
 }: {
+  copyText: string;
   groceryListId: string;
   name: string | null;
   status: GroceryListStatus;
@@ -190,11 +202,17 @@ function GroceryListOverview({
             ) : null}
           </div>
         </div>
-        <LifecycleAction
-          groceryListId={groceryListId}
-          status={status}
-          view={view}
-        />
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+          <CopyGroceryListButton
+            copyText={copyText}
+            disabled={summary.totalItemCount === 0}
+          />
+          <LifecycleAction
+            groceryListId={groceryListId}
+            status={status}
+            view={view}
+          />
+        </div>
       </div>
 
       <dl className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">

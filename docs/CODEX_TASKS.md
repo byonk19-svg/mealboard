@@ -1294,13 +1294,14 @@ calorie-guidance dashboard signals, durable grocery source linkage,
 source-aware unused-grocery wrap-up, pending grocery review/apply handling,
 weekly wrap-up staple review handoff, recipe filters, recipe import smoke
 coverage, owner-only household member linking/removal/ownership transfer,
-automatic grocery item-state retry, review-informed suggestion scoring, baby Try
-This status handoff, ingredient merge/split review controls, PWA install
-metadata, and the Next/PostCSS audit override are complete.
+bounded grocery item-state retry with manual recovery, generic grocery-list copy,
+review-informed suggestion scoring, baby Try This status handoff, ingredient
+merge/split review controls, PWA install metadata, and the Next/PostCSS audit
+override are complete.
 For the current repo state, run focused follow-up slices in this order:
 
 1. **Household member lifecycle depth** - add role editing beyond ownership transfer and household switching only after shared household use proves it is needed.
-2. **PWA/mobile offline resilience** - improve grocery-list behavior beyond item-state auto-retry without adding broad offline sync.
+2. **PWA/mobile offline resilience** - improve grocery-list behavior beyond bounded item-state retry without adding broad offline sync.
 3. **Email-delivered invitations** - add invitation delivery only if shared household use becomes frequent enough to justify an email flow.
 4. **Weekly wrap-up review depth** - support richer multi-source staple review only if real household use shows the current single-staple review handoff is too narrow.
 

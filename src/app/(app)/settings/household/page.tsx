@@ -41,8 +41,9 @@ export default async function HouseholdSettingsPage({
           Household
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
-          Link existing MealBoard auth users to this household. This preparation
-          slice does not send email, transfer ownership, or support multiple
+          Link existing MealBoard auth users to this household, transfer
+          ownership when needed, and keep shared access explicit. This
+          preparation slice does not send email invitations or support multiple
           households per login yet.
         </p>
       </div>

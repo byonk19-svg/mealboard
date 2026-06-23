@@ -3,10 +3,18 @@ import {
   evaluateHouseholdMemberRemoval,
   evaluateHouseholdMemberLink,
   evaluateHouseholdOwnerTransfer,
+  normalizeHouseholdRole,
   normalizeHouseholdMemberEmail
 } from "./members";
 
 describe("household member helpers", () => {
+  it("normalizes only supported household roles", () => {
+    expect(normalizeHouseholdRole("owner")).toBe("owner");
+    expect(normalizeHouseholdRole("member")).toBe("member");
+    expect(normalizeHouseholdRole("admin")).toBeNull();
+    expect(normalizeHouseholdRole(null)).toBeNull();
+  });
+
   it("normalizes member emails for auth lookup", () => {
     expect(normalizeHouseholdMemberEmail(" Elaine@Example.COM ")).toBe(
       "elaine@example.com"
@@ -283,6 +291,40 @@ describe("household member helpers", () => {
     ).toEqual({
       ok: false,
       reason: "That household member is no longer available."
+    });
+  });
+
+  it("rejects ownership transfer when household ownership is ambiguous", () => {
+    expect(
+      evaluateHouseholdOwnerTransfer({
+        actorRole: "owner",
+        actorUserId: "owner-user",
+        householdId: "household-1",
+        memberships: [
+          {
+            householdId: "household-1",
+            id: "membership-owner",
+            role: "owner",
+            userId: "owner-user"
+          },
+          {
+            householdId: "household-1",
+            id: "membership-other-owner",
+            role: "owner",
+            userId: "other-owner"
+          },
+          {
+            householdId: "household-1",
+            id: "membership-member",
+            role: "member",
+            userId: "member-user"
+          }
+        ],
+        targetMembershipId: "membership-member"
+      })
+    ).toEqual({
+      ok: false,
+      reason: "Resolve household ownership before transferring ownership."
     });
   });
 });

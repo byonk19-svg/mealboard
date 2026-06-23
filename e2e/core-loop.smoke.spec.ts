@@ -107,7 +107,7 @@ test.describe("MealBoard core loop", () => {
     await expect(page.getByText("Manual grocery item added.")).toBeVisible();
 
     await page.getByRole("button", { name: "Check off" }).first().click();
-    await expect(page.getByText("Grocery item updated.")).toBeVisible();
+    await expect(page.getByText("Grocery item updated.").first()).toBeVisible();
     await page.getByRole("button", { name: "Finalize list" }).click();
     await page.goto(`/plan-week?weekStartDate=${weekStartDate}`);
     const mondayRecipeSelect = page.getByLabel("Recipe for Monday");
@@ -119,7 +119,15 @@ test.describe("MealBoard core loop", () => {
     await page.waitForURL(/message=Recipe\+added\+to\+the\+week|message=Recipe%20added%20to%20the%20week/, {
       timeout: 45_000
     });
-    await page.getByRole("button", { name: "Approve for groceries" }).first().click();
+    const mondayPlannedMeal = page
+      .getByRole("article", { name: `Planned meal ${recipeName}` })
+      .nth(1);
+    await mondayPlannedMeal
+      .getByRole("button", { name: "Approve for groceries" })
+      .click();
+    await expect(
+      mondayPlannedMeal.getByText("Approved for groceries")
+    ).toBeVisible();
     await expect(page.getByText("Protected grocery list: Finalized")).toBeVisible();
     await expect(
       page.getByText("MealBoard will not silently change this list")
@@ -158,7 +166,7 @@ test.describe("MealBoard core loop", () => {
 
 function getFutureSundayDateKey(seed: number) {
   const date = new Date();
-  date.setDate(date.getDate() + 28 + (seed % 90));
+  date.setDate(date.getDate() + 365 + (seed % 3650));
   const day = date.getDay();
   date.setDate(date.getDate() - day);
 

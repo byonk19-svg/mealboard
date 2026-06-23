@@ -10,6 +10,9 @@ import {
 } from "react";
 import {
   getGroceryProgressOperationKey,
+  isGroceryProgressRetryableStatus,
+  markGroceryProgressOperationAttempted,
+  markGroceryProgressOperationTerminal,
   mergeGroceryProgressOperations,
   parseGroceryProgressOperations,
   removeGroceryProgressOperation,
@@ -79,22 +82,66 @@ export function GroceryItemStateControls({
   );
 
   const pendingText = useMemo(() => {
-    if (pendingFields.length === 0) {
+    if (itemOperations.length === 0) {
       return null;
     }
 
+    if (itemOperations.some((operation) => operation.terminal)) {
+      return "Update not applicable. Refresh list or retry manually.";
+    }
+
     return "Saved locally. Retry when service returns.";
-  }, [pendingFields.length]);
+  }, [itemOperations]);
+  const nextRetryDelayMs = useMemo(() => {
+    const retryableOperations = itemOperations.filter(
+      (operation) => !operation.terminal
+    );
+
+    if (retryableOperations.length === 0) {
+      return null;
+    }
+
+    const now = getCurrentTimestamp();
+    const nextRetryAt = Math.min(
+      ...retryableOperations.map(
+        (operation) => operation.nextRetryAt ?? now
+      )
+    );
+
+    return Math.max(nextRetryAt - now, 0);
+  }, [itemOperations]);
 
   const sendOperation = useCallback(
-    async (operation: GroceryProgressOperation) => {
+    async (
+      operation: GroceryProgressOperation,
+      options: { force?: boolean } = {}
+    ) => {
       const operationKey = getGroceryProgressOperationKey(operation);
+      const now = getCurrentTimestamp();
+
+      if (!options.force && operation.terminal) {
+        return;
+      }
+
+      if (
+        !options.force &&
+        operation.nextRetryAt !== null &&
+        operation.nextRetryAt !== undefined &&
+        operation.nextRetryAt > now
+      ) {
+        return;
+      }
 
       if (inFlightOperationKeysRef.current.has(operationKey)) {
         return;
       }
 
       inFlightOperationKeysRef.current.add(operationKey);
+      setStatusMessage(
+        operation.attemptCount
+          ? `Retrying pending change (attempt ${operation.attemptCount + 1}).`
+          : "Saving grocery item."
+      );
 
       try {
         const response = await fetch(
@@ -111,7 +158,31 @@ export function GroceryItemStateControls({
         );
 
         if (!response.ok) {
-          throw new Error("Grocery item update failed.");
+          const errorPayload = await readErrorPayload(response);
+          const message =
+            errorPayload?.error ?? "Grocery item update failed.";
+          const attemptedOperation = markGroceryProgressOperationAttempted({
+            now,
+            operation: {
+              ...operation,
+              lastError: message
+            },
+            status: response.status
+          });
+          const nextOperation = isGroceryProgressRetryableStatus(response.status)
+            ? attemptedOperation
+            : markGroceryProgressOperationTerminal({
+                error: message,
+                operation: attemptedOperation
+              });
+
+          writeOrReplaceOperation(storageKey, nextOperation);
+          setStatusMessage(
+            nextOperation.terminal
+              ? "Update not applicable. Refresh list or retry manually."
+              : "Saved locally. Will retry when service returns."
+          );
+          return;
         }
 
         const remainingOperations = removeGroceryProgressOperation({
@@ -122,7 +193,13 @@ export function GroceryItemStateControls({
         writeOperations(storageKey, remainingOperations);
         setStatusMessage("Grocery item updated.");
       } catch {
-        setStatusMessage("Saved locally. Retry when service returns.");
+        const nextOperation = markGroceryProgressOperationAttempted({
+          now,
+          operation,
+          status: 0
+        });
+        writeOrReplaceOperation(storageKey, nextOperation);
+        setStatusMessage("Saved locally. Will retry when service returns.");
       } finally {
         inFlightOperationKeysRef.current.delete(operationKey);
       }
@@ -130,29 +207,36 @@ export function GroceryItemStateControls({
     [storageKey]
   );
 
-  const retryPendingOperations = useCallback(async () => {
-    if (!canEdit) {
+  const retryPendingOperations = useCallback(
+    async (options: { force?: boolean } = {}) => {
+      if (!canEdit) {
+        return;
+      }
+
+      const operations = readOperations(storageKey).filter(
+        (operation) => operation.itemId === itemId
+      );
+
+      for (const operation of operations) {
+        await sendOperation(operation, options);
+      }
+    },
+    [canEdit, itemId, sendOperation, storageKey]
+  );
+
+  useEffect(() => {
+    if (nextRetryDelayMs === null) {
       return;
     }
 
-    const operations = readOperations(storageKey).filter(
-      (operation) => operation.itemId === itemId
-    );
-
-    for (const operation of operations) {
-      await sendOperation(operation);
-    }
-  }, [canEdit, itemId, sendOperation, storageKey]);
-
-  useEffect(() => {
     const retryTimer = window.setTimeout(() => {
       void retryPendingOperations();
-    }, 0);
+    }, nextRetryDelayMs);
 
     return () => {
       window.clearTimeout(retryTimer);
     };
-  }, [retryPendingOperations]);
+  }, [nextRetryDelayMs, retryPendingOperations]);
 
   useEffect(() => {
     function retryWhenReady() {
@@ -244,7 +328,7 @@ export function GroceryItemStateControls({
       {pendingText ? (
         <button
           className="min-h-10 rounded-md border border-border px-3 py-2 text-xs font-medium transition hover:bg-muted"
-          onClick={retryPendingOperations}
+          onClick={() => retryPendingOperations({ force: true })}
           type="button"
         >
           Retry pending changes
@@ -281,6 +365,20 @@ function writeOperations(
   window.dispatchEvent(new Event("mealboard:grocery-progress"));
 }
 
+function writeOrReplaceOperation(
+  storageKey: string,
+  operation: GroceryProgressOperation
+) {
+  writeOperations(storageKey, [
+    ...readOperations(storageKey).filter(
+      (candidate) =>
+        getGroceryProgressOperationKey(candidate) !==
+        getGroceryProgressOperationKey(operation)
+    ),
+    operation
+  ]);
+}
+
 function readRawOperations(storageKey: string) {
   if (typeof window === "undefined") {
     return "";
@@ -305,4 +403,22 @@ function subscribeToGroceryProgress(onStoreChange: () => void) {
 
 function getCurrentTimestamp() {
   return Date.now();
+}
+
+async function readErrorPayload(response: Response) {
+  try {
+    const payload: unknown = await response.json();
+
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+      return null;
+    }
+
+    const candidate = payload as { error?: unknown };
+
+    return typeof candidate.error === "string"
+      ? { error: candidate.error }
+      : null;
+  } catch {
+    return null;
+  }
 }

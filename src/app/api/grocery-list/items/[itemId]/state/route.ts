@@ -1,6 +1,9 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
-import { updateGroceryListItemState } from "@/lib/grocery/data";
+import {
+  GroceryListItemStateError,
+  updateGroceryListItemState
+} from "@/lib/grocery/data";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 
 type RouteContext = {
@@ -55,8 +58,19 @@ export async function PATCH(request: Request, context: RouteContext) {
       itemId
     });
   } catch (error) {
+    if (error instanceof GroceryListItemStateError) {
+      return NextResponse.json(
+        {
+          code: error.code,
+          error: error.message
+        },
+        { status: getGroceryListItemStateStatus(error.code) }
+      );
+    }
+
     return NextResponse.json(
       {
+        code: "unknown",
         error:
           error instanceof Error ? error.message : "Grocery item update failed."
       },
@@ -67,6 +81,18 @@ export async function PATCH(request: Request, context: RouteContext) {
   revalidatePath("/grocery-list");
 
   return NextResponse.json({ ok: true });
+}
+
+function getGroceryListItemStateStatus(code: GroceryListItemStateError["code"]) {
+  if (code === "missing_item") {
+    return 404;
+  }
+
+  if (code === "not_editable") {
+    return 409;
+  }
+
+  return 400;
 }
 
 function parseGroceryItemStatePayload(payload: unknown) {

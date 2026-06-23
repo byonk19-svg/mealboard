@@ -1,6 +1,6 @@
 # MealBoard MVP Readiness
 
-This document captures the current private family MVP state after the rule-based suggestions, smart swaps, Plan Week profile view, saved-food administration, Preferences food creation, actionable dashboard queue, baby weekly-plan persistence, baby Try This status handoff, pending grocery-change review/apply flow, household member lifecycle prep, owner transfer, mobile grocery spotty-service auto-retry, PWA install metadata, weekly wrap-up expansion, review-informed suggestion scoring, hardening, and E2E smoke slices. It is a handoff snapshot for future Codex work so the next phase can build from known product truth instead of rediscovering the app.
+This document captures the current private family MVP state after the rule-based suggestions, smart swaps, Plan Week profile view, saved-food administration, Preferences food creation, actionable dashboard queue, baby weekly-plan persistence, baby Try This status handoff, pending grocery-change review/apply flow, household member lifecycle prep, owner transfer, mobile grocery spotty-service retry, generic grocery-list copy support, PWA install metadata, weekly wrap-up expansion, review-informed suggestion scoring, hardening, and E2E smoke slices. It is a handoff snapshot for future Codex work so the next phase can build from known product truth instead of rediscovering the app.
 
 ## Current Status
 
@@ -15,7 +15,7 @@ The latest verified flow covers:
 - Create and edit a recipe with structured ingredients, nutrition estimates, tags, and profile approvals.
 - Configure the active weekly plan with adult work/off days and weekly goals.
 - Review and add rule-based adult meal suggestion drafts.
-- Let recent weekly wrap-up recipe ratings, skipped meals, and leftover tags influence rule-based suggestion ranking.
+- Let recent weekly wrap-up recipe ratings, skipped meals, too-much-leftover tags, and leftover-friendly tags influence rule-based suggestion ranking.
 - Add saved recipes to specific days, profiles, and meal slots.
 - Review the week by profile, including clear Baby Meal 1/2 rows.
 - Approve planned meals for grocery generation.
@@ -27,7 +27,8 @@ The latest verified flow covers:
 - Open a smart swap panel, review ranked replacements, see grocery add/remove/keep impact, and confirm a swap without silently changing protected grocery lists.
 - Use Shopping, Profile, and Meal grocery views.
 - Add a manual grocery item with household/profile context and source note.
-- Toggle checked and already-have item states, including automatic local retry for a failed mobile item-state request when the browser returns online or regains focus.
+- Toggle checked and already-have item states, including local pending-state preservation, bounded retry backoff, manual retry, and terminal feedback for item-state requests that can no longer apply.
+- Copy a generic plain-text grocery list grouped by category for manual use outside MealBoard.
 - Advance a grocery list through Draft -> Finalized -> Shopping Started -> Completed.
 - Open the optional weekly wrap-up after completed shopping.
 - Capture made/skipped meal outcomes, leftovers, source-aware unused grocery notes, and hand source-aware staple adjustment intent to Settings for explicit review before any staple changes.
@@ -68,7 +69,7 @@ Use a linked local household user. Do not commit `.env.local`, `.env.cloud.local
 17. Add a manual grocery item with a note/context.
 18. Confirm Shopping, Profile, and Meal views still render.
 19. Expand source context and confirm recipe/staple/baby/manual explanations are visible.
-20. Toggle checked and already-have on an item. On mobile, simulate a failed item-state request and confirm the pending local state clears automatically after browser online/focus retry.
+20. Toggle checked and already-have on an item. On mobile, simulate a failed item-state request and confirm the pending local state remains visible, then use Retry pending changes after service recovery.
 21. Advance lifecycle one step at a time:
     - Draft -> Finalized
     - Finalized -> Shopping Started
@@ -108,7 +109,7 @@ proposed tree.
 These are intentionally out of scope for the current MVP unless a future task explicitly reopens them:
 
 - AI meal planning or AI nutrition estimation
-- H-E-B integration, export, aisle mapping, or price behavior
+- H-E-B integration, H-E-B-specific export, aisle mapping, or price behavior
 - Native iPhone or Android apps
 - Full pantry inventory, barcode scanning, expiration tracking, or reminders
 - Recipe photos and full recipe-link import
@@ -123,7 +124,7 @@ These are intentionally out of scope for the current MVP unless a future task ex
 Good next slices should stay narrow and start from the verified MVP loop. Candidate directions:
 
 - Member role editing beyond owner transfer and household switching
-- Broader PWA/mobile offline resilience for grocery shopping beyond item-state retry
+- Broader PWA/mobile offline resilience for grocery shopping beyond bounded item-state retry
 - Email-delivered invitations if shared household use becomes frequent
 
 Prefer one focused slice at a time, and keep cloud Supabase migration pushes as explicit approval points.

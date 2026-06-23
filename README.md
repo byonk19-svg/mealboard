@@ -30,11 +30,12 @@ Implemented MVP surfaces include:
 - Recipe library with structured ingredients, profile approvals, and calorie/protein estimate fields
 - Weekly planning with adult work/off days, Day/Profile views, planned recipe items, approval/lock/remove/swap actions, staples review, and a small nutrition estimate summary
 - Rule-based adult meal suggestion drafts with reason labels, why-this context, and recent wrap-up review signals
+- Current-week repeat awareness and too-much-leftover feedback in rule-based suggestion scoring
 - Smart swap suggestions with confirmation and grocery add/remove/keep impact preview
 - Staples settings CRUD, weekly staple selection, and selected staples flowing into grocery generation
 - Grocery list generation from approved planned meals, persisted approved baby foods, and selected staples
 - Pending grocery-change review/apply handling when a finalized or shopping-started list would differ from the current approved plan
-- Mobile-friendly grocery shopping list with Shopping/Profile/Meal views, source context, manual add-ons, checked/already-have state, spotty-service retry for item state taps, and Draft -> Finalized -> Shopping Started -> Completed lifecycle
+- Mobile-friendly grocery shopping list with Shopping/Profile/Meal views, source context, generic copyable plain text, manual add-ons, checked/already-have state, bounded spotty-service retry/manual recovery for item state taps, and Draft -> Finalized -> Shopping Started -> Completed lifecycle
 - Baby settings with stage context, baby food statuses, Baby Meal 1/2 routine preview, Try This preview with manual status handoff, and Plan Week Baby Meal 1/2 persistence
 - Dashboard current-week summary with planning status, grocery status, next best action, setup-aware and calorie-guidance needs-attention items, and optional weekly wrap-up entry after completed shopping
 - Weekly wrap-up capture for made/skipped meals, leftovers, recipe/profile feedback, source-aware unused groceries, and explicit staple/quantity review handoff

@@ -109,7 +109,8 @@ export default async function RecipesPage({ searchParams }: RecipesPageProps) {
           <h2 className="mt-3 text-2xl font-semibold">Add the first recipe</h2>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
             Start with a simple meal and a few structured ingredient rows.
-            Paste parsing, weekly planning, and grocery generation come later.
+            Profile approvals make the recipe available for Plan Week and
+            grocery generation.
           </p>
         </section>
       )}

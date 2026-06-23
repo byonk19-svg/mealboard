@@ -3,6 +3,8 @@ export type HouseholdMemberLinkMembership = {
   userId: string;
 };
 
+export type HouseholdRole = "owner" | "member";
+
 export type HouseholdMemberRemovalMembership = HouseholdMemberLinkMembership & {
   id: string;
   role: string;
@@ -56,6 +58,10 @@ export function normalizeHouseholdMemberEmail(value: FormDataEntryValue | null) 
   return email;
 }
 
+export function normalizeHouseholdRole(value: string | null): HouseholdRole | null {
+  return value === "owner" || value === "member" ? value : null;
+}
+
 export function evaluateHouseholdMemberLink({
   actorRole,
   existingMemberships,
@@ -67,7 +73,7 @@ export function evaluateHouseholdMemberLink({
   householdId: string;
   targetUserId: string | null;
 }): HouseholdMemberLinkDecision {
-  if (actorRole !== "owner") {
+  if (normalizeHouseholdRole(actorRole) !== "owner") {
     return {
       ok: false,
       reason: "Only household owners can link members."
@@ -122,7 +128,7 @@ export function evaluateHouseholdMemberRemoval({
   memberships: HouseholdMemberRemovalMembership[];
   targetMembershipId: string | null;
 }): HouseholdMemberRemovalDecision {
-  if (actorRole !== "owner") {
+  if (normalizeHouseholdRole(actorRole) !== "owner") {
     return {
       ok: false,
       reason: "Only household owners can remove members."
@@ -143,7 +149,10 @@ export function evaluateHouseholdMemberRemoval({
     };
   }
 
-  if (membership.role === "owner" || membership.userId === actorUserId) {
+  if (
+    normalizeHouseholdRole(membership.role) === "owner" ||
+    membership.userId === actorUserId
+  ) {
     return {
       ok: false,
       reason: "Owner transfer must be added before removing an owner."
@@ -170,7 +179,7 @@ export function evaluateHouseholdOwnerTransfer({
   memberships: HouseholdMemberRemovalMembership[];
   targetMembershipId: string | null;
 }): HouseholdOwnerTransferDecision {
-  if (actorRole !== "owner") {
+  if (normalizeHouseholdRole(actorRole) !== "owner") {
     return {
       ok: false,
       reason: "Only household owners can transfer ownership."
@@ -183,13 +192,28 @@ export function evaluateHouseholdOwnerTransfer({
   const actorMembership =
     householdMemberships.find(
       (membership) =>
-        membership.userId === actorUserId && membership.role === "owner"
+        membership.userId === actorUserId &&
+        normalizeHouseholdRole(membership.role) === "owner"
     ) ?? null;
 
   if (!actorMembership) {
     return {
       ok: false,
       reason: "Only the current household owner can transfer ownership."
+    };
+  }
+
+  const ownerMemberships = householdMemberships.filter(
+    (membership) => normalizeHouseholdRole(membership.role) === "owner"
+  );
+
+  if (
+    ownerMemberships.length !== 1 ||
+    ownerMemberships[0]?.id !== actorMembership.id
+  ) {
+    return {
+      ok: false,
+      reason: "Resolve household ownership before transferring ownership."
     };
   }
 
@@ -206,7 +230,7 @@ export function evaluateHouseholdOwnerTransfer({
   }
 
   if (
-    targetMembership.role === "owner" ||
+    normalizeHouseholdRole(targetMembership.role) === "owner" ||
     targetMembership.userId === actorUserId
   ) {
     return {

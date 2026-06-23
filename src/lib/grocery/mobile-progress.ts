@@ -1,11 +1,24 @@
 export type GroceryProgressField = "alreadyHave" | "checked";
 
 export type GroceryProgressOperation = {
+  attemptCount?: number;
   field: GroceryProgressField;
   itemId: string;
+  lastError?: string | null;
+  nextRetryAt?: number | null;
+  terminal?: boolean;
   updatedAt: number;
   value: boolean;
 };
+
+export type NormalizedGroceryProgressOperation = Required<
+  Pick<
+    GroceryProgressOperation,
+    "attemptCount" | "field" | "itemId" | "lastError" | "nextRetryAt" | "terminal" | "updatedAt" | "value"
+  >
+>;
+
+const RETRY_BACKOFF_MS = [5_000, 15_000, 30_000, 60_000] as const;
 
 const fieldOrder: Record<GroceryProgressField, number> = {
   alreadyHave: 0,
@@ -25,14 +38,15 @@ export function getGroceryProgressStorageKey({
 export function mergeGroceryProgressOperations(
   operations: GroceryProgressOperation[]
 ) {
-  const latestByItemField = new Map<string, GroceryProgressOperation>();
+  const latestByItemField = new Map<string, NormalizedGroceryProgressOperation>();
 
   for (const operation of operations) {
-    const key = operationKey(operation);
+    const normalizedOperation = normalizeGroceryProgressOperation(operation);
+    const key = operationKey(normalizedOperation);
     const current = latestByItemField.get(key);
 
-    if (!current || operation.updatedAt >= current.updatedAt) {
-      latestByItemField.set(key, operation);
+    if (!current || normalizedOperation.updatedAt >= current.updatedAt) {
+      latestByItemField.set(key, normalizedOperation);
     }
   }
 
@@ -127,6 +141,79 @@ export function removeGroceryProgressOperation({
   );
 }
 
+export function markGroceryProgressOperationAttempted({
+  now,
+  operation,
+  status = 0
+}: {
+  now: number;
+  operation: GroceryProgressOperation;
+  status?: number;
+}): NormalizedGroceryProgressOperation {
+  const normalizedOperation = normalizeGroceryProgressOperation(operation);
+  const attemptCount = normalizedOperation.attemptCount + 1;
+
+  if (!isGroceryProgressRetryableStatus(status)) {
+    return markGroceryProgressOperationTerminal({
+      error: normalizedOperation.lastError ?? "This update cannot be retried.",
+      operation: {
+        ...normalizedOperation,
+        attemptCount
+      }
+    });
+  }
+
+  return {
+    ...normalizedOperation,
+    attemptCount,
+    lastError: normalizedOperation.lastError,
+    nextRetryAt: buildGroceryProgressNextRetryAt({ attemptCount, now }),
+    terminal: false
+  };
+}
+
+export function markGroceryProgressOperationTerminal({
+  error,
+  operation
+}: {
+  error: string | null;
+  operation: GroceryProgressOperation;
+}): NormalizedGroceryProgressOperation {
+  const normalizedOperation = normalizeGroceryProgressOperation(operation);
+
+  return {
+    ...normalizedOperation,
+    lastError: error,
+    nextRetryAt: null,
+    terminal: true
+  };
+}
+
+export function buildGroceryProgressNextRetryAt({
+  attemptCount,
+  now
+}: {
+  attemptCount: number;
+  now: number;
+}) {
+  const delay =
+    RETRY_BACKOFF_MS[
+      Math.min(Math.max(attemptCount - 1, 0), RETRY_BACKOFF_MS.length - 1)
+    ];
+
+  return now + delay;
+}
+
+export function isGroceryProgressRetryableStatus(status: number) {
+  return (
+    status === 0 ||
+    status === 408 ||
+    status === 425 ||
+    status === 429 ||
+    status >= 500
+  );
+}
+
 export function getGroceryProgressOperationKey(
   operation: Pick<GroceryProgressOperation, "field" | "itemId">
 ) {
@@ -135,6 +222,21 @@ export function getGroceryProgressOperationKey(
 
 function operationKey(operation: Pick<GroceryProgressOperation, "field" | "itemId">) {
   return getGroceryProgressOperationKey(operation);
+}
+
+function normalizeGroceryProgressOperation(
+  operation: GroceryProgressOperation
+): NormalizedGroceryProgressOperation {
+  return {
+    attemptCount: operation.attemptCount ?? 0,
+    field: operation.field,
+    itemId: operation.itemId,
+    lastError: operation.lastError ?? null,
+    nextRetryAt: operation.nextRetryAt ?? null,
+    terminal: operation.terminal ?? false,
+    updatedAt: operation.updatedAt,
+    value: operation.value
+  };
 }
 
 function isGroceryProgressOperation(
