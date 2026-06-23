@@ -13,7 +13,8 @@ This repo is separate from RT Scheduler. Product and technical decisions should 
 MealBoard has reached a private family MVP readiness checkpoint for the
 planning and grocery loop, with rule-based suggestions, smart swaps, baby
 solids planning, an actionable dashboard queue, pending grocery-change
-review/apply handling, weekly wrap-up learning, and E2E smoke coverage.
+review/apply handling, owner-linked household members, install metadata,
+weekly wrap-up learning, and E2E smoke coverage.
 
 The current core loop is:
 
@@ -24,6 +25,7 @@ Recipes -> Plan Week -> Staples -> Grocery List -> Dashboard
 Implemented MVP surfaces include:
 
 - Email/password auth and household-scoped app routes
+- Household settings for owner-only linking of existing auth users
 - Household profiles, preferences, grocery categories, saved foods, and a Preferences food-create flow
 - Recipe library with structured ingredients, profile approvals, and calorie/protein estimate fields
 - Weekly planning with adult work/off days, Day/Profile views, planned recipe items, approval/lock/remove/swap actions, staples review, and a small nutrition estimate summary
@@ -37,6 +39,7 @@ Implemented MVP surfaces include:
 - Dashboard current-week summary with planning status, grocery status, next best action, setup-aware and calorie-guidance needs-attention items, and optional weekly wrap-up entry after completed shopping
 - Weekly wrap-up capture for made/skipped meals, leftovers, recipe/profile feedback, source-aware unused groceries, and explicit staple/quantity review handoff
 - Recipe library filters for search, status, planning approval, and nutrition-review needs
+- PWA install metadata and app icons without offline/service-worker behavior
 - Playwright smoke coverage for protected route auth boundaries, plus credential-gated core-loop and mobile grocery smokes
 
 See `docs/MVP_READINESS.md` for the manual smoke checklist, known gaps, deferred features, and local environment notes.
@@ -56,6 +59,8 @@ copy .env.example .env.local
 ```
 
 Fill in Supabase values before using the protected app routes or login flow.
+`SUPABASE_SERVICE_ROLE_KEY` is used only by server-side household member
+linking and local E2E setup; never expose it to browser code.
 
 Run the development server:
 
@@ -123,14 +128,30 @@ Run the authenticated smoke with those values in your shell environment:
 ```bash
 npm run e2e:smoke
 npm run e2e:grocery-mobile
+npm run e2e:household-members
 npm run e2e:recipe-import
+npm run e2e:pwa
 ```
+
+For `npm run e2e:household-members`, also seed an unlinked second auth user:
+
+```powershell
+$env:MEALBOARD_E2E_EMAIL='mealboard-e2e-member-local@example.test'
+$env:MEALBOARD_E2E_PASSWORD='Mealboard-e2e-member-local-12345!'
+$env:MEALBOARD_E2E_SKIP_MEMBERSHIP='true'
+npm run e2e:seed-local-user
+Remove-Item Env:\MEALBOARD_E2E_SKIP_MEMBERSHIP
+```
+
+The household-member smoke derives the local email-to-user-id lookup from the seeded auth user. Set `MEALBOARD_LOCAL_AUTH_USER_LOOKUP` manually only for non-Docker or non-default local auth setups.
 
 The Playwright smoke scripts use separate default ports to avoid common local
 dev-server collisions. Override with `PLAYWRIGHT_PORT=3128` or another free
 port when needed.
 
-For ad hoc local development, create an auth user through the login page or Supabase Studio. Then link that user to the seeded household by running this SQL in local Supabase Studio after replacing the email:
+For ad hoc local development, create the first owner auth user through the login
+page or Supabase Studio. Then link that first owner to the seeded household by
+running this SQL in local Supabase Studio after replacing the email:
 
 ```sql
 insert into public.household_memberships (household_id, user_id, role)
@@ -144,6 +165,11 @@ on conflict (household_id, user_id) do nothing;
 ```
 
 Local Studio is available after `supabase start`; check your CLI output for the exact Studio URL. Do not commit `.env.local`, `.env.cloud.local`, access tokens, service-role keys, or Supabase temp files.
+
+After the first owner can sign in, open `/settings/household` to link additional
+existing auth users by email. This MVP prep slice does not send email
+invitations, remove members, transfer ownership, or support multiple households
+per login yet.
 
 ## Verification
 
@@ -162,10 +188,10 @@ If the Supabase CLI is installed and Docker is running, also verify the local da
 supabase db reset
 ```
 
-Current dependency-audit note: `npm audit --omit=dev` reports a Next vendored
-PostCSS advisory whose available automated fix is a breaking forced downgrade.
-Do not run `npm audit fix --force` for that item; revisit when Next ships a
-non-breaking stable fix.
+Current dependency-audit note: Next is pinned to the current stable patch and
+`package.json` uses a targeted override so Next's vendored PostCSS resolves to
+the patched `8.5.10` line. Do not run `npm audit fix --force`; it can still
+choose unsafe downgrade paths on future advisories.
 
 ## Project Structure
 

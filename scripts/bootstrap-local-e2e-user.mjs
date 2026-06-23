@@ -7,6 +7,9 @@ const email =
   process.env.MEALBOARD_E2E_EMAIL ?? "mealboard-e2e-local@example.test";
 const password =
   process.env.MEALBOARD_E2E_PASSWORD ?? "Mealboard-e2e-local-12345!";
+const shouldLinkMembership =
+  process.env.MEALBOARD_E2E_SKIP_MEMBERSHIP !== "true";
+const membershipRole = process.env.MEALBOARD_E2E_ROLE ?? "owner";
 const databaseContainer =
   process.env.MEALBOARD_E2E_DB_CONTAINER ?? "supabase_db_mealboard";
 
@@ -87,10 +90,16 @@ upserted_identity as (
         updated_at = now()
   returning user_id
 )
+${shouldLinkMembership ? `
 insert into public.household_memberships (household_id, user_id, role)
-select ${sqlString(householdId)}, user_id, 'owner'
+select ${sqlString(householdId)}, user_id, ${sqlString(membershipRole)}
 from upserted_identity
 on conflict (household_id, user_id) do nothing;
+` : `
+delete from public.household_memberships
+where household_id = ${sqlString(householdId)}
+  and user_id in (select user_id from upserted_identity);
+`}
 `;
 
 execFileSync(
@@ -113,7 +122,11 @@ execFileSync(
   }
 );
 
-console.log(`Seeded local E2E user ${email} for household ${householdId}.`);
+console.log(
+  shouldLinkMembership
+    ? `Seeded local E2E user ${email} for household ${householdId}.`
+    : `Seeded local E2E auth user ${email} without a household membership.`
+);
 console.log("Use these environment variables when running npm run e2e:smoke:");
 console.log(`MEALBOARD_E2E_EMAIL=${email}`);
 console.log(`MEALBOARD_E2E_PASSWORD=${password}`);

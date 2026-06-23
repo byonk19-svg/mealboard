@@ -19,6 +19,21 @@ export type FoodMatch = {
   groceryCategoryId: string | null;
 };
 
+export function createBlankIngredientReviewRow(): IngredientReviewRow {
+  return {
+    display_name: "",
+    food_id: null,
+    quantity: null,
+    unit: null,
+    grocery_category_id: null,
+    preparation: null,
+    notes: null,
+    optional: false,
+    needsReview: false,
+    reviewReason: null
+  };
+}
+
 export function buildIngredientReviewRows({
   foods,
   parsedIngredients
@@ -125,6 +140,51 @@ export function updateIngredientFoodSelection(
       ? nextSelection.groceryCategoryId
       : row.grocery_category_id
   };
+}
+
+export function splitIngredientReviewRow(row: IngredientReviewRow) {
+  return [
+    row,
+    {
+      ...createBlankIngredientReviewRow(),
+      needsReview: true,
+      reviewReason: "Split row; fill in the new ingredient."
+    }
+  ];
+}
+
+export function mergeIngredientReviewRows(
+  first: IngredientReviewRow,
+  second: IngredientReviewRow
+): IngredientReviewRow {
+  return {
+    display_name:
+      joinText([first.display_name, second.display_name], " + ") ?? "",
+    food_id: first.food_id === second.food_id ? first.food_id : null,
+    quantity:
+      first.quantity === second.quantity && first.unit === second.unit
+        ? first.quantity
+        : null,
+    unit: first.unit === second.unit ? first.unit : null,
+    grocery_category_id:
+      first.grocery_category_id === second.grocery_category_id
+        ? first.grocery_category_id
+        : null,
+    preparation: joinText([first.preparation, second.preparation], "; "),
+    notes: joinText([first.notes, second.notes], "; "),
+    optional: first.optional || second.optional,
+    needsReview: true,
+    reviewReason: "Merged row; review quantity, unit, and food match."
+  };
+}
+
+function joinText(values: Array<string | null>, separator: string) {
+  const joined = values
+    .map((value) => value?.trim())
+    .filter((value): value is string => Boolean(value))
+    .join(separator);
+
+  return joined.length > 0 ? joined : null;
 }
 
 function normalizeName(value: string) {

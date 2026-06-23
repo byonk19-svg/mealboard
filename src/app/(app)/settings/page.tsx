@@ -19,6 +19,20 @@ export default function SettingsPage() {
       <div className="grid gap-4 md:grid-cols-2">
         <Link
           className="rounded-lg border border-border bg-card p-5 shadow-sm transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          href="/settings/household"
+        >
+          <p className="text-sm font-medium text-muted-foreground">
+            Shared access
+          </p>
+          <h2 className="mt-2 text-xl font-semibold">Household</h2>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Review the current household membership and create copyable
+            invitation links for future shared access.
+          </p>
+        </Link>
+
+        <Link
+          className="rounded-lg border border-border bg-card p-5 shadow-sm transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           href="/settings/profiles"
         >
           <p className="text-sm font-medium text-muted-foreground">

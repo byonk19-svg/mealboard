@@ -1292,13 +1292,14 @@ Preferences food creation, dashboard attention queue, mobile grocery polish,
 weekly wrap-up expansion, Baby Meal 1/2 persistence, setup-aware and
 calorie-guidance dashboard signals, durable grocery source linkage,
 source-aware unused-grocery wrap-up, pending grocery review/apply handling,
-weekly wrap-up staple review handoff, recipe filters, and recipe import smoke
-coverage are complete. For the current repo state, run focused follow-up slices
-in this order:
+weekly wrap-up staple review handoff, recipe filters, recipe import smoke
+coverage, owner-only household member linking, ingredient merge/split review
+controls, PWA install metadata, and the Next/PostCSS audit override are complete.
+For the current repo state, run focused follow-up slices in this order:
 
-1. **Safe dependency-audit follow-up** — revisit the Next/PostCSS audit only when Next provides a non-breaking fix path.
-2. **Shared household/member invite preparation** - prepare the next household collaboration step without disrupting the single-user MVP.
-3. **PWA/mobile install polish** - improve home-screen/offline-adjacent ergonomics after the private MVP loop is stable.
+1. **Household member lifecycle** - add member removal, role editing, owner transfer, and household switching only after the owner-link flow is used successfully.
+2. **PWA/mobile offline resilience** - improve grocery-list behavior under spotty service without adding broad offline sync.
+3. **Email-delivered invitations** - add invitation delivery only if shared household use becomes frequent enough to justify an email flow.
 4. **Weekly wrap-up review depth** - support richer multi-source staple review only if real household use shows the current single-staple review handoff is too narrow.
 
 Keep H-E-B integration, AI, full pantry inventory, reminders, native apps,

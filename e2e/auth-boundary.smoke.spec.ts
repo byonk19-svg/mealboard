@@ -5,6 +5,7 @@ const protectedRoutes = [
   "/recipes",
   "/plan-week",
   "/grocery-list",
+  "/settings/household",
   "/settings/baby"
 ];
 

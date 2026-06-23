@@ -10,7 +10,9 @@
     "e2e:headed": "playwright test e2e/core-loop.smoke.spec.ts --project=chromium --headed",
     "e2e:install": "playwright install chromium",
     "e2e:grocery-mobile": "node scripts/run-playwright-with-port.mjs 3106 e2e/grocery-mobile.smoke.spec.ts --project=chromium",
+    "e2e:household-members": "node scripts/run-household-members-e2e.mjs",
     "e2e:recipe-import": "node scripts/run-playwright-with-port.mjs 3107 e2e/recipe-import.smoke.spec.ts --project=chromium",
+    "e2e:pwa": "node scripts/run-playwright-with-port.mjs 3109 e2e/pwa-install.smoke.spec.ts --project=chromium",
     "e2e:seed-local-user": "node scripts/bootstrap-local-e2e-user.mjs",
     "e2e:smoke": "node scripts/run-playwright-with-port.mjs 3105 e2e/core-loop.smoke.spec.ts --project=chromium",
     "start": "next start",
@@ -23,7 +25,7 @@
     "@supabase/supabase-js": "^2.106.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "next": "^16.2.6",
+    "next": "^16.2.9",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "tailwind-merge": "^3.4.0"
@@ -35,9 +37,14 @@
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
     "eslint": "^9.39.1",
-    "eslint-config-next": "^16.2.6",
+    "eslint-config-next": "^16.2.9",
     "tailwindcss": "^4.3.0",
     "typescript": "^5.9.3",
     "vitest": "^4.1.7"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "8.5.10"
+    }
   }
 }

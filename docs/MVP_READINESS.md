@@ -1,6 +1,6 @@
 # MealBoard MVP Readiness
 
-This document captures the current private family MVP state after the rule-based suggestions, smart swaps, Plan Week profile view, Preferences food creation, actionable dashboard queue, baby weekly-plan persistence, pending grocery-change review/apply flow, weekly wrap-up expansion, hardening, and E2E smoke slices. It is a handoff snapshot for future Codex work so the next phase can build from known product truth instead of rediscovering the app.
+This document captures the current private family MVP state after the rule-based suggestions, smart swaps, Plan Week profile view, Preferences food creation, actionable dashboard queue, baby weekly-plan persistence, pending grocery-change review/apply flow, household member linking prep, PWA install metadata, weekly wrap-up expansion, hardening, and E2E smoke slices. It is a handoff snapshot for future Codex work so the next phase can build from known product truth instead of rediscovering the app.
 
 ## Current Status
 
@@ -32,6 +32,8 @@ The latest verified flow covers:
 - Capture made/skipped meal outcomes, leftovers, source-aware unused grocery notes, and hand source-aware staple adjustment intent to Settings for explicit review before any staple changes.
 - Confirm Dashboard reflects current week planning, grocery status, next best action, setup-aware and calorie-guidance needs-attention items, and wrap-up entry when eligible.
 - Filter the recipe library by search text, recipe status, planning approval, and nutrition-review needs.
+- Link an existing auth user to the current household from `/settings/household` when signed in as an owner.
+- Serve PWA install metadata and icon assets without adding offline/service-worker behavior.
 - Run unauthenticated Playwright auth-boundary smoke coverage plus credential-gated core-loop and mobile grocery smokes.
 
 ## Manual Smoke Checklist
@@ -73,6 +75,8 @@ Use a linked local household user. Do not commit `.env.local`, `.env.cloud.local
 23. Confirm current week, planning status, grocery status, next best action, needs-attention queue, and wrap-up entry are reasonable.
 24. After finalizing or starting shopping, change an approved planned meal, confirm Plan Week shows pending grocery changes, apply the reviewed grocery updates, and confirm manual items/check state are preserved where applicable.
 25. Open the weekly wrap-up, save one meal outcome with leftover context if prompted, acknowledge unused groceries with a future staple adjustment if prompted, confirm Settings opens a review banner instead of changing staples automatically, or dismiss it.
+26. Open `/settings/household` as the owner, link an existing unlinked auth user by email, then confirm that user can sign in and reach the protected app.
+27. Open `/manifest.webmanifest` and confirm install icons are served.
 
 ## Known Local Environment Note
 
@@ -90,10 +94,10 @@ Do not delete Docker volumes as part of this recovery, and do not remove unrelat
 
 ## Dependency Audit Note
 
-As of June 22, 2026, `npm audit --omit=dev` still reports the Next vendored
-PostCSS advisory and recommends `npm audit fix --force`, which would install a
-breaking old Next version. Do not force that fix. Revisit when Next ships a
-non-breaking stable release that removes the vulnerable vendored PostCSS path.
+As of June 23, 2026, `npm audit --omit=dev` passes after aligning Next packages
+to the current stable patch and applying a targeted PostCSS override for Next's
+vendored dependency. Do not use `npm audit fix --force` without inspecting the
+proposed tree.
 
 ## Deferred Features
 
@@ -106,16 +110,16 @@ These are intentionally out of scope for the current MVP unless a future task ex
 - Recipe photos and full recipe-link import
 - Full macro tracking, calorie targets, strict warnings, or nutrition dashboards
 - Baby nutrition, milk intake, and reaction tracking
-- Multi-user household invitations and shared account workflows
-- PWA install/offline polish
+- Email-delivered household invitations, member removal, owner transfer, and multi-household switching
+- Full offline/PWA service-worker behavior
 - Grocery history intelligence
 
 ## Next Phase Options
 
 Good next slices should stay narrow and start from the verified MVP loop. Candidate directions:
 
-- Safe dependency-audit follow-up when a non-breaking Next/PostCSS fix is available
-- Shared household/member invite preparation
-- PWA/mobile install polish
+- Member removal, role editing, owner transfer, and household switching
+- PWA/mobile offline resilience for grocery shopping
+- Email-delivered invitations if shared household use becomes frequent
 
 Prefer one focused slice at a time, and keep cloud Supabase migration pushes as explicit approval points.

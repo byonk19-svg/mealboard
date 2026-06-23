@@ -41,11 +41,24 @@ test.describe("Recipe import and filters", () => {
     await expect(page.getByLabel("Ingredient 2 display name")).toHaveValue(
       /salt/i
     );
+    const secondIngredient = page
+      .getByLabel("Ingredient 2 display name")
+      .locator("xpath=ancestor::div[contains(@class, 'rounded-md')][1]");
+    await secondIngredient
+      .getByRole("button", { name: "Merge with previous" })
+      .click();
+    await expect(page.getByLabel("Ingredient 1 display name")).toHaveValue(
+      /salt/i
+    );
+    await page.getByRole("button", { name: "Split" }).first().click();
+    await page.getByLabel("Ingredient 2 display name").fill(`E2E Pepper ${suffix}`);
     await page.getByLabel("Ingredient 2 quantity").fill("1");
     await page.getByLabel("Ingredient 2 unit").fill("pinch");
-    await page
+    for (const checkbox of await page
       .getByRole("checkbox", { name: "I reviewed this row" })
-      .check();
+      .all()) {
+      await checkbox.check();
+    }
     await page
       .getByText("Approved for planning")
       .locator("..")

@@ -3,6 +3,9 @@
 import { useId, useState } from "react";
 import {
   buildIngredientReviewRows,
+  createBlankIngredientReviewRow,
+  mergeIngredientReviewRows,
+  splitIngredientReviewRow,
   updateIngredientDisplayName,
   updateIngredientFoodSelection,
   type IngredientReviewRow
@@ -19,18 +22,7 @@ type IngredientReviewEditorProps = {
   initialRows: IngredientFormRow[];
 };
 
-const blankRow: IngredientFormRow = {
-  display_name: "",
-  food_id: null,
-  quantity: null,
-  unit: null,
-  grocery_category_id: null,
-  preparation: null,
-  notes: null,
-  optional: false,
-  needsReview: false,
-  reviewReason: null
-};
+const blankRow: IngredientFormRow = createBlankIngredientReviewRow();
 
 export function IngredientReviewEditor({
   categories,
@@ -70,7 +62,29 @@ export function IngredientReviewEditor({
     });
   }
 
-  // TODO: Add explicit merge/split controls if review needs more than add/delete/edit.
+  function splitRow(indexToSplit: number) {
+    setRows((currentRows) =>
+      currentRows.flatMap((row, index) =>
+        index === indexToSplit ? splitIngredientReviewRow(row) : [row]
+      )
+    );
+  }
+
+  function mergeWithPrevious(indexToMerge: number) {
+    if (indexToMerge <= 0) {
+      return;
+    }
+
+    setRows((currentRows) => {
+      const nextRows = [...currentRows];
+      nextRows[indexToMerge - 1] = mergeIngredientReviewRows(
+        nextRows[indexToMerge - 1],
+        nextRows[indexToMerge]
+      );
+      nextRows.splice(indexToMerge, 1);
+      return nextRows.length > 0 ? nextRows : [{ ...blankRow }];
+    });
+  }
 
   function updateRow(
     indexToUpdate: number,
@@ -137,6 +151,8 @@ export function IngredientReviewEditor({
             ingredient={ingredient}
             key={index}
             onDelete={() => deleteRow(index)}
+            onMergePrevious={() => mergeWithPrevious(index)}
+            onSplit={() => splitRow(index)}
             onUpdate={(patch) => updateRow(index, patch)}
           />
         ))}
@@ -152,6 +168,8 @@ function IngredientRow({
   index,
   ingredient,
   onDelete,
+  onMergePrevious,
+  onSplit,
   onUpdate
 }: {
   categories: GroceryCategory[];
@@ -160,6 +178,8 @@ function IngredientRow({
   index: number;
   ingredient: IngredientFormRow;
   onDelete: () => void;
+  onMergePrevious: () => void;
+  onSplit: () => void;
   onUpdate: (patch: Partial<IngredientFormRow>) => void;
 }) {
   const needsReview = ingredient.needsReview ?? false;
@@ -181,13 +201,30 @@ function IngredientRow({
             </p>
           ) : null}
         </div>
-        <button
-          className="rounded-md border border-border px-2 py-1 text-xs font-medium transition-colors hover:bg-muted"
-          onClick={onDelete}
-          type="button"
-        >
-          Delete
-        </button>
+        <div className="flex flex-wrap justify-end gap-2">
+          <button
+            className="rounded-md border border-border px-2 py-1 text-xs font-medium transition-colors hover:bg-muted"
+            disabled={index === 0}
+            onClick={onMergePrevious}
+            type="button"
+          >
+            Merge with previous
+          </button>
+          <button
+            className="rounded-md border border-border px-2 py-1 text-xs font-medium transition-colors hover:bg-muted"
+            onClick={onSplit}
+            type="button"
+          >
+            Split
+          </button>
+          <button
+            className="rounded-md border border-border px-2 py-1 text-xs font-medium transition-colors hover:bg-muted"
+            onClick={onDelete}
+            type="button"
+          >
+            Delete
+          </button>
+        </div>
       </div>
 
       <input

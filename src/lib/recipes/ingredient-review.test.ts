@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   buildIngredientReviewRows,
+  createBlankIngredientReviewRow,
+  mergeIngredientReviewRows,
   resolveFoodMatch,
   resolveFoodSelection,
+  splitIngredientReviewRow,
   updateIngredientFoodSelection,
   updateIngredientDisplayName
 } from "./ingredient-review";
@@ -127,6 +130,54 @@ describe("ingredient review helpers", () => {
     expect(updateIngredientFoodSelection(row, "food-spinach", foods)).toMatchObject({
       food_id: "food-spinach",
       grocery_category_id: "cat-manual"
+    });
+  });
+
+  it("creates a blank row after the current row when splitting", () => {
+    const row = buildIngredientReviewRows({
+      foods,
+      parsedIngredients: [parsedIngredient({ displayName: "rice" })]
+    })[0];
+
+    expect(splitIngredientReviewRow(row)).toEqual([
+      row,
+      {
+        ...createBlankIngredientReviewRow(),
+        needsReview: true,
+        reviewReason: "Split row; fill in the new ingredient."
+      }
+    ]);
+  });
+
+  it("merges adjacent rows and marks the result for review", () => {
+    const [first, secondRow] = buildIngredientReviewRows({
+      foods,
+      parsedIngredients: [
+        parsedIngredient({
+          displayName: "rice",
+          notes: "rinsed",
+          preparation: "cooked"
+        }),
+        parsedIngredient({
+          displayName: "baby spinach",
+          notes: "packed",
+          preparation: "chopped",
+          quantity: 2
+        })
+      ]
+    });
+    const second = { ...secondRow, optional: true };
+
+    expect(mergeIngredientReviewRows(first, second)).toMatchObject({
+      display_name: "rice + baby spinach",
+      food_id: null,
+      grocery_category_id: null,
+      needsReview: true,
+      notes: "rinsed; packed",
+      optional: true,
+      preparation: "cooked; chopped",
+      quantity: null,
+      reviewReason: "Merged row; review quantity, unit, and food match."
     });
   });
 });
