@@ -31,6 +31,11 @@ export type Food = {
   default_grocery_category_id: string | null;
 };
 
+export type SavedFood = Food & {
+  archived_at: string | null;
+  grocery_category_name: string | null;
+};
+
 export type FoodPreference = {
   id: string;
   household_id: string;

@@ -1,6 +1,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { join } from "node:path";
 
+const ownerEmail = process.env.MEALBOARD_E2E_EMAIL;
 const memberEmail =
   process.env.MEALBOARD_E2E_MEMBER_EMAIL ??
   "mealboard-e2e-member-local@example.test";
@@ -11,7 +12,8 @@ const env = { ...process.env };
 
 if (!env.MEALBOARD_LOCAL_AUTH_USER_LOOKUP) {
   try {
-    const memberUserId = execFileSync(
+    const emails = [ownerEmail, memberEmail].filter(Boolean);
+    const rows = execFileSync(
       "docker",
       [
         "exec",
@@ -24,15 +26,21 @@ if (!env.MEALBOARD_LOCAL_AUTH_USER_LOOKUP) {
         "-t",
         "-A",
         "-c",
-        `select id from auth.users where lower(email) = lower(${sqlString(memberEmail)}) limit 1`
+        `select lower(email) || '|' || id from auth.users where lower(email) in (${emails.map(sqlString).join(",")})`
       ],
       { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }
-    ).trim();
+    )
+      .split(/\r?\n/)
+      .map((row) => row.trim())
+      .filter(Boolean);
+    const usersByEmail = Object.fromEntries(
+      rows
+        .map((row) => row.split("|"))
+        .filter((row) => row.length === 2)
+    );
 
-    if (memberUserId) {
-      env.MEALBOARD_LOCAL_AUTH_USER_LOOKUP = JSON.stringify({
-        [memberEmail]: memberUserId
-      });
+    if (Object.keys(usersByEmail).length > 0) {
+      env.MEALBOARD_LOCAL_AUTH_USER_LOOKUP = JSON.stringify(usersByEmail);
     }
   } catch {
     // Production-like environments can still pass if Supabase auth admin works.

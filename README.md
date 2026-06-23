@@ -25,11 +25,11 @@ Recipes -> Plan Week -> Staples -> Grocery List -> Dashboard
 Implemented MVP surfaces include:
 
 - Email/password auth and household-scoped app routes
-- Household settings for owner-only linking and removal of existing member users
-- Household profiles, preferences, grocery categories, saved foods, and a Preferences food-create flow
+- Household settings for owner-only linking, ownership transfer, and removal of existing member users
+- Household profiles, preferences, grocery categories, dedicated saved-food administration, and a Preferences food-create flow
 - Recipe library with structured ingredients, profile approvals, and calorie/protein estimate fields
 - Weekly planning with adult work/off days, Day/Profile views, planned recipe items, approval/lock/remove/swap actions, staples review, and a small nutrition estimate summary
-- Rule-based adult meal suggestion drafts with reason labels and why-this context
+- Rule-based adult meal suggestion drafts with reason labels, why-this context, and recent wrap-up review signals
 - Smart swap suggestions with confirmation and grocery add/remove/keep impact preview
 - Staples settings CRUD, weekly staple selection, and selected staples flowing into grocery generation
 - Grocery list generation from approved planned meals, persisted approved baby foods, and selected staples
@@ -40,7 +40,7 @@ Implemented MVP surfaces include:
 - Weekly wrap-up capture for made/skipped meals, leftovers, recipe/profile feedback, source-aware unused groceries, and explicit staple/quantity review handoff
 - Recipe library filters for search, status, planning approval, and nutrition-review needs
 - PWA install metadata and app icons without offline/service-worker behavior
-- Playwright smoke coverage for protected route auth boundaries, plus credential-gated core-loop and mobile grocery smokes
+- Playwright smoke coverage for protected route auth boundaries, plus credential-gated core-loop, settings-foods, household-member, and mobile grocery smokes
 
 See `docs/MVP_READINESS.md` for the manual smoke checklist, known gaps, deferred features, and local environment notes.
 
@@ -128,6 +128,7 @@ Run the authenticated smoke with those values in your shell environment:
 ```bash
 npm run e2e:smoke
 npm run e2e:grocery-mobile
+npm run e2e:settings-foods
 npm run e2e:household-members
 npm run e2e:baby-settings
 npm run e2e:recipe-import
@@ -168,9 +169,9 @@ on conflict (household_id, user_id) do nothing;
 Local Studio is available after `supabase start`; check your CLI output for the exact Studio URL. Do not commit `.env.local`, `.env.cloud.local`, access tokens, service-role keys, or Supabase temp files.
 
 After the first owner can sign in, open `/settings/household` to link additional
-existing auth users by email or remove a non-owner member. This MVP prep slice
-does not send email invitations, transfer ownership, or support multiple
-households per login yet.
+existing auth users by email, transfer ownership to another household member,
+or remove a non-owner member. This MVP prep slice does not send email
+invitations or support multiple households per login yet.
 
 ## Verification
 

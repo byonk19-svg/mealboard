@@ -2,6 +2,7 @@ import type { User } from "@supabase/supabase-js";
 import {
   evaluateHouseholdMemberRemoval,
   evaluateHouseholdMemberLink,
+  evaluateHouseholdOwnerTransfer,
   normalizeHouseholdMemberEmail
 } from "@/lib/household/members";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -160,6 +161,80 @@ export async function removeHouseholdMember({
 
   if (deleteError) {
     throw new Error(deleteError.message);
+  }
+}
+
+export async function transferHouseholdOwnership({
+  actorRole,
+  actorUserId,
+  householdId,
+  membershipId
+}: {
+  actorRole: string | null;
+  actorUserId: string;
+  householdId: string;
+  membershipId: string;
+}) {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("household_memberships")
+    .select("id, household_id, user_id, role")
+    .eq("household_id", householdId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const memberships = ((data ?? []) as Array<{
+    household_id: string;
+    id: string;
+    role: string;
+    user_id: string;
+  }>).map((membership) => ({
+    householdId: membership.household_id,
+    id: membership.id,
+    role: membership.role,
+    userId: membership.user_id
+  }));
+  const decision = evaluateHouseholdOwnerTransfer({
+    actorRole,
+    actorUserId,
+    householdId,
+    memberships,
+    targetMembershipId: membershipId
+  });
+
+  if (!decision.ok) {
+    throw new Error(decision.reason);
+  }
+
+  const { error: promoteError } = await admin
+    .from("household_memberships")
+    .update({ role: "owner" })
+    .eq("household_id", householdId)
+    .eq("id", decision.newOwnerMembershipId)
+    .eq("user_id", decision.newOwnerUserId);
+
+  if (promoteError) {
+    throw new Error(promoteError.message);
+  }
+
+  const { error: demoteError } = await admin
+    .from("household_memberships")
+    .update({ role: "member" })
+    .eq("household_id", householdId)
+    .eq("id", decision.previousOwnerMembershipId)
+    .eq("user_id", actorUserId);
+
+  if (demoteError) {
+    await admin
+      .from("household_memberships")
+      .update({ role: "member" })
+      .eq("household_id", householdId)
+      .eq("id", decision.newOwnerMembershipId)
+      .eq("user_id", decision.newOwnerUserId);
+
+    throw new Error(demoteError.message);
   }
 }
 

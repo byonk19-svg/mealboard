@@ -129,6 +129,28 @@ describe("scoreRecipeForMealSlot", () => {
     expect(clean.eligible && warning.eligible && clean.score > warning.score).toBe(true);
     expect(warning.reasonLabels).toContain("Preference warning");
   });
+
+  it("boosts recently loved recipes and labels the review signal", () => {
+    const result = scoreRecipeForMealSlot({
+      goals: [],
+      profileId: "profile-brianna",
+      recipe: recipe(),
+      requestedMealType: "lunch",
+      reviewSignal: {
+        leftoverCount: 1,
+        mealProfileId: "profile-brianna",
+        rating: "love",
+        recipeId: "recipe-1",
+        skippedCount: 0
+      }
+    });
+
+    expect(result).toMatchObject({
+      eligible: true,
+      reasonLabels: expect.arrayContaining(["Loved before", "Leftover-friendly"]),
+      score: 94
+    });
+  });
 });
 
 describe("buildRuleBasedSwapSuggestions", () => {
@@ -314,6 +336,44 @@ describe("buildRuleBasedMealSuggestions", () => {
     });
 
     expect(suggestions).toEqual([]);
+  });
+
+  it("ranks skipped or disliked review signals below clean alternatives", () => {
+    const suggestions = buildRuleBasedMealSuggestions({
+      goals: [],
+      planItems: [],
+      profileDays: [
+        profileDay({
+          adult_day_type: "off_day",
+          meal_profile_id: "profile-brianna",
+          plan_date: "2026-06-22"
+        })
+      ],
+      profiles: [
+        {
+          id: "profile-brianna",
+          name: "Brianna",
+          profile_type: "adult"
+        }
+      ],
+      recipes: [
+        recipe({ id: "alpha", meal_type: "dinner", name: "Alpha Dinner" }),
+        recipe({ id: "beta", meal_type: "dinner", name: "Beta Dinner" })
+      ],
+      reviewSignals: [
+        {
+          leftoverCount: 0,
+          mealProfileId: "profile-brianna",
+          rating: "dislike",
+          recipeId: "alpha",
+          skippedCount: 1
+        }
+      ],
+      weekDateKeys: ["2026-06-22"]
+    });
+
+    expect(suggestions[0]?.recipeId).toBe("beta");
+    expect(suggestions[0]?.reasonLabels).not.toContain("Skipped recently");
   });
 });
 

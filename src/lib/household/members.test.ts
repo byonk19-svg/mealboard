@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   evaluateHouseholdMemberRemoval,
   evaluateHouseholdMemberLink,
+  evaluateHouseholdOwnerTransfer,
   normalizeHouseholdMemberEmail
 } from "./members";
 
@@ -192,6 +193,92 @@ describe("household member helpers", () => {
           }
         ],
         targetMembershipId: "membership-member"
+      })
+    ).toEqual({
+      ok: false,
+      reason: "That household member is no longer available."
+    });
+  });
+
+  it("allows an owner to transfer ownership to a non-owner member", () => {
+    expect(
+      evaluateHouseholdOwnerTransfer({
+        actorRole: "owner",
+        actorUserId: "owner-user",
+        householdId: "household-1",
+        memberships: [
+          {
+            householdId: "household-1",
+            id: "membership-owner",
+            role: "owner",
+            userId: "owner-user"
+          },
+          {
+            householdId: "household-1",
+            id: "membership-member",
+            role: "member",
+            userId: "member-user"
+          }
+        ],
+        targetMembershipId: "membership-member"
+      })
+    ).toEqual({
+      newOwnerMembershipId: "membership-member",
+      newOwnerUserId: "member-user",
+      ok: true,
+      previousOwnerMembershipId: "membership-owner"
+    });
+  });
+
+  it("rejects owner transfer by non-owners or to invalid targets", () => {
+    const memberships = [
+      {
+        householdId: "household-1",
+        id: "membership-owner",
+        role: "owner",
+        userId: "owner-user"
+      },
+      {
+        householdId: "household-1",
+        id: "membership-member",
+        role: "member",
+        userId: "member-user"
+      }
+    ];
+
+    expect(
+      evaluateHouseholdOwnerTransfer({
+        actorRole: "member",
+        actorUserId: "member-user",
+        householdId: "household-1",
+        memberships,
+        targetMembershipId: "membership-owner"
+      })
+    ).toEqual({
+      ok: false,
+      reason: "Only household owners can transfer ownership."
+    });
+
+    expect(
+      evaluateHouseholdOwnerTransfer({
+        actorRole: "owner",
+        actorUserId: "owner-user",
+        householdId: "household-1",
+        memberships,
+        targetMembershipId: "membership-owner"
+      })
+    ).toEqual({
+      ok: false,
+      reason: "Choose a non-owner member to become owner."
+    });
+
+    expect(
+      evaluateHouseholdOwnerTransfer({
+        actorRole: "owner",
+        actorUserId: "owner-user",
+        householdId: "household-1",
+        memberships,
+        targetMembershipId: "missing"
       })
     ).toEqual({
       ok: false,

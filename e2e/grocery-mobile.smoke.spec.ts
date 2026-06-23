@@ -79,7 +79,7 @@ test.describe("Mobile grocery list", () => {
         page.getByText("Saved locally. Retry when service returns.").first()
       ).toBeVisible();
       await page.unroute(stateRoutePattern);
-      await page.getByRole("button", { name: "Retry pending changes" }).first().click();
+      await page.evaluate(() => window.dispatchEvent(new Event("online")));
       await expect(page.getByText("Grocery item updated.").first()).toBeVisible();
     }
 

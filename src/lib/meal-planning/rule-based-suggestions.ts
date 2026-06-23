@@ -53,12 +53,21 @@ export type RuleBasedSwapSuggestion = {
   whyThis: string;
 };
 
+export type RecipeReviewSignal = {
+  leftoverCount: number;
+  mealProfileId: string | null;
+  rating: "love" | "like" | "okay" | "dislike" | "hard_no" | null;
+  recipeId: string;
+  skippedCount: number;
+};
+
 type ScoreRecipeInput = {
   adultDayType?: AdultDayType | null;
   goals: WeeklyGoalType[];
   profileId: string;
   recipe: RecipeWithDetails;
   requestedMealType: MealType;
+  reviewSignal?: RecipeReviewSignal | null;
 };
 
 type BuildSuggestionsInput = {
@@ -67,6 +76,7 @@ type BuildSuggestionsInput = {
   profileDays: WeeklyPlanProfileDay[];
   profiles: SuggestionProfile[];
   recipes: RecipeWithDetails[];
+  reviewSignals?: RecipeReviewSignal[];
   weekDateKeys: string[];
 };
 
@@ -75,6 +85,7 @@ type BuildSwapSuggestionsInput = {
   planItems: WeeklyPlanItem[];
   profileDays: WeeklyPlanProfileDay[];
   recipes: RecipeWithDetails[];
+  reviewSignals?: RecipeReviewSignal[];
   targetItem: WeeklyPlanItem;
 };
 
@@ -94,7 +105,8 @@ export function scoreRecipeForMealSlot({
   goals,
   profileId,
   recipe,
-  requestedMealType
+  requestedMealType,
+  reviewSignal
 }: ScoreRecipeInput): MealSuggestionScore {
   if (recipe.status === "retired") {
     return rejected("Recipe is retired.");
@@ -170,6 +182,30 @@ export function scoreRecipeForMealSlot({
     reasonLabels.push("Preference warning");
   }
 
+  if (reviewSignal?.rating === "love") {
+    score += 10;
+    reasonLabels.push("Loved before");
+  } else if (reviewSignal?.rating === "like") {
+    score += 5;
+    reasonLabels.push("Liked before");
+  } else if (reviewSignal?.rating === "dislike") {
+    score -= 25;
+    reasonLabels.push("Disliked before");
+  } else if (reviewSignal?.rating === "hard_no") {
+    score -= 45;
+    reasonLabels.push("Poor recent review");
+  }
+
+  if ((reviewSignal?.skippedCount ?? 0) > 0) {
+    score -= Math.min(reviewSignal?.skippedCount ?? 0, 2) * 15;
+    reasonLabels.push("Skipped recently");
+  }
+
+  if ((reviewSignal?.leftoverCount ?? 0) > 0) {
+    score += 4;
+    reasonLabels.push("Leftover-friendly");
+  }
+
   return {
     eligible: true,
     reasonLabels,
@@ -184,6 +220,7 @@ export function buildRuleBasedMealSuggestions({
   profileDays,
   profiles,
   recipes,
+  reviewSignals = [],
   weekDateKeys
 }: BuildSuggestionsInput): RuleBasedMealSuggestion[] {
   const profileDayByKey = new Map(
@@ -201,6 +238,7 @@ export function buildRuleBasedMealSuggestions({
     .filter((profile) => profile.profile_type === "adult")
     .sort((a, b) => a.name.localeCompare(b.name));
   const suggestions: RuleBasedMealSuggestion[] = [];
+  const reviewSignalByRecipeProfile = buildReviewSignalLookup(reviewSignals);
 
   for (const dateKey of weekDateKeys) {
     for (const profile of adultProfiles) {
@@ -218,7 +256,8 @@ export function buildRuleBasedMealSuggestions({
           goals,
           mealType,
           profile,
-          recipes
+          recipes,
+          reviewSignalByRecipeProfile
         });
 
         if (suggestion) {
@@ -236,6 +275,7 @@ export function buildRuleBasedSwapSuggestions({
   planItems,
   profileDays,
   recipes,
+  reviewSignals = [],
   targetItem
 }: BuildSwapSuggestionsInput): RuleBasedSwapSuggestion[] {
   if (
@@ -266,6 +306,7 @@ export function buildRuleBasedSwapSuggestions({
       )
       .map((item) => item.recipe_id)
   );
+  const reviewSignalByRecipeProfile = buildReviewSignalLookup(reviewSignals);
 
   return recipes
     .filter(
@@ -279,7 +320,12 @@ export function buildRuleBasedSwapSuggestions({
         goals,
         profileId: targetItem.meal_profile_id ?? "",
         recipe,
-        requestedMealType: targetItem.meal_type
+        requestedMealType: targetItem.meal_type,
+        reviewSignal: getReviewSignal({
+          profileId: targetItem.meal_profile_id,
+          recipeId: recipe.id,
+          reviewSignalByRecipeProfile
+        })
       })
     }))
     .filter(
@@ -306,7 +352,8 @@ function getBestSuggestionForSlot({
   goals,
   mealType,
   profile,
-  recipes
+  recipes,
+  reviewSignalByRecipeProfile
 }: {
   adultDayType: AdultDayType | null;
   dateKey: string;
@@ -314,6 +361,7 @@ function getBestSuggestionForSlot({
   mealType: MealType;
   profile: SuggestionProfile;
   recipes: RecipeWithDetails[];
+  reviewSignalByRecipeProfile: Map<string, RecipeReviewSignal>;
 }) {
   const scored = recipes
     .map((recipe) => ({
@@ -323,7 +371,12 @@ function getBestSuggestionForSlot({
         goals,
         profileId: profile.id,
         recipe,
-        requestedMealType: mealType
+        requestedMealType: mealType,
+        reviewSignal: getReviewSignal({
+          profileId: profile.id,
+          recipeId: recipe.id,
+          reviewSignalByRecipeProfile
+        })
       })
     }))
     .filter(
@@ -351,6 +404,33 @@ function getBestSuggestionForSlot({
     recipeName: best.recipe.name,
     score: best.score.score
   } satisfies RuleBasedMealSuggestion;
+}
+
+function buildReviewSignalLookup(reviewSignals: RecipeReviewSignal[]) {
+  return new Map(
+    reviewSignals
+      .filter((signal) => signal.mealProfileId)
+      .map((signal) => [
+        `${signal.recipeId}:${signal.mealProfileId}`,
+        signal
+      ])
+  );
+}
+
+function getReviewSignal({
+  profileId,
+  recipeId,
+  reviewSignalByRecipeProfile
+}: {
+  profileId: string | null;
+  recipeId: string;
+  reviewSignalByRecipeProfile: Map<string, RecipeReviewSignal>;
+}) {
+  if (!profileId) {
+    return null;
+  }
+
+  return reviewSignalByRecipeProfile.get(`${recipeId}:${profileId}`) ?? null;
 }
 
 function compareScoredRecipes(

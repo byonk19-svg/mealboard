@@ -15,7 +15,7 @@ test.describe("Household member lifecycle", () => {
     "Set MEALBOARD_E2E_EMAIL and MEALBOARD_E2E_PASSWORD for authenticated smoke."
   );
 
-  test("links an existing auth user, lets that member reach the app, and removes access", async ({
+  test("links an existing auth user, transfers ownership, and removes access", async ({
     page
   }) => {
     await page.goto("/login");
@@ -26,16 +26,29 @@ test.describe("Household member lifecycle", () => {
 
     await page.goto("/settings");
     await page.getByRole("link", { name: /Shared access Household/ }).click();
-    await expect(page.getByRole("heading", { name: "Household" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { exact: true, name: "Household" })
+    ).toBeVisible();
     const memberHeading = page.getByRole("heading", { name: memberEmail });
 
     if ((await memberHeading.count()) === 0) {
       await page.getByLabel("Existing auth user email").fill(memberEmail);
       await page.getByRole("button", { name: "Link member" }).click();
-      await expect(page.getByText(`Linked ${memberEmail} to this household.`)).toBeVisible();
+      await expect(
+        page.getByText(
+          new RegExp(
+            `Linked ${escapeRegExp(memberEmail)} to this household\\.|That user is already linked to this household\\.`
+          )
+        )
+      ).toBeVisible();
     }
 
     await expect(memberHeading).toBeVisible();
+    await memberHeading
+      .locator("xpath=ancestor::article[1]")
+      .getByRole("button", { name: "Make owner" })
+      .click();
+    await expect(page.getByText("Household ownership transferred.")).toBeVisible();
 
     await page.getByRole("button", { name: "Sign out" }).click();
     await page.waitForURL(/\/login/);
@@ -45,6 +58,16 @@ test.describe("Household member lifecycle", () => {
     await expect(page).toHaveURL(/\/dashboard/);
     await expect(page.getByRole("heading", { name: "Current Week" })).toBeVisible();
     await expect(page.getByText("No household linked")).toHaveCount(0);
+    await page.goto("/settings/household");
+    await expect(
+      page.getByRole("heading", { exact: true, name: "Household" })
+    ).toBeVisible();
+    await page
+      .getByRole("heading", { name: ownerEmail ?? "" })
+      .locator("xpath=ancestor::article[1]")
+      .getByRole("button", { name: "Make owner" })
+      .click();
+    await expect(page.getByText("Household ownership transferred.")).toBeVisible();
 
     await page.getByRole("button", { name: "Sign out" }).click();
     await page.waitForURL(/\/login/);
@@ -74,3 +97,7 @@ test.describe("Household member lifecycle", () => {
     ).toBeVisible();
   });
 });
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}

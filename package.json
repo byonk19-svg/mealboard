@@ -15,6 +15,7 @@
     "e2e:recipe-import": "node scripts/run-playwright-with-port.mjs 3107 e2e/recipe-import.smoke.spec.ts --project=chromium",
     "e2e:pwa": "node scripts/run-playwright-with-port.mjs 3109 e2e/pwa-install.smoke.spec.ts --project=chromium",
     "e2e:seed-local-user": "node scripts/bootstrap-local-e2e-user.mjs",
+    "e2e:settings-foods": "node scripts/run-playwright-with-port.mjs 3111 e2e/settings-foods.smoke.spec.ts --project=chromium",
     "e2e:smoke": "node scripts/run-playwright-with-port.mjs 3105 e2e/core-loop.smoke.spec.ts --project=chromium",
     "start": "next start",
     "lint": "eslint .",

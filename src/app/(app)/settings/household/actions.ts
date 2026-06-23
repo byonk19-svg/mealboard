@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   linkExistingUserToHousehold,
-  removeHouseholdMember
+  removeHouseholdMember,
+  transferHouseholdOwnership
 } from "@/lib/household/data";
 import { normalizeHouseholdMemberEmail } from "@/lib/household/members";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
@@ -78,4 +79,36 @@ export async function removeHouseholdMemberAction(formData: FormData) {
 
   revalidatePath("/settings/household");
   householdRedirect("Household member removed.");
+}
+
+export async function transferHouseholdOwnershipAction(formData: FormData) {
+  const householdContext = await getCurrentHouseholdContext();
+
+  if (!householdContext.household || !householdContext.user) {
+    householdRedirect("Link your user to a household before editing sharing.");
+  }
+
+  const membershipId = String(formData.get("membershipId") ?? "").trim();
+
+  if (!membershipId) {
+    householdRedirect("Choose a household member first.");
+  }
+
+  try {
+    await transferHouseholdOwnership({
+      actorRole: householdContext.membership?.role ?? null,
+      actorUserId: householdContext.user.id,
+      householdId: householdContext.household.id,
+      membershipId
+    });
+  } catch (error) {
+    householdRedirect(
+      error instanceof Error
+        ? error.message
+        : "Household ownership could not be transferred."
+    );
+  }
+
+  revalidatePath("/settings/household");
+  householdRedirect("Household ownership transferred.");
 }

@@ -1,7 +1,15 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
 import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore
+} from "react";
+import {
+  getGroceryProgressOperationKey,
   mergeGroceryProgressOperations,
   parseGroceryProgressOperations,
   removeGroceryProgressOperation,
@@ -31,6 +39,7 @@ export function GroceryItemStateControls({
   storageKey
 }: GroceryItemStateControlsProps) {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const inFlightOperationKeysRef = useRef<Set<string>>(new Set());
   const rawOperations = useSyncExternalStore(
     subscribeToGroceryProgress,
     () => readRawOperations(storageKey),
@@ -77,6 +86,97 @@ export function GroceryItemStateControls({
     return "Saved locally. Retry when service returns.";
   }, [pendingFields.length]);
 
+  const sendOperation = useCallback(
+    async (operation: GroceryProgressOperation) => {
+      const operationKey = getGroceryProgressOperationKey(operation);
+
+      if (inFlightOperationKeysRef.current.has(operationKey)) {
+        return;
+      }
+
+      inFlightOperationKeysRef.current.add(operationKey);
+
+      try {
+        const response = await fetch(
+          `/api/grocery-list/items/${encodeURIComponent(operation.itemId)}/state`,
+          {
+            body: JSON.stringify({
+              [operation.field]: operation.value
+            }),
+            headers: {
+              "Content-Type": "application/json"
+            },
+            method: "PATCH"
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error("Grocery item update failed.");
+        }
+
+        const remainingOperations = removeGroceryProgressOperation({
+          field: operation.field,
+          itemId: operation.itemId,
+          operations: readOperations(storageKey)
+        });
+        writeOperations(storageKey, remainingOperations);
+        setStatusMessage("Grocery item updated.");
+      } catch {
+        setStatusMessage("Saved locally. Retry when service returns.");
+      } finally {
+        inFlightOperationKeysRef.current.delete(operationKey);
+      }
+    },
+    [storageKey]
+  );
+
+  const retryPendingOperations = useCallback(async () => {
+    if (!canEdit) {
+      return;
+    }
+
+    const operations = readOperations(storageKey).filter(
+      (operation) => operation.itemId === itemId
+    );
+
+    for (const operation of operations) {
+      await sendOperation(operation);
+    }
+  }, [canEdit, itemId, sendOperation, storageKey]);
+
+  useEffect(() => {
+    const retryTimer = window.setTimeout(() => {
+      void retryPendingOperations();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(retryTimer);
+    };
+  }, [retryPendingOperations]);
+
+  useEffect(() => {
+    function retryWhenReady() {
+      if (
+        typeof document !== "undefined" &&
+        document.visibilityState === "hidden"
+      ) {
+        return;
+      }
+
+      void retryPendingOperations();
+    }
+
+    window.addEventListener("online", retryWhenReady);
+    window.addEventListener("focus", retryWhenReady);
+    document.addEventListener("visibilitychange", retryWhenReady);
+
+    return () => {
+      window.removeEventListener("online", retryWhenReady);
+      window.removeEventListener("focus", retryWhenReady);
+      document.removeEventListener("visibilitychange", retryWhenReady);
+    };
+  }, [retryPendingOperations]);
+
   async function updateField(field: GroceryProgressField, value: boolean) {
     if (!canEdit) {
       return;
@@ -96,47 +196,6 @@ export function GroceryItemStateControls({
     ]));
 
     await sendOperation(operation);
-  }
-
-  async function retryPendingOperations() {
-    const operations = readOperations(storageKey).filter(
-      (operation) => operation.itemId === itemId
-    );
-
-    for (const operation of operations) {
-      await sendOperation(operation);
-    }
-  }
-
-  async function sendOperation(operation: GroceryProgressOperation) {
-    try {
-      const response = await fetch(
-        `/api/grocery-list/items/${encodeURIComponent(itemId)}/state`,
-        {
-          body: JSON.stringify({
-            [operation.field]: operation.value
-          }),
-          headers: {
-            "Content-Type": "application/json"
-          },
-          method: "PATCH"
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Grocery item update failed.");
-      }
-
-      const remainingOperations = removeGroceryProgressOperation({
-        field: operation.field,
-        itemId,
-        operations: readOperations(storageKey)
-      });
-      writeOperations(storageKey, remainingOperations);
-      setStatusMessage("Grocery item updated.");
-    } catch {
-      setStatusMessage("Saved locally. Retry when service returns.");
-    }
   }
 
   const checkedPending = pendingFields.includes("checked");

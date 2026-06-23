@@ -30,6 +30,18 @@ export type HouseholdMemberRemovalDecision =
       reason: string;
     };
 
+export type HouseholdOwnerTransferDecision =
+  | {
+      ok: true;
+      newOwnerMembershipId: string;
+      newOwnerUserId: string;
+      previousOwnerMembershipId: string;
+    }
+  | {
+      ok: false;
+      reason: string;
+    };
+
 export function normalizeHouseholdMemberEmail(value: FormDataEntryValue | null) {
   const email = String(value ?? "").trim().toLowerCase();
 
@@ -142,5 +154,71 @@ export function evaluateHouseholdMemberRemoval({
     membershipId: membership.id,
     ok: true,
     userId: membership.userId
+  };
+}
+
+export function evaluateHouseholdOwnerTransfer({
+  actorRole,
+  actorUserId,
+  householdId,
+  memberships,
+  targetMembershipId
+}: {
+  actorRole: string | null;
+  actorUserId: string;
+  householdId: string;
+  memberships: HouseholdMemberRemovalMembership[];
+  targetMembershipId: string | null;
+}): HouseholdOwnerTransferDecision {
+  if (actorRole !== "owner") {
+    return {
+      ok: false,
+      reason: "Only household owners can transfer ownership."
+    };
+  }
+
+  const householdMemberships = memberships.filter(
+    (membership) => membership.householdId === householdId
+  );
+  const actorMembership =
+    householdMemberships.find(
+      (membership) =>
+        membership.userId === actorUserId && membership.role === "owner"
+    ) ?? null;
+
+  if (!actorMembership) {
+    return {
+      ok: false,
+      reason: "Only the current household owner can transfer ownership."
+    };
+  }
+
+  const targetMembership =
+    householdMemberships.find(
+      (membership) => membership.id === targetMembershipId
+    ) ?? null;
+
+  if (!targetMembership) {
+    return {
+      ok: false,
+      reason: "That household member is no longer available."
+    };
+  }
+
+  if (
+    targetMembership.role === "owner" ||
+    targetMembership.userId === actorUserId
+  ) {
+    return {
+      ok: false,
+      reason: "Choose a non-owner member to become owner."
+    };
+  }
+
+  return {
+    newOwnerMembershipId: targetMembership.id,
+    newOwnerUserId: targetMembership.userId,
+    ok: true,
+    previousOwnerMembershipId: actorMembership.id
   };
 }

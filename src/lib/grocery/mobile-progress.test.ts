@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyGroceryProgressOperations,
+  getGroceryProgressOperationKey,
   getGroceryProgressStorageKey,
   mergeGroceryProgressOperations,
   parseGroceryProgressOperations,
@@ -15,6 +16,15 @@ describe("mobile grocery progress helpers", () => {
         groceryListId: "list-1"
       })
     ).toBe("mealboard:grocery-progress:list-1:2026-06-23T12:00:00.000Z");
+  });
+
+  it("builds a stable retry key per item field", () => {
+    expect(
+      getGroceryProgressOperationKey({
+        field: "checked",
+        itemId: "item-1"
+      })
+    ).toBe("item-1:checked");
   });
 
   it("keeps the newest operation per item field", () => {

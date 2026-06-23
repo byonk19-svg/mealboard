@@ -4,6 +4,7 @@ import type {
   Food,
   FoodPreference,
   MealProfile,
+  SavedFood,
   Staple
 } from "@/lib/settings/types";
 
@@ -30,6 +31,10 @@ type StapleRow = Omit<
 
 type BabyFoodStatusRow = Omit<BabyFoodStatusEntry, "food_name"> & {
   foods: { name: string } | { name: string }[] | null;
+};
+
+type SavedFoodRow = Omit<SavedFood, "grocery_category_name"> & {
+  grocery_categories: { name: string } | { name: string }[] | null;
 };
 
 export async function getMealProfiles(householdId: string) {
@@ -107,6 +112,43 @@ export async function getFoods(
   }
 
   return (data ?? []) as Food[];
+}
+
+export async function getSavedFoods(householdId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("foods")
+    .select(
+      "id, household_id, name, default_unit, default_grocery_category_id, archived_at, grocery_categories(name)"
+    )
+    .eq("household_id", householdId)
+    .order("name", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data ?? []) as SavedFoodRow[])
+    .map((row) => ({
+      archived_at: row.archived_at,
+      default_grocery_category_id: row.default_grocery_category_id,
+      default_unit: row.default_unit,
+      grocery_category_name: getOptionalJoinedName(row.grocery_categories),
+      household_id: row.household_id,
+      id: row.id,
+      name: row.name
+    }))
+    .sort((a, b) => {
+      if (a.archived_at && !b.archived_at) {
+        return 1;
+      }
+
+      if (!a.archived_at && b.archived_at) {
+        return -1;
+      }
+
+      return a.name.localeCompare(b.name);
+    });
 }
 
 export async function getFoodPreferences(householdId: string) {

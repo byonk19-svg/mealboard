@@ -19,6 +19,7 @@ import {
   getWeeklyPlanItems,
   getWeeklyPlanProfileDays
 } from "@/lib/weekly-plans/data";
+import { getRecipeReviewSignals } from "@/lib/weekly-wrap-up/data";
 import {
   getWeekDates,
   getWeekStartDate
@@ -394,11 +395,12 @@ export async function confirmWeeklyPlanItemSwap(formData: FormData) {
     planWeekRedirect(weekStartDate, "That meal is no longer in the plan.", view);
   }
 
-  const [profileDays, goals, planItems, recipes] = await Promise.all([
+  const [profileDays, goals, planItems, recipes, reviewSignals] = await Promise.all([
     getWeeklyPlanProfileDays(household.id, itemRow.weekly_plan_id),
     getWeeklyPlanGoals(household.id, itemRow.weekly_plan_id),
     getWeeklyPlanItems(household.id, itemRow.weekly_plan_id),
-    getRecipes(household.id)
+    getRecipes(household.id),
+    getRecipeReviewSignals(household.id)
   ]);
   const targetItem = planItems.find((item) => item.id === itemId);
 
@@ -411,6 +413,7 @@ export async function confirmWeeklyPlanItemSwap(formData: FormData) {
     planItems,
     profileDays,
     recipes,
+    reviewSignals,
     targetItem
   }).find((suggestion) => suggestion.recipeId === recipeId);
 
@@ -554,12 +557,20 @@ export async function addRuleBasedMealSuggestions(formData: FormData) {
     planWeekRedirect(weekStartDate, "That planning week is no longer available.");
   }
 
-  const [profiles, profileDays, goals, planItems, recipes] = await Promise.all([
+  const [
+    profiles,
+    profileDays,
+    goals,
+    planItems,
+    recipes,
+    reviewSignals
+  ] = await Promise.all([
     getMealProfiles(household.id),
     getWeeklyPlanProfileDays(household.id, weeklyPlan.id),
     getWeeklyPlanGoals(household.id, weeklyPlan.id),
     getWeeklyPlanItems(household.id, weeklyPlan.id),
-    getRecipes(household.id)
+    getRecipes(household.id),
+    getRecipeReviewSignals(household.id)
   ]);
   const suggestions = buildRuleBasedMealSuggestions({
     goals: goals.map((goal) => goal.goal),
@@ -567,6 +578,7 @@ export async function addRuleBasedMealSuggestions(formData: FormData) {
     profileDays,
     profiles,
     recipes,
+    reviewSignals,
     weekDateKeys: getWeekDates(weekStartDate).map((date) => date.dateKey)
   });
 

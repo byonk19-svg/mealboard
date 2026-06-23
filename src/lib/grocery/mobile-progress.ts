@@ -127,8 +127,14 @@ export function removeGroceryProgressOperation({
   );
 }
 
-function operationKey(operation: Pick<GroceryProgressOperation, "field" | "itemId">) {
+export function getGroceryProgressOperationKey(
+  operation: Pick<GroceryProgressOperation, "field" | "itemId">
+) {
   return `${operation.itemId}:${operation.field}`;
+}
+
+function operationKey(operation: Pick<GroceryProgressOperation, "field" | "itemId">) {
+  return getGroceryProgressOperationKey(operation);
 }
 
 function isGroceryProgressOperation(

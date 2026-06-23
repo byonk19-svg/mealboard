@@ -61,6 +61,20 @@ export default function SettingsPage() {
 
         <Link
           className="rounded-lg border border-border bg-card p-5 shadow-sm transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          href="/settings/foods"
+        >
+          <p className="text-sm font-medium text-muted-foreground">
+            Household food list
+          </p>
+          <h2 className="mt-2 text-xl font-semibold">Saved Foods</h2>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Create foods once, edit default units or grocery categories, and
+            archive foods that should no longer be selected.
+          </p>
+        </Link>
+
+        <Link
+          className="rounded-lg border border-border bg-card p-5 shadow-sm transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           href="/settings/baby"
         >
           <p className="text-sm font-medium text-muted-foreground">

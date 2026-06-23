@@ -1,6 +1,7 @@
 import {
   linkExistingHouseholdMember,
-  removeHouseholdMemberAction
+  removeHouseholdMemberAction,
+  transferHouseholdOwnershipAction
 } from "@/app/(app)/settings/household/actions";
 import {
   getHouseholdMemberSettings,
@@ -137,6 +138,7 @@ function MemberCard({
 }) {
   const canRemove =
     canManage && member.role !== "owner" && member.userId !== actorUserId;
+  const canTransferOwnership = canRemove;
 
   return (
     <article className="rounded-md border border-border bg-background p-4 text-sm">
@@ -151,6 +153,17 @@ function MemberCard({
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <p className="capitalize text-muted-foreground">{member.role}</p>
+          {canTransferOwnership ? (
+            <form action={transferHouseholdOwnershipAction}>
+              <input name="membershipId" type="hidden" value={member.id} />
+              <button
+                className="min-h-10 rounded-md border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
+                type="submit"
+              >
+                Make owner
+              </button>
+            </form>
+          ) : null}
           {canRemove ? (
             <form action={removeHouseholdMemberAction}>
               <input name="membershipId" type="hidden" value={member.id} />

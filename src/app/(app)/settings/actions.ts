@@ -5,7 +5,11 @@ import { redirect } from "next/navigation";
 import { normalizeBabyFoodStatusInput } from "@/lib/settings/baby-food-statuses";
 import { normalizeBabyProfileInput } from "@/lib/settings/baby-profile";
 import { resolveSettingsReturnPath } from "@/lib/settings/baby-settings";
-import { foodNameKey, normalizeFoodCreateInput } from "@/lib/settings/foods";
+import {
+  foodNameKey,
+  normalizeFoodCreateInput,
+  normalizeSavedFoodInput
+} from "@/lib/settings/foods";
 import { normalizeStapleInput } from "@/lib/settings/staples";
 import { preferenceLevels, type FoodPreferenceLevel } from "@/lib/settings/types";
 import { createClient } from "@/lib/supabase/server";
@@ -319,6 +323,153 @@ export async function createPreferenceFood(formData: FormData) {
   });
 }
 
+export async function saveSavedFood(formData: FormData) {
+  const path = "/settings/foods";
+  const household = await requireHousehold(path);
+  const foodId = textOrNull(formData.get("foodId"));
+  let input: ReturnType<typeof normalizeSavedFoodInput>;
+
+  try {
+    input = normalizeSavedFoodInput({
+      defaultGroceryCategoryId: textOrNull(
+        formData.get("defaultGroceryCategoryId")
+      ),
+      defaultUnit: textOrNull(formData.get("defaultUnit")),
+      name: textOrNull(formData.get("name"))
+    });
+  } catch (error) {
+    settingsRedirect(
+      path,
+      error instanceof Error ? error.message : "Food could not be saved."
+    );
+  }
+
+  const supabase = await createClient();
+
+  if (input.defaultGroceryCategoryId) {
+    const { data: category, error: categoryError } = await supabase
+      .from("grocery_categories")
+      .select("id")
+      .eq("household_id", household.id)
+      .eq("id", input.defaultGroceryCategoryId)
+      .is("archived_at", null)
+      .maybeSingle();
+
+    if (categoryError) {
+      settingsRedirect(path, "Grocery category could not be loaded.");
+    }
+
+    if (!category) {
+      settingsRedirect(path, "Choose an active grocery category.");
+    }
+  }
+
+  const { data: existingFoods, error: existingFoodsError } = await supabase
+    .from("foods")
+    .select("id, name")
+    .eq("household_id", household.id);
+
+  if (existingFoodsError) {
+    settingsRedirect(path, existingFoodsError.message);
+  }
+
+  const duplicateFood = (existingFoods ?? []).find(
+    (food) =>
+      food.id !== foodId && foodNameKey(food.name) === foodNameKey(input.name)
+  );
+
+  if (duplicateFood) {
+    settingsRedirect(path, "That food already exists.");
+  }
+
+  const payload = {
+    default_grocery_category_id: input.defaultGroceryCategoryId,
+    default_unit: input.defaultUnit,
+    household_id: household.id,
+    name: input.name
+  };
+  const result = foodId
+    ? await supabase
+        .from("foods")
+        .update(payload)
+        .eq("household_id", household.id)
+        .eq("id", foodId)
+        .select("id")
+        .maybeSingle()
+    : await supabase.from("foods").insert(payload).select("id").maybeSingle();
+
+  if (result.error) {
+    settingsRedirect(path, result.error.message);
+  }
+
+  if (!result.data) {
+    settingsRedirect(path, "That food is no longer available.");
+  }
+
+  revalidateSavedFoodPaths();
+  settingsRedirect(path, foodId ? "Food updated." : "Food created.");
+}
+
+export async function archiveSavedFood(formData: FormData) {
+  const path = "/settings/foods";
+  const household = await requireHousehold(path);
+  const foodId = textOrNull(formData.get("foodId"));
+
+  if (!foodId) {
+    settingsRedirect(path, "Food is required.");
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("foods")
+    .update({ archived_at: new Date().toISOString() })
+    .eq("household_id", household.id)
+    .eq("id", foodId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    settingsRedirect(path, error.message);
+  }
+
+  if (!data) {
+    settingsRedirect(path, "That food is no longer available.");
+  }
+
+  revalidateSavedFoodPaths();
+  settingsRedirect(path, "Food archived.");
+}
+
+export async function restoreSavedFood(formData: FormData) {
+  const path = "/settings/foods";
+  const household = await requireHousehold(path);
+  const foodId = textOrNull(formData.get("foodId"));
+
+  if (!foodId) {
+    settingsRedirect(path, "Food is required.");
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("foods")
+    .update({ archived_at: null })
+    .eq("household_id", household.id)
+    .eq("id", foodId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    settingsRedirect(path, error.message);
+  }
+
+  if (!data) {
+    settingsRedirect(path, "That food is no longer available.");
+  }
+
+  revalidateSavedFoodPaths();
+  settingsRedirect(path, "Food restored.");
+}
+
 export async function deleteFoodPreference(formData: FormData) {
   const path = "/settings/preferences";
   const household = await requireHousehold(path);
@@ -588,4 +739,12 @@ export async function deactivateStaple(formData: FormData) {
   revalidatePath("/settings");
   revalidatePath(path);
   settingsRedirect(path, "Staple deactivated.");
+}
+
+function revalidateSavedFoodPaths() {
+  revalidatePath("/settings");
+  revalidatePath("/settings/foods");
+  revalidatePath("/settings/preferences");
+  revalidatePath("/settings/staples");
+  revalidatePath("/settings/baby");
 }

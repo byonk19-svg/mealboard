@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import type { RecipeReviewSignal } from "@/lib/meal-planning/rule-based-suggestions";
+import type { RecipeRating } from "@/lib/recipes/types";
 import {
   getStapleWrapUpAdjustmentIntent,
   type StapleWrapUpAdjustmentIntent
@@ -51,6 +53,14 @@ type GroceryItemSourceRow = {
 
 type RecipeReviewRow = {
   weekly_plan_item_id: string | null;
+};
+
+type RecipeReviewSignalRow = {
+  created_at: string;
+  meal_profile_id: string | null;
+  quick_tags: string[];
+  rating: RecipeRating | null;
+  recipe_id: string;
 };
 
 type WrapUpRow = {
@@ -198,6 +208,56 @@ export async function getStapleWrapUpAdjustmentReview({
   return getStapleWrapUpAdjustmentIntent(
     (data as StapleWrapUpAdjustmentRow | null)?.response ?? null
   );
+}
+
+export async function getRecipeReviewSignals(householdId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("recipe_reviews")
+    .select("recipe_id, meal_profile_id, rating, quick_tags, created_at")
+    .eq("household_id", householdId)
+    .not("meal_profile_id", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(500);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const signalsByKey = new Map<string, RecipeReviewSignal>();
+
+  for (const row of (data ?? []) as RecipeReviewSignalRow[]) {
+    if (!row.meal_profile_id) {
+      continue;
+    }
+
+    const key = `${row.recipe_id}:${row.meal_profile_id}`;
+    const signal =
+      signalsByKey.get(key) ??
+      ({
+        leftoverCount: 0,
+        mealProfileId: row.meal_profile_id,
+        rating: null,
+        recipeId: row.recipe_id,
+        skippedCount: 0
+      } satisfies RecipeReviewSignal);
+
+    if (!signal.rating && row.rating) {
+      signal.rating = row.rating;
+    }
+
+    if (row.quick_tags.includes("skipped")) {
+      signal.skippedCount += 1;
+    }
+
+    if (row.quick_tags.some(isLeftoverQuickTag)) {
+      signal.leftoverCount += 1;
+    }
+
+    signalsByKey.set(key, signal);
+  }
+
+  return Array.from(signalsByKey.values());
 }
 
 async function getOrInsertWrapUp(
@@ -571,4 +631,8 @@ function toNullableNumber(value: number | string | null) {
   const numberValue = typeof value === "number" ? value : Number(value);
 
   return Number.isFinite(numberValue) ? numberValue : null;
+}
+
+function isLeftoverQuickTag(tag: string) {
+  return ["some", "lots", "used_leftovers"].includes(tag);
 }

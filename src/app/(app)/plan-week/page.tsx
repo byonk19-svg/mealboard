@@ -52,6 +52,7 @@ import {
   getWeeklyPlanProfileDays,
   getWeeklyPlanStapleSelections
 } from "@/lib/weekly-plans/data";
+import { getRecipeReviewSignals } from "@/lib/weekly-wrap-up/data";
 import { buildPlanItemsByProfile } from "@/lib/weekly-plans/group-plan-items";
 import {
   buildPlanWeekSummary,
@@ -111,6 +112,7 @@ export default async function PlanWeekPage({
     planItems,
     recipeOptions,
     recipes,
+    reviewSignals,
     staples,
     pendingGroceryChanges,
     stapleSelections
@@ -121,6 +123,7 @@ export default async function PlanWeekPage({
         getWeeklyPlanItems(householdContext.household.id, weeklyPlan.id),
         getPlanRecipeOptions(householdContext.household.id),
         getRecipes(householdContext.household.id),
+        getRecipeReviewSignals(householdContext.household.id),
         getStaples(householdContext.household.id),
         getPendingGroceryChangesForWeeklyPlan({
           householdId: householdContext.household.id,
@@ -131,7 +134,7 @@ export default async function PlanWeekPage({
           weeklyPlan.id
         )
       ])
-    : [[], [], [], [], [], [], null, []];
+    : [[], [], [], [], [], [], [], null, []];
   const profileDayLookup = new Map(
     profileDays.map((day) => [
       `${day.meal_profile_id}:${day.plan_date}`,
@@ -164,6 +167,7 @@ export default async function PlanWeekPage({
         profileDays,
         profiles,
         recipes,
+        reviewSignals,
         weekDateKeys: weekDates.map((date) => date.dateKey)
       })
     : [];
@@ -174,6 +178,7 @@ export default async function PlanWeekPage({
         planItems,
         profileDays,
         recipes,
+        reviewSignals,
         targetItem: selectedSwapItem
       })
     : [];
