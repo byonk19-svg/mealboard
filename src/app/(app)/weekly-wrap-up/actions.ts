@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 import type { RecipeRating, RecipeStatus } from "@/lib/recipes/types";
+import { getStapleWrapUpAdjustmentIntent } from "@/lib/settings/staples";
 import { toUnusedGroceryCandidate } from "@/lib/weekly-wrap-up/build-wrap-up-items";
 
 type RecipeWrapUpStatus = Extract<
@@ -114,10 +115,11 @@ export async function acknowledgeUnusedGroceryItem(formData: FormData) {
     supabase,
     wrapUpItemId
   });
+  const response = { notes, resolution, unusedGrocery };
   const { error } = await supabase
     .from("weekly_wrap_up_items")
     .update({
-      response: { notes, resolution, unusedGrocery },
+      response,
       status: "completed"
     })
     .eq("household_id", household.id)
@@ -137,6 +139,14 @@ export async function acknowledgeUnusedGroceryItem(formData: FormData) {
 
   revalidatePath("/dashboard");
   revalidatePath(`/weekly-wrap-up/${weeklyPlanId}`);
+  const stapleIntent = getStapleWrapUpAdjustmentIntent(response);
+
+  if (stapleIntent) {
+    redirect(
+      `/settings/staples?wrapUpItemId=${encodeURIComponent(wrapUpItemId)}&message=${encodeURIComponent("Review this staple before changing it.")}`
+    );
+  }
+
   wrapUpRedirect(weeklyPlanId, "Unused grocery item noted.");
 }
 

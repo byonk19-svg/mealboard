@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { GeneratedGroceryItem } from "./generate-grocery-list";
 import {
+  buildPendingGroceryChangeApplication,
   buildPendingGroceryChanges,
+  getPendingGroceryChangeApplyState,
   type ProtectedGroceryListItem
 } from "./pending-grocery-changes";
 
@@ -75,6 +77,109 @@ describe("buildPendingGroceryChanges", () => {
       removedCount: 0
     });
   });
+
+  it("requires real automatic differences before applying reviewed changes", () => {
+    const unchanged = buildPendingGroceryChanges({
+      currentItems: [
+        protectedItem({ displayName: "Chicken", foodId: "food-chicken" }),
+        protectedItem({ displayName: "Manual apples", foodId: null, manualItem: true })
+      ],
+      generatedItems: [
+        generatedItem({ displayName: "Chicken", foodId: "food-chicken" })
+      ]
+    });
+    const changed = buildPendingGroceryChanges({
+      currentItems: [
+        protectedItem({ displayName: "Chicken", foodId: "food-chicken" })
+      ],
+      generatedItems: [
+        generatedItem({ displayName: "Rice", foodId: "food-rice" })
+      ]
+    });
+
+    expect(getPendingGroceryChangeApplyState(unchanged)).toEqual({
+      canApply: false,
+      label: "No grocery updates to apply"
+    });
+    expect(getPendingGroceryChangeApplyState(changed)).toEqual({
+      canApply: true,
+      label: "Apply reviewed grocery updates"
+    });
+  });
+
+  it("builds operation-ready changes with current ids and generated indexes", () => {
+    const application = buildPendingGroceryChangeApplication({
+      currentItems: [
+        protectedItem({
+          displayName: "Chicken",
+          foodId: "food-chicken",
+          id: "current-kept"
+        }),
+        protectedItem({
+          displayName: "Rice",
+          foodId: "food-rice",
+          id: "current-removed"
+        }),
+        protectedItem({
+          displayName: "Manual apples",
+          foodId: null,
+          id: "manual-kept",
+          manualItem: true
+        })
+      ],
+      generatedItems: [
+        generatedItem({ displayName: "Chicken", foodId: "food-chicken" }),
+        generatedItem({ displayName: "Black Beans", foodId: "food-beans" })
+      ]
+    });
+
+    expect(application.kept).toEqual([
+      expect.objectContaining({
+        currentItemId: "current-kept",
+        generatedIndex: 0
+      })
+    ]);
+    expect(application.removed).toEqual([
+      expect.objectContaining({
+        currentItemId: "current-removed"
+      })
+    ]);
+    expect(application.added).toEqual([
+      expect.objectContaining({
+        generatedIndex: 1
+      })
+    ]);
+    expect(application.manualItemIds).toEqual(["manual-kept"]);
+  });
+
+  it("preserves manual grocery item order from the current protected list", () => {
+    const application = buildPendingGroceryChangeApplication({
+      currentItems: [
+        protectedItem({
+          displayName: "Manual second",
+          foodId: null,
+          id: "manual-b",
+          manualItem: true
+        }),
+        protectedItem({
+          displayName: "Chicken",
+          foodId: "food-chicken",
+          id: "current-kept"
+        }),
+        protectedItem({
+          displayName: "Manual first",
+          foodId: null,
+          id: "manual-a",
+          manualItem: true
+        })
+      ],
+      generatedItems: [
+        generatedItem({ displayName: "Chicken", foodId: "food-chicken" })
+      ]
+    });
+
+    expect(application.manualItemIds).toEqual(["manual-b", "manual-a"]);
+  });
 });
 
 function generatedItem(
@@ -99,6 +204,7 @@ function protectedItem(
   return {
     displayName: "Chicken",
     foodId: "food-chicken",
+    id: "protected-item",
     manualItem: false,
     preferredQuantityText: null,
     quantity: 1,

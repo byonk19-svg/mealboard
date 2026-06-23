@@ -2,7 +2,10 @@ import {
   createOrSelectWeeklyPlan,
   saveWeeklyPlanSetup
 } from "@/app/(app)/plan-week/actions";
-import { generateGroceryListForWeek } from "@/app/(app)/grocery-list/actions";
+import {
+  applyPendingGroceryChangesForWeek,
+  generateGroceryListForWeek
+} from "@/app/(app)/grocery-list/actions";
 import { BabyRoutinePreviewSection } from "@/components/plan-week/baby-routine-preview-section";
 import { ManualPlanSection } from "@/components/plan-week/manual-plan-section";
 import { NutritionSummarySection } from "@/components/plan-week/nutrition-summary-section";
@@ -14,6 +17,10 @@ import {
   getSwapGroceryImpactsForWeeklyPlanItem,
   type WeeklyPlanPendingGroceryChanges
 } from "@/lib/grocery/data";
+import {
+  getPendingGroceryChangeApplyState,
+  type PendingGroceryChangeItem
+} from "@/lib/grocery/pending-grocery-changes";
 import { generateBabyMeals } from "@/lib/baby/generate-baby-meals";
 import {
   buildRuleBasedMealSuggestions,
@@ -508,6 +515,7 @@ function GroceryGenerationPanel({
   weeklyPlanId: string;
 }) {
   const canGenerate = approvedRecipeItemCount > 0 || selectedStapleCount > 0;
+  const protectedListExists = Boolean(pendingChanges);
 
   return (
     <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
@@ -530,21 +538,27 @@ function GroceryGenerationPanel({
           </dl>
         </div>
 
-        <form action={generateGroceryListForWeek}>
-          <input name="weekStartDate" type="hidden" value={weekStartDate} />
-          <input name="weeklyPlanId" type="hidden" value={weeklyPlanId} />
-          <button
-            className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-            disabled={!canGenerate}
-            type="submit"
-          >
-            Generate grocery list
-          </button>
-        </form>
+        {!protectedListExists ? (
+          <form action={generateGroceryListForWeek}>
+            <input name="weekStartDate" type="hidden" value={weekStartDate} />
+            <input name="weeklyPlanId" type="hidden" value={weeklyPlanId} />
+            <button
+              className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              disabled={!canGenerate}
+              type="submit"
+            >
+              Generate grocery list
+            </button>
+          </form>
+        ) : null}
       </div>
 
       {pendingChanges ? (
-        <PendingGroceryChangesPanel pendingChanges={pendingChanges} />
+        <PendingGroceryChangesPanel
+          pendingChanges={pendingChanges}
+          weekStartDate={weekStartDate}
+          weeklyPlanId={weeklyPlanId}
+        />
       ) : null}
 
       {!canGenerate ? (
@@ -558,11 +572,16 @@ function GroceryGenerationPanel({
 }
 
 function PendingGroceryChangesPanel({
-  pendingChanges
+  pendingChanges,
+  weekStartDate,
+  weeklyPlanId
 }: {
   pendingChanges: WeeklyPlanPendingGroceryChanges;
+  weekStartDate: string;
+  weeklyPlanId: string;
 }) {
   const { changes, groceryList } = pendingChanges;
+  const applyState = getPendingGroceryChangeApplyState(changes);
 
   return (
     <div className="mt-5 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
@@ -584,7 +603,81 @@ function PendingGroceryChangesPanel({
           staples.
         </p>
       ) : null}
+      {changes.hasChanges ? (
+        <>
+          <div className="mt-4 grid gap-3 lg:grid-cols-3">
+            <PendingGroceryChangeList
+              heading="Add"
+              items={changes.added}
+              tone="add"
+            />
+            <PendingGroceryChangeList
+              heading="Remove"
+              items={changes.removed}
+              tone="remove"
+            />
+            <PendingGroceryChangeList
+              heading="Keep"
+              items={changes.kept}
+              tone="keep"
+            />
+          </div>
+          <form action={applyPendingGroceryChangesForWeek} className="mt-4">
+            <input name="weekStartDate" type="hidden" value={weekStartDate} />
+            <input name="weeklyPlanId" type="hidden" value={weeklyPlanId} />
+            <button
+              className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={!applyState.canApply}
+              type="submit"
+            >
+              {applyState.label}
+            </button>
+          </form>
+        </>
+      ) : null}
     </div>
+  );
+}
+
+function PendingGroceryChangeList({
+  heading,
+  items,
+  tone
+}: {
+  heading: string;
+  items: PendingGroceryChangeItem[];
+  tone: "add" | "keep" | "remove";
+}) {
+  const toneClassName =
+    tone === "add"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-950"
+      : tone === "remove"
+        ? "border-red-200 bg-red-50 text-red-950"
+        : "border-border bg-white/70 text-amber-950";
+
+  return (
+    <section className={`rounded-md border p-3 ${toneClassName}`}>
+      <h3 className="font-semibold">
+        {heading} {items.length}
+      </h3>
+      {items.length === 0 ? (
+        <p className="mt-2 text-sm opacity-80">No items.</p>
+      ) : (
+        <ul className="mt-2 space-y-1">
+          {items.slice(0, 6).map((item, index) => (
+            <li className="text-sm" key={`${item.displayName}:${index}`}>
+              {item.displayName}{" "}
+              <span className="opacity-75">({formatPendingQuantity(item)})</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {items.length > 6 ? (
+        <p className="mt-2 text-xs opacity-75">
+          {items.length - 6} more {items.length - 6 === 1 ? "item" : "items"}.
+        </p>
+      ) : null}
+    </section>
   );
 }
 
@@ -649,6 +742,20 @@ function formatGroceryStatus(status: string) {
   return status
     .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function formatPendingQuantity(item: PendingGroceryChangeItem) {
+  if (item.preferredQuantityText) {
+    return item.preferredQuantityText;
+  }
+
+  if (item.quantity === null && !item.unit) {
+    return "quantity needs review";
+  }
+
+  return [item.quantity, item.unit]
+    .filter((value) => value !== null && value !== "")
     .join(" ");
 }
 

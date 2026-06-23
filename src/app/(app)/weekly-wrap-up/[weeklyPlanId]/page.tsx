@@ -265,8 +265,10 @@ function UnusedGrocerySection({
               >
                 <option value="acknowledged">Keep as-is</option>
                 <option value="use_later">Use later this week</option>
-                <option value="reduce_future_amount">Buy less next time</option>
-                <option value="pause_future_buy">Pause this for now</option>
+                <option value="reduce_future_amount">Review staple amount</option>
+                <option value="pause_future_buy">
+                  Review whether to pause this staple
+                </option>
               </select>
             </label>
             <label className="text-sm font-medium">

@@ -1,6 +1,6 @@
 # MealBoard MVP Readiness
 
-This document captures the current private family MVP state after the rule-based suggestions, smart swaps, Plan Week profile view, Preferences food creation, actionable dashboard queue, baby weekly-plan persistence, pending grocery-change, weekly wrap-up expansion, hardening, and E2E smoke slices. It is a handoff snapshot for future Codex work so the next phase can build from known product truth instead of rediscovering the app.
+This document captures the current private family MVP state after the rule-based suggestions, smart swaps, Plan Week profile view, Preferences food creation, actionable dashboard queue, baby weekly-plan persistence, pending grocery-change review/apply flow, weekly wrap-up expansion, hardening, and E2E smoke slices. It is a handoff snapshot for future Codex work so the next phase can build from known product truth instead of rediscovering the app.
 
 ## Current Status
 
@@ -22,14 +22,14 @@ The latest verified flow covers:
 - Apply Baby Meal 1/2 to the selected planning week as explicit baby plan slots.
 - Select active staples for the week.
 - Generate a grocery list from approved planned meals, approved persisted baby foods, and selected staples.
-- See pending grocery-change counts when a protected grocery list would differ from the current plan.
+- Review and apply pending grocery add/remove/keep updates when a protected grocery list would differ from the current plan.
 - Open a smart swap panel, review ranked replacements, see grocery add/remove/keep impact, and confirm a swap without silently changing protected grocery lists.
 - Use Shopping, Profile, and Meal grocery views.
 - Add a manual grocery item with household/profile context and source note.
 - Toggle checked and already-have item states.
 - Advance a grocery list through Draft -> Finalized -> Shopping Started -> Completed.
 - Open the optional weekly wrap-up after completed shopping.
-- Capture made/skipped meal outcomes, leftovers, source-aware unused grocery notes, and future buying/staple-adjustment intent in weekly wrap-up.
+- Capture made/skipped meal outcomes, leftovers, source-aware unused grocery notes, and hand source-aware staple adjustment intent to Settings for explicit review before any staple changes.
 - Confirm Dashboard reflects current week planning, grocery status, next best action, setup-aware and calorie-guidance needs-attention items, and wrap-up entry when eligible.
 - Filter the recipe library by search text, recipe status, planning approval, and nutrition-review needs.
 - Run unauthenticated Playwright auth-boundary smoke coverage plus credential-gated core-loop and mobile grocery smokes.
@@ -71,7 +71,8 @@ Use a linked local household user. Do not commit `.env.local`, `.env.cloud.local
     - Shopping Started -> Completed
 22. Open `/dashboard`.
 23. Confirm current week, planning status, grocery status, next best action, needs-attention queue, and wrap-up entry are reasonable.
-24. Open the weekly wrap-up, save one meal outcome with leftover context if prompted, acknowledge unused groceries with a future adjustment if prompted, or dismiss it.
+24. After finalizing or starting shopping, change an approved planned meal, confirm Plan Week shows pending grocery changes, apply the reviewed grocery updates, and confirm manual items/check state are preserved where applicable.
+25. Open the weekly wrap-up, save one meal outcome with leftover context if prompted, acknowledge unused groceries with a future staple adjustment if prompted, confirm Settings opens a review banner instead of changing staples automatically, or dismiss it.
 
 ## Known Local Environment Note
 
@@ -108,14 +109,12 @@ These are intentionally out of scope for the current MVP unless a future task ex
 - Multi-user household invitations and shared account workflows
 - PWA install/offline polish
 - Grocery history intelligence
-- Full grocery-list replacement review workflow beyond current pending add/remove/keep visibility
 
 ## Next Phase Options
 
 Good next slices should stay narrow and start from the verified MVP loop. Candidate directions:
 
 - Safe dependency-audit follow-up when a non-breaking Next/PostCSS fix is available
-- Review workflow for applying source-aware weekly wrap-up staple suggestions without hidden automatic changes
 - Shared household/member invite preparation
 - PWA/mobile install polish
 

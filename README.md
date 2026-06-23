@@ -13,7 +13,7 @@ This repo is separate from RT Scheduler. Product and technical decisions should 
 MealBoard has reached a private family MVP readiness checkpoint for the
 planning and grocery loop, with rule-based suggestions, smart swaps, baby
 solids planning, an actionable dashboard queue, pending grocery-change
-visibility, weekly wrap-up learning, and E2E smoke coverage.
+review/apply handling, weekly wrap-up learning, and E2E smoke coverage.
 
 The current core loop is:
 
@@ -31,11 +31,11 @@ Implemented MVP surfaces include:
 - Smart swap suggestions with confirmation and grocery add/remove/keep impact preview
 - Staples settings CRUD, weekly staple selection, and selected staples flowing into grocery generation
 - Grocery list generation from approved planned meals, persisted approved baby foods, and selected staples
-- Pending grocery-change visibility when a finalized or shopping-started list would differ from the current approved plan
+- Pending grocery-change review/apply handling when a finalized or shopping-started list would differ from the current approved plan
 - Mobile-friendly grocery shopping list with Shopping/Profile/Meal views, source context, manual add-ons, checked/already-have state, and Draft -> Finalized -> Shopping Started -> Completed lifecycle
 - Baby settings with stage context, baby food statuses, Baby Meal 1/2 routine preview, Try This preview, and Plan Week Baby Meal 1/2 persistence
 - Dashboard current-week summary with planning status, grocery status, next best action, setup-aware and calorie-guidance needs-attention items, and optional weekly wrap-up entry after completed shopping
-- Weekly wrap-up capture for made/skipped meals, leftovers, recipe/profile feedback, source-aware unused groceries, and future staple/quantity notes
+- Weekly wrap-up capture for made/skipped meals, leftovers, recipe/profile feedback, source-aware unused groceries, and explicit staple/quantity review handoff
 - Recipe library filters for search, status, planning approval, and nutrition-review needs
 - Playwright smoke coverage for protected route auth boundaries, plus credential-gated core-loop and mobile grocery smokes
 
@@ -125,6 +125,10 @@ npm run e2e:smoke
 npm run e2e:grocery-mobile
 npm run e2e:recipe-import
 ```
+
+The Playwright smoke scripts use separate default ports to avoid common local
+dev-server collisions. Override with `PLAYWRIGHT_PORT=3128` or another free
+port when needed.
 
 For ad hoc local development, create an auth user through the login page or Supabase Studio. Then link that user to the seeded household by running this SQL in local Supabase Studio after replacing the email:
 

@@ -4,7 +4,7 @@ const email = process.env.MEALBOARD_E2E_EMAIL;
 const password = process.env.MEALBOARD_E2E_PASSWORD;
 
 test.describe("MealBoard core loop", () => {
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
 
   test.skip(
     !email || !password,
@@ -18,6 +18,7 @@ test.describe("MealBoard core loop", () => {
     const recipeName = `E2E Turkey Wrap ${suffix}`;
     const stapleName = `E2E Crackers ${suffix}`;
     const manualItemName = `E2E Manual Apples ${suffix}`;
+    const weekStartDate = getFutureSundayDateKey(Number(suffix));
 
     await page.goto("/login");
     await page.getByLabel("Email").fill(email ?? "");
@@ -45,11 +46,16 @@ test.describe("MealBoard core loop", () => {
     await page.waitForURL(/\/recipes\/[^/?]+\?message=/, { timeout: 30_000 });
     await expect(page.getByText("Recipe created.")).toBeVisible();
 
-    await page.goto("/plan-week");
+    await page.goto(`/plan-week?weekStartDate=${weekStartDate}`);
+    await page.getByLabel("Week of").fill(weekStartDate);
     await page.getByRole("button", { name: "Create or select week" }).click();
     await expect(page.getByRole("button", { name: "Save weekly setup" })).toBeVisible();
     await page.getByRole("button", { name: "Save weekly setup" }).click();
     await expect(page.getByLabel("Recipe for Sunday")).toBeVisible();
+    const weeklyPlanId =
+      (await page.locator('input[name="weeklyPlanId"]').first().getAttribute("value")) ??
+      "";
+    expect(weeklyPlanId).toBeTruthy();
 
     const recipeSelect = page.getByLabel("Recipe for Sunday");
     const recipeOptionValue = await recipeSelect
@@ -103,6 +109,32 @@ test.describe("MealBoard core loop", () => {
     await page.getByRole("button", { name: "Check off" }).first().click();
     await expect(page.getByText("Grocery item updated.")).toBeVisible();
     await page.getByRole("button", { name: "Finalize list" }).click();
+    await page.goto(`/plan-week?weekStartDate=${weekStartDate}`);
+    const mondayRecipeSelect = page.getByLabel("Recipe for Monday");
+    await mondayRecipeSelect.selectOption(recipeOptionValue ?? "");
+    await mondayRecipeSelect
+      .locator("xpath=ancestor::form[1]")
+      .getByRole("button", { name: "Add recipe" })
+      .click();
+    await page.waitForURL(/message=Recipe\+added\+to\+the\+week|message=Recipe%20added%20to%20the%20week/, {
+      timeout: 45_000
+    });
+    await page.getByRole("button", { name: "Approve for groceries" }).first().click();
+    await expect(page.getByText("Protected grocery list: Finalized")).toBeVisible();
+    await expect(
+      page.getByText("MealBoard will not silently change this list")
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Apply reviewed grocery updates" })
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: "Apply reviewed grocery updates" })
+      .click();
+    await expect(
+      page.getByText("Applied pending grocery changes:")
+    ).toBeVisible();
+    await page.goto("/grocery-list");
+    await expect(page.getByText("Finalized")).toBeVisible();
     await page.getByRole("button", { name: "Start shopping" }).click();
     await page.getByRole("button", { name: "Complete shopping" }).click();
     await expect(page.getByText("This grocery list is completed.")).toBeVisible();
@@ -111,5 +143,28 @@ test.describe("MealBoard core loop", () => {
     await expect(page.getByRole("heading", { name: "Current Week" })).toBeVisible();
     await expect(page.getByText("Planning status")).toBeVisible();
     await expect(page.getByText("Grocery status")).toBeVisible();
+    await page.goto(`/weekly-wrap-up/${weeklyPlanId}`);
+    await expect(
+      page.getByRole("heading", { name: "Review what needs attention" })
+    ).toBeVisible();
+    const saveFeedback = page.getByRole("button", { name: "Save feedback" });
+
+    if ((await saveFeedback.count()) > 0) {
+      await saveFeedback.first().click();
+      await expect(page.getByText("Recipe feedback saved.")).toBeVisible();
+    }
   });
 });
+
+function getFutureSundayDateKey(seed: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + 28 + (seed % 90));
+  const day = date.getDay();
+  date.setDate(date.getDate() - day);
+
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0")
+  ].join("-");
+}

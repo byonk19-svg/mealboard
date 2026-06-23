@@ -19,10 +19,12 @@ import type {
   Staple
 } from "@/lib/settings/types";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
+import { getStapleWrapUpAdjustmentReview } from "@/lib/weekly-wrap-up/data";
 
 type StaplesPageProps = {
   searchParams: Promise<{
     message?: string;
+    wrapUpItemId?: string;
   }>;
 };
 
@@ -30,21 +32,37 @@ export default async function StaplesPage({
   searchParams
 }: StaplesPageProps) {
   const householdContext = await getCurrentHouseholdContext();
-  const { message } = await searchParams;
+  const { message, wrapUpItemId } = await searchParams;
 
   if (!householdContext.household) {
     return null;
   }
 
-  const [profiles, foods, groceryCategories, staples] = await Promise.all([
+  const [
+    profiles,
+    foods,
+    groceryCategories,
+    staples,
+    wrapUpAdjustmentIntent
+  ] = await Promise.all([
     getMealProfiles(householdContext.household.id),
     getFoods(householdContext.household.id),
     getGroceryCategories(householdContext.household.id),
-    getStaples(householdContext.household.id)
+    getStaples(householdContext.household.id),
+    wrapUpItemId
+      ? getStapleWrapUpAdjustmentReview({
+          householdId: householdContext.household.id,
+          wrapUpItemId
+        })
+      : Promise.resolve(null)
   ]);
   const activeStaples = staples.filter((staple) => staple.active);
   const inactiveStaples = staples.filter((staple) => !staple.active);
   const contextGroups = buildContextGroups(activeStaples, profiles);
+  const wrapUpStaple = wrapUpAdjustmentIntent
+    ? staples.find((staple) => staple.id === wrapUpAdjustmentIntent.stapleId) ??
+      null
+    : null;
 
   return (
     <section className="space-y-6">
@@ -60,6 +78,13 @@ export default async function StaplesPage({
       </div>
 
       {message ? <SettingsMessage message={message} /> : null}
+
+      {wrapUpItemId ? (
+        <StapleWrapUpReviewCallout
+          intent={wrapUpAdjustmentIntent}
+          staple={wrapUpStaple}
+        />
+      ) : null}
 
       <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
         <h2 className="text-xl font-semibold">Add staple</h2>
@@ -93,6 +118,9 @@ export default async function StaplesPage({
                   <StapleCard
                     foods={foods}
                     groceryCategories={groceryCategories}
+                    isReviewTarget={
+                      staple.id === wrapUpAdjustmentIntent?.stapleId
+                    }
                     key={staple.id}
                     mealProfiles={profiles}
                     staple={staple}
@@ -139,16 +167,22 @@ export default async function StaplesPage({
 function StapleCard({
   foods,
   groceryCategories,
+  isReviewTarget = false,
   mealProfiles,
   staple
 }: {
   foods: Food[];
   groceryCategories: GroceryCategory[];
+  isReviewTarget?: boolean;
   mealProfiles: MealProfile[];
   staple: Staple;
 }) {
   return (
-    <article className="rounded-lg border border-border bg-card p-5 shadow-sm">
+    <article
+      className={`rounded-lg border bg-card p-5 shadow-sm ${
+        isReviewTarget ? "border-amber-300 ring-2 ring-amber-200" : "border-border"
+      }`}
+    >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3 className="text-xl font-semibold">{staple.display_name}</h3>
@@ -183,6 +217,46 @@ function StapleCard({
         submitLabel="Save staple"
       />
     </article>
+  );
+}
+
+function StapleWrapUpReviewCallout({
+  intent,
+  staple
+}: {
+  intent: Awaited<ReturnType<typeof getStapleWrapUpAdjustmentReview>>;
+  staple: Staple | null;
+}) {
+  if (!intent || !staple) {
+    return (
+      <section className="rounded-lg border border-border bg-muted/40 p-5 text-sm text-muted-foreground">
+        This wrap-up item could not be matched to one active staple. Review
+        staples manually before changing anything.
+      </section>
+    );
+  }
+
+  const isPause = intent.resolution === "pause_future_buy";
+
+  return (
+    <section className="rounded-lg border border-amber-200 bg-amber-50 p-5 text-sm text-amber-950">
+      <h2 className="text-lg font-semibold">Review staple change</h2>
+      <p className="mt-2 leading-6">
+        You marked {intent.groceryDisplayName} unused and chose to{" "}
+        {isPause ? "review whether to pause it" : "buy less next time"}. No
+        staple has changed yet.
+      </p>
+      <p className="mt-2 leading-6">
+        {isPause
+          ? `Deactivate ${staple.display_name} only if you want MealBoard to stop suggesting it.`
+          : `Edit ${staple.display_name}'s quantity, frequency, or notes, then save the staple.`}
+      </p>
+      {intent.notes ? (
+        <p className="mt-2 rounded-md bg-white/70 px-3 py-2">
+          Wrap-up note: {intent.notes}
+        </p>
+      ) : null}
+    </section>
   );
 }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   formatStapleFrequency,
+  getStapleWrapUpAdjustmentIntent,
   normalizeStapleInput
 } from "./staples";
 
@@ -67,4 +68,95 @@ describe("staples settings helpers", () => {
   it("formats staple frequencies for display", () => {
     expect(formatStapleFrequency("every_two_weeks")).toBe("Every 2 weeks");
   });
+
+  it("extracts a buy-less wrap-up intent for one staple source", () => {
+    expect(
+      getStapleWrapUpAdjustmentIntent({
+        notes: "Still had half",
+        resolution: "reduce_future_amount",
+        unusedGrocery: unusedStaple()
+      })
+    ).toEqual({
+      groceryDisplayName: "Crackers",
+      notes: "Still had half",
+      resolution: "reduce_future_amount",
+      stapleId: "staple-1"
+    });
+  });
+
+  it("extracts a pause wrap-up intent for one staple source", () => {
+    expect(
+      getStapleWrapUpAdjustmentIntent({
+        notes: null,
+        resolution: "pause_future_buy",
+        unusedGrocery: unusedStaple()
+      })
+    ).toEqual({
+      groceryDisplayName: "Crackers",
+      notes: null,
+      resolution: "pause_future_buy",
+      stapleId: "staple-1"
+    });
+  });
+
+  it("ignores non-actionable and ambiguous wrap-up responses", () => {
+    expect(
+      getStapleWrapUpAdjustmentIntent({
+        resolution: "acknowledged",
+        unusedGrocery: unusedStaple()
+      })
+    ).toBeNull();
+    expect(
+      getStapleWrapUpAdjustmentIntent({
+        resolution: "use_later",
+        unusedGrocery: unusedStaple()
+      })
+    ).toBeNull();
+    expect(
+      getStapleWrapUpAdjustmentIntent({
+        resolution: "pause_future_buy",
+        unusedGrocery: unusedStaple({
+          classification: "mixed",
+          sources: [
+            { sourceId: "staple-1", sourceType: "staple" },
+            { sourceId: "plan-item-1", sourceType: "meal_generated" }
+          ]
+        })
+      })
+    ).toBeNull();
+    expect(
+      getStapleWrapUpAdjustmentIntent({
+        resolution: "pause_future_buy",
+        unusedGrocery: unusedStaple({
+          sources: [
+            { sourceId: "staple-1", sourceType: "staple" },
+            { sourceId: "staple-2", sourceType: "staple" }
+          ]
+        })
+      })
+    ).toBeNull();
+    expect(
+      getStapleWrapUpAdjustmentIntent({
+        resolution: "pause_future_buy",
+        unusedGrocery: unusedStaple({
+          sources: [{ sourceId: null, sourceType: "staple" }]
+        })
+      })
+    ).toBeNull();
+  });
 });
+
+function unusedStaple(
+  overrides: Partial<{
+    classification: string | null;
+    displayName: string;
+    sources: Array<{ sourceId: string | null; sourceType: string }>;
+  }> = {}
+) {
+  return {
+    classification: "staple",
+    displayName: "Crackers",
+    sources: [{ sourceId: "staple-1", sourceType: "staple" }],
+    ...overrides
+  };
+}

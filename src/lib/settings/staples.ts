@@ -18,6 +18,22 @@ export type NormalizedStapleInput = {
   unit: string | null;
 };
 
+export type UnusedGroceryResolution =
+  | "acknowledged"
+  | "pause_future_buy"
+  | "reduce_future_amount"
+  | "use_later";
+
+export type StapleWrapUpAdjustmentIntent = {
+  groceryDisplayName: string;
+  notes: string | null;
+  resolution: Extract<
+    UnusedGroceryResolution,
+    "pause_future_buy" | "reduce_future_amount"
+  >;
+  stapleId: string;
+};
+
 export const stapleFrequencies = [
   "weekly",
   "every_two_weeks",
@@ -62,8 +78,73 @@ export function formatStapleFrequency(frequency: StapleFrequency) {
   return labels[frequency];
 }
 
+export function getStapleWrapUpAdjustmentIntent(
+  response: unknown
+): StapleWrapUpAdjustmentIntent | null {
+  if (!isRecord(response)) {
+    return null;
+  }
+
+  const resolution = response.resolution;
+
+  if (
+    resolution !== "pause_future_buy" &&
+    resolution !== "reduce_future_amount"
+  ) {
+    return null;
+  }
+
+  const unusedGrocery = response.unusedGrocery;
+
+  if (!isRecord(unusedGrocery) || unusedGrocery.classification !== "staple") {
+    return null;
+  }
+
+  const sources = Array.isArray(unusedGrocery.sources)
+    ? unusedGrocery.sources
+    : [];
+  const stapleSourceIds = Array.from(
+    new Set(
+      sources
+        .filter(
+          (source): source is Record<string, unknown> =>
+            isRecord(source) && source.sourceType === "staple"
+        )
+        .map((source) =>
+          typeof source.sourceId === "string" ? source.sourceId : null
+        )
+        .filter((sourceId): sourceId is string => Boolean(sourceId))
+    )
+  );
+
+  if (stapleSourceIds.length !== 1 || sources.length !== stapleSourceIds.length) {
+    return null;
+  }
+
+  const groceryDisplayName =
+    typeof unusedGrocery.displayName === "string"
+      ? normalizeText(unusedGrocery.displayName)
+      : null;
+
+  if (!groceryDisplayName) {
+    return null;
+  }
+
+  return {
+    groceryDisplayName,
+    notes:
+      typeof response.notes === "string" ? normalizeText(response.notes) : null,
+    resolution,
+    stapleId: stapleSourceIds[0] ?? ""
+  };
+}
+
 function isStapleFrequency(value: string | null): value is StapleFrequency {
   return stapleFrequencies.includes(value as StapleFrequency);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 function normalizeText(value: string | null) {

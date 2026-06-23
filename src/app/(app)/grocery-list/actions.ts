@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import {
   addManualGroceryItem,
   advanceGroceryListLifecycle,
+  applyPendingGroceryChangesForWeeklyPlan,
   generateAndPersistGroceryList,
   updateGroceryListItemState
 } from "@/lib/grocery/data";
@@ -77,6 +78,44 @@ export async function generateGroceryListForWeek(formData: FormData) {
   revalidatePath("/plan-week");
   revalidatePath("/grocery-list");
   groceryListRedirect("Draft grocery list generated.");
+}
+
+export async function applyPendingGroceryChangesForWeek(formData: FormData) {
+  const weekStartDate =
+    textOrNull(formData.get("weekStartDate")) ?? getWeekStartDate(new Date());
+  const weeklyPlanId = textOrNull(formData.get("weeklyPlanId"));
+
+  if (!weeklyPlanId) {
+    planWeekRedirect(weekStartDate, "Create a planning week first.");
+  }
+
+  const householdContext = await getCurrentHouseholdContext();
+
+  if (!householdContext.household) {
+    planWeekRedirect(weekStartDate, "Link your user to a household first.");
+  }
+
+  let result;
+
+  try {
+    result = await applyPendingGroceryChangesForWeeklyPlan({
+      householdId: householdContext.household.id,
+      weeklyPlanId
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Pending grocery changes could not be applied.";
+    planWeekRedirect(weekStartDate, message);
+  }
+
+  revalidatePath("/plan-week");
+  revalidatePath("/grocery-list");
+  planWeekRedirect(
+    weekStartDate,
+    `Applied pending grocery changes: added ${result.addedCount}, removed ${result.removedCount}, kept ${result.keptCount}.`
+  );
 }
 
 export async function updateGroceryItemChecked(formData: FormData) {

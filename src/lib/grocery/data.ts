@@ -6,6 +6,7 @@ import {
   type GroceryGenerationSelectedStaple
 } from "./generate-grocery-list";
 import {
+  buildPendingGroceryChangeApplication,
   buildPendingGroceryChanges,
   type PendingGroceryChanges
 } from "./pending-grocery-changes";
@@ -194,6 +195,13 @@ export type SwapGroceryImpact = {
   removedCount: number;
 };
 
+export type AppliedPendingGroceryChanges = {
+  addedCount: number;
+  keptCount: number;
+  manualItemCount: number;
+  removedCount: number;
+};
+
 type GroceryListItemSourceRow = {
   grocery_list_item_id: string;
   id: string;
@@ -285,6 +293,176 @@ export async function generateAndPersistGroceryList({
   return groceryListId;
 }
 
+export async function applyPendingGroceryChangesForWeeklyPlan({
+  householdId,
+  weeklyPlanId
+}: {
+  householdId: string;
+  weeklyPlanId: string;
+}): Promise<AppliedPendingGroceryChanges> {
+  const supabase = await createClient();
+  const weeklyPlan = await getScopedWeeklyPlan(
+    supabase,
+    householdId,
+    weeklyPlanId
+  );
+
+  if (!weeklyPlan) {
+    throw new Error("That weekly plan is no longer available.");
+  }
+
+  const protectedList = await getProtectedGroceryListForWeeklyPlan(
+    supabase,
+    householdId,
+    weeklyPlan.id
+  );
+
+  if (!protectedList) {
+    throw new Error("That protected grocery list is no longer available.");
+  }
+
+  const [currentItems, generated] = await Promise.all([
+    getGroceryListItems(supabase, householdId, protectedList.id),
+    buildGeneratedGroceryListForWeeklyPlan({
+      allowEmpty: true,
+      householdId,
+      supabase,
+      weeklyPlan
+    })
+  ]);
+  const currentComparableItems = currentItems.map((item) => ({
+    displayName: item.displayName,
+    foodId: item.foodId,
+    id: item.id,
+    manualItem: item.manualItem,
+    preferredQuantityText: item.preferredQuantityText,
+    quantity: item.quantity,
+    unit: item.unit
+  }));
+  const changes = buildPendingGroceryChanges({
+    currentItems: currentComparableItems,
+    generatedItems: generated.items
+  });
+
+  if (!changes.hasChanges) {
+    return {
+      addedCount: 0,
+      keptCount: changes.keptCount,
+      manualItemCount: changes.manualItemCount,
+      removedCount: 0
+    };
+  }
+
+  const application = buildPendingGroceryChangeApplication({
+    currentItems: currentComparableItems,
+    generatedItems: generated.items
+  });
+  const affectedItemIds = [
+    ...application.kept.map((item) => item.currentItemId),
+    ...application.removed.map((item) => item.currentItemId)
+  ];
+
+  if (affectedItemIds.length > 0) {
+    const { error } = await supabase
+      .from("grocery_item_sources")
+      .delete()
+      .eq("household_id", householdId)
+      .in("grocery_list_item_id", affectedItemIds);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  if (application.removed.length > 0) {
+    const { error } = await supabase
+      .from("grocery_list_items")
+      .delete()
+      .eq("household_id", householdId)
+      .in(
+        "id",
+        application.removed.map((item) => item.currentItemId)
+      )
+      .eq("manual_item", false);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  for (const kept of application.kept) {
+    const { error } = await supabase
+      .from("grocery_list_items")
+      .update({
+        display_name: kept.item.displayName,
+        food_id: kept.item.foodId,
+        grocery_category_id: kept.item.categoryId,
+        needs_review: kept.item.needsReview,
+        preferred_quantity_text: kept.item.preferredQuantityText,
+        quantity: kept.item.quantity,
+        review_reason: kept.item.reviewReason,
+        sort_order: kept.generatedIndex,
+        unit: kept.item.unit
+      })
+      .eq("household_id", householdId)
+      .eq("id", kept.currentItemId)
+      .eq("manual_item", false);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  const itemIdByGeneratedIndex = new Map(
+    application.kept.map((item) => [item.generatedIndex, item.currentItemId])
+  );
+
+  if (application.added.length > 0) {
+    const addedItemIds = await createGroceryListItemsAtGeneratedIndexes(
+      supabase,
+      householdId,
+      protectedList.id,
+      application.added
+    );
+    addedItemIds.forEach((itemId, generatedIndex) => {
+      itemIdByGeneratedIndex.set(generatedIndex, itemId);
+    });
+  }
+
+  await resequenceManualGroceryItems({
+    householdId,
+    manualItemIds: application.manualItemIds,
+    sortOffset: generated.items.length,
+    supabase
+  });
+
+  await createGroceryItemSources(
+    supabase,
+    householdId,
+    itemIdByGeneratedIndex,
+    generated.sources.filter((source) =>
+      itemIdByGeneratedIndex.has(source.groceryItemIndex)
+    )
+  );
+
+  const { error: listError } = await supabase
+    .from("grocery_lists")
+    .update({ generated_at: new Date().toISOString() })
+    .eq("household_id", householdId)
+    .eq("id", protectedList.id);
+
+  if (listError) {
+    throw new Error(listError.message);
+  }
+
+  return {
+    addedCount: application.added.length,
+    keptCount: application.kept.length,
+    manualItemCount: application.manualItemIds.length,
+    removedCount: application.removed.length
+  };
+}
+
 export async function getLatestGroceryList(householdId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -372,6 +550,7 @@ export async function getPendingGroceryChangesForWeeklyPlan({
       currentItems: currentItems.map((item) => ({
         displayName: item.displayName,
         foodId: item.foodId,
+        id: item.id,
         manualItem: item.manualItem,
         preferredQuantityText: item.preferredQuantityText,
         quantity: item.quantity,
@@ -477,6 +656,7 @@ export async function getSwapGroceryImpactsForWeeklyPlanItem({
   const currentComparableItems = currentItems.map((item) => ({
     displayName: item.displayName,
     foodId: item.foodId,
+    id: item.id,
     manualItem: item.manualItem,
     preferredQuantityText: item.preferredQuantityText,
     quantity: item.quantity,
@@ -1160,6 +1340,68 @@ async function createGroceryListItems(
       item.id
     ])
   );
+}
+
+async function createGroceryListItemsAtGeneratedIndexes(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  householdId: string,
+  groceryListId: string,
+  items: Array<{ generatedIndex: number; item: GeneratedGroceryList["items"][number] }>
+) {
+  const { data, error } = await supabase
+    .from("grocery_list_items")
+    .insert(
+      items.map(({ generatedIndex, item }) => ({
+        display_name: item.displayName,
+        food_id: item.foodId,
+        grocery_category_id: item.categoryId,
+        grocery_list_id: groceryListId,
+        household_id: householdId,
+        needs_review: item.needsReview,
+        preferred_quantity_text: item.preferredQuantityText,
+        quantity: item.quantity,
+        review_reason: item.reviewReason,
+        sort_order: generatedIndex,
+        unit: item.unit
+      }))
+    )
+    .select("id, sort_order");
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return new Map(
+    ((data ?? []) as InsertedGroceryListItem[]).map((item) => [
+      item.sort_order,
+      item.id
+    ])
+  );
+}
+
+async function resequenceManualGroceryItems({
+  householdId,
+  manualItemIds,
+  sortOffset,
+  supabase
+}: {
+  householdId: string;
+  manualItemIds: string[];
+  sortOffset: number;
+  supabase: Awaited<ReturnType<typeof createClient>>;
+}) {
+  for (const [index, itemId] of manualItemIds.entries()) {
+    const { error } = await supabase
+      .from("grocery_list_items")
+      .update({ sort_order: sortOffset + index })
+      .eq("household_id", householdId)
+      .eq("id", itemId)
+      .eq("manual_item", true);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  }
 }
 
 async function createGroceryItemSources(

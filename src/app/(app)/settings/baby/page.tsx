@@ -156,10 +156,11 @@ export default async function BabySettingsPage({
       {babyProfile ? <BabyTryThisPreview tryThis={babyTryThis} /> : null}
 
       <section className="rounded-lg border border-dashed border-border bg-card p-5">
-        <h2 className="text-xl font-semibold">Coming later</h2>
+        <h2 className="text-xl font-semibold">Still out of scope</h2>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          Weekly plan writes, Try This persistence, grocery behavior,
-          nutrition, milk intake, and reaction tracking stay out of this slice.
+          Try This persistence, nutrition, milk intake, and reaction tracking
+          stay out of this slice. Routine Baby Meal 1/2 items can be applied to
+          Plan Week, and approved baby food rows can flow into groceries.
         </p>
       </section>
     </section>

@@ -1,5 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import {
+  getStapleWrapUpAdjustmentIntent,
+  type StapleWrapUpAdjustmentIntent
+} from "@/lib/settings/staples";
+import {
   buildWeeklyWrapUpCandidates,
   toUnusedGroceryCandidate,
   type WrapUpGroceryItem,
@@ -73,6 +77,10 @@ type WrapUpItemRow = {
     recipe_id: string | null;
     recipes: JoinedValue<{ name: string; status: WrapUpPlanItem["recipeStatus"] }>;
   }>;
+};
+
+type StapleWrapUpAdjustmentRow = {
+  response: Record<string, unknown>;
 };
 
 export type WeeklyWrapUpItem = {
@@ -164,6 +172,32 @@ export async function getOrCreateWeeklyWrapUp({
     weeklyPlanId,
     wrapUpId: wrapUp.id
   };
+}
+
+export async function getStapleWrapUpAdjustmentReview({
+  householdId,
+  wrapUpItemId
+}: {
+  householdId: string;
+  wrapUpItemId: string;
+}): Promise<StapleWrapUpAdjustmentIntent | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("weekly_wrap_up_items")
+    .select("response")
+    .eq("household_id", householdId)
+    .eq("id", wrapUpItemId)
+    .eq("prompt_type", "unused_grocery_item")
+    .eq("status", "completed")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return getStapleWrapUpAdjustmentIntent(
+    (data as StapleWrapUpAdjustmentRow | null)?.response ?? null
+  );
 }
 
 async function getOrInsertWrapUp(
