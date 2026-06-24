@@ -51,6 +51,26 @@ export default async function RecipeDetailPage({
 
       {message ? <RecipeMessage message={message} /> : null}
 
+      {recipe.source_url ? (
+        <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+          <p className="text-sm font-medium text-muted-foreground">
+            Recipe source
+          </p>
+          <a
+            className="mt-2 inline-flex text-sm font-semibold text-primary underline-offset-4 hover:underline"
+            href={recipe.source_url}
+            rel="noreferrer"
+            target="_blank"
+          >
+            {recipe.source_title ?? recipe.source_url}
+          </a>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            MealBoard stores the reviewed recipe fields and source attribution,
+            not the original page content.
+          </p>
+        </section>
+      ) : null}
+
       <RecipeForm
         categories={categories}
         foods={foods}

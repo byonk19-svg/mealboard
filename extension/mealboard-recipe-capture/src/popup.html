@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MealBoard Recipe Capture</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main>
+      <h1>MealBoard Capture</h1>
+
+      <label for="mealboard-url">MealBoard URL</label>
+      <div class="setting-row">
+        <input id="mealboard-url" name="mealboard-url" type="url" spellcheck="false">
+        <button id="save-url" type="button">Save</button>
+      </div>
+
+      <button id="capture-page" class="primary" type="button">Capture active tab</button>
+      <button id="open-import" type="button">Open import page</button>
+
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+    </main>
+
+    <script src="settings.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

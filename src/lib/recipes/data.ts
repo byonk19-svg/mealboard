@@ -54,7 +54,7 @@ export async function getRecipes(householdId: string) {
   const { data, error } = await supabase
     .from("recipes")
     .select(
-      "id, household_id, name, description, status, meal_type, servings, prep_minutes, cook_minutes, effort_level, repeat_rule, instructions, notes, estimated_calories_per_serving, estimated_protein_grams_per_serving, nutrition_confidence, created_at, updated_at"
+      "id, household_id, name, description, status, meal_type, servings, prep_minutes, cook_minutes, effort_level, repeat_rule, instructions, notes, source_title, source_url, estimated_calories_per_serving, estimated_protein_grams_per_serving, nutrition_confidence, created_at, updated_at"
     )
     .eq("household_id", householdId)
     .is("archived_at", null)
@@ -77,7 +77,7 @@ export async function getRecipe(householdId: string, recipeId: string) {
   const { data, error } = await supabase
     .from("recipes")
     .select(
-      "id, household_id, name, description, status, meal_type, servings, prep_minutes, cook_minutes, effort_level, repeat_rule, instructions, notes, estimated_calories_per_serving, estimated_protein_grams_per_serving, nutrition_confidence, created_at, updated_at"
+      "id, household_id, name, description, status, meal_type, servings, prep_minutes, cook_minutes, effort_level, repeat_rule, instructions, notes, source_title, source_url, estimated_calories_per_serving, estimated_protein_grams_per_serving, nutrition_confidence, created_at, updated_at"
     )
     .eq("household_id", householdId)
     .eq("id", recipeId)

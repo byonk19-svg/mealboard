@@ -41,6 +41,8 @@ export type Recipe = {
   repeat_rule: RecipeRepeatRule | null;
   instructions: string | null;
   notes: string | null;
+  source_title: string | null;
+  source_url: string | null;
   estimated_calories_per_serving: number | null;
   estimated_protein_grams_per_serving: number | null;
   nutrition_confidence: EstimateConfidence | null;

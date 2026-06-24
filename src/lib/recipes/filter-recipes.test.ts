@@ -122,6 +122,8 @@ function recipe({
     prep_minutes: null,
     repeat_rule: null,
     servings: 1,
+    source_title: null,
+    source_url: null,
     status,
     tags: tags.map((tag) => ({
       id: `${name}-${tag}`,

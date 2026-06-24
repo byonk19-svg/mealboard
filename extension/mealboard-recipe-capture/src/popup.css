@@ -1,0 +1,81 @@
+:root {
+  color-scheme: light dark;
+  font-family: Arial, sans-serif;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: Canvas;
+  color: CanvasText;
+}
+
+main {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+h1 {
+  margin: 0 0 4px;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+label {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.setting-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+input,
+button {
+  min-height: 34px;
+  border: 1px solid #8a8f98;
+  border-radius: 6px;
+  font: inherit;
+}
+
+input {
+  min-width: 0;
+  padding: 0 8px;
+}
+
+button {
+  cursor: pointer;
+  padding: 0 10px;
+  background: ButtonFace;
+  color: ButtonText;
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.primary {
+  border-color: #0f6b4f;
+  background: #0f6b4f;
+  color: white;
+  font-weight: 700;
+}
+
+.status {
+  min-height: 32px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.status[data-state="error"] {
+  color: #a52222;
+}
+
+.status[data-state="success"] {
+  color: #0f6b4f;
+}

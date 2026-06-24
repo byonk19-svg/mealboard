@@ -27,7 +27,7 @@ Implemented MVP surfaces include:
 - Email/password auth and household-scoped app routes
 - Household settings for owner-only linking, ownership transfer, and removal of existing member users
 - Household profiles, preferences, grocery categories, dedicated saved-food administration, and a Preferences food-create flow
-- Recipe library with structured ingredients, profile approvals, and calorie/protein estimate fields
+- Recipe library with structured ingredients, profile approvals, calorie/protein estimate fields, review-first structured URL import, source attribution, and a private unpacked Chrome recipe capture extension
 - Weekly planning with adult work/off days, Day/Profile views, planned recipe items, approval/lock/remove/swap actions, staples review, and a small nutrition estimate summary
 - Rule-based adult meal suggestion drafts with reason labels, why-this context, and recent wrap-up review signals
 - Current-week repeat awareness and too-much-leftover feedback in rule-based suggestion scoring
@@ -74,6 +74,30 @@ Open:
 ```txt
 http://localhost:3000
 ```
+
+## Recipe URL Import And Private Chrome Capture
+
+MealBoard can import structured recipe data from `/recipes/import`. Imported
+recipes always open a review screen before saving, and final recipes store only
+reviewed fields plus source URL/title attribution.
+
+The private unpacked Chrome capture extension lives at:
+
+```txt
+extension/mealboard-recipe-capture
+```
+
+To use it locally:
+
+1. Open `chrome://extensions`.
+2. Enable Developer mode.
+3. Choose "Load unpacked".
+4. Select `extension/mealboard-recipe-capture`.
+5. In the extension popup, keep the MealBoard URL pointed at the local app, such as `http://localhost:3000`.
+
+The extension captures only the active tab after clicking it. It sends page URL,
+title, JSON-LD recipe data, and selected text fallback into MealBoard review; it
+does not save recipes directly or collect recipe photos.
 
 ## Supabase Local Setup
 

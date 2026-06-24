@@ -1,6 +1,6 @@
 # MealBoard MVP Readiness
 
-This document captures the current private family MVP state after the rule-based suggestions, smart swaps, Plan Week profile view, saved-food administration, Preferences food creation, actionable dashboard queue, baby weekly-plan persistence, baby Try This status handoff, pending grocery-change review/apply flow, household member lifecycle prep, owner transfer, mobile grocery spotty-service retry, generic grocery-list copy support, PWA install metadata, weekly wrap-up expansion, review-informed suggestion scoring, hardening, and E2E smoke slices. It is a handoff snapshot for future Codex work so the next phase can build from known product truth instead of rediscovering the app.
+This document captures the current private family MVP state after the rule-based suggestions, smart swaps, Plan Week profile view, saved-food administration, Preferences food creation, actionable dashboard queue, baby weekly-plan persistence, baby Try This status handoff, pending grocery-change review/apply flow, household member lifecycle prep, owner transfer, mobile grocery spotty-service retry, generic grocery-list copy support, PWA install metadata, weekly wrap-up expansion, review-informed suggestion scoring, structured recipe URL import/private Chrome capture, hardening, and E2E smoke slices. It is a handoff snapshot for future Codex work so the next phase can build from known product truth instead of rediscovering the app.
 
 ## Current Status
 
@@ -13,6 +13,7 @@ Recipes -> Plan Week -> Staples -> Grocery List -> Dashboard
 The latest verified flow covers:
 
 - Create and edit a recipe with structured ingredients, nutrition estimates, tags, and profile approvals.
+- Import a structured recipe URL or private Chrome capture into Recipe Import Review, correct flagged rows, and save only reviewed recipe fields plus source attribution.
 - Configure the active weekly plan with adult work/off days and weekly goals.
 - Review and add rule-based adult meal suggestion drafts.
 - Let recent weekly wrap-up recipe ratings, skipped meals, too-much-leftover tags, and leftover-friendly tags influence rule-based suggestion ranking.
@@ -53,35 +54,36 @@ Use a linked local household user. Do not commit `.env.local`, `.env.cloud.local
    - calorie/protein estimates if known
    - one or more profile approvals
 3. Open the created recipe, edit a small field, and save.
-4. Open `/plan-week`.
-5. Select the active week.
-6. Save adult work/off days and one weekly goal.
-7. Add a saved recipe to a day/profile/meal slot.
-8. If rule-based suggestions are available, add suggested meals and confirm they stay unapproved.
-9. Approve at least one planned meal for groceries.
-10. Apply Baby routine suggestions, approve at least one baby plan row if baby groceries should be included, and confirm Baby Meal 1/2 labels are clear.
-11. Select at least one active staple and save selected staples.
-12. Open a planned meal swap, review grocery impact, and cancel or confirm it.
-13. Switch Plan Week to Profile view and confirm Brianna, Elaine, Baby, and Shared/Family sections are clear.
-14. Generate the grocery list.
-15. Open `/grocery-list`.
-16. Confirm generated recipe items, approved baby foods, and selected staples appear with sensible quantities, categories, and source context.
-17. Add a manual grocery item with a note/context.
-18. Confirm Shopping, Profile, and Meal views still render.
-19. Expand source context and confirm recipe/staple/baby/manual explanations are visible.
-20. Toggle checked and already-have on an item. On mobile, simulate a failed item-state request and confirm the pending local state remains visible, then use Retry pending changes after service recovery.
-21. Advance lifecycle one step at a time:
+4. Open `/recipes/import`, load a structured recipe URL or use the private Chrome capture extension, review the imported draft, correct one flagged row, save it, and confirm the final recipe shows Recipe source attribution without storing the source page content.
+5. Open `/plan-week`.
+6. Select the active week.
+7. Save adult work/off days and one weekly goal.
+8. Add a saved recipe to a day/profile/meal slot.
+9. If rule-based suggestions are available, add suggested meals and confirm they stay unapproved.
+10. Approve at least one planned meal for groceries.
+11. Apply Baby routine suggestions, approve at least one baby plan row if baby groceries should be included, and confirm Baby Meal 1/2 labels are clear.
+12. Select at least one active staple and save selected staples.
+13. Open a planned meal swap, review grocery impact, and cancel or confirm it.
+14. Switch Plan Week to Profile view and confirm Brianna, Elaine, Baby, and Shared/Family sections are clear.
+15. Generate the grocery list.
+16. Open `/grocery-list`.
+17. Confirm generated recipe items, approved baby foods, and selected staples appear with sensible quantities, categories, and source context.
+18. Add a manual grocery item with a note/context.
+19. Confirm Shopping, Profile, and Meal views still render.
+20. Expand source context and confirm recipe/staple/baby/manual explanations are visible.
+21. Toggle checked and already-have on an item. On mobile, simulate a failed item-state request and confirm the pending local state remains visible, then use Retry pending changes after service recovery.
+22. Advance lifecycle one step at a time:
     - Draft -> Finalized
     - Finalized -> Shopping Started
     - Shopping Started -> Completed
-22. Open `/dashboard`.
-23. Confirm current week, planning status, grocery status, next best action, needs-attention queue, and wrap-up entry are reasonable.
-24. After finalizing or starting shopping, change an approved planned meal, confirm Plan Week shows pending grocery changes, apply the reviewed grocery updates, and confirm manual items/check state are preserved where applicable.
-25. Open the weekly wrap-up, save one meal outcome with leftover context if prompted, acknowledge unused groceries with a future staple adjustment if prompted, confirm Settings opens a review banner instead of changing staples automatically, or dismiss it.
-26. Open `/settings/baby`, track a Try This food when one is available, and confirm it becomes a normal baby food status without adding it to groceries automatically.
-27. Open `/settings/foods`, create a household food with defaults, archive it, and restore it.
-28. Open `/settings/household` as the owner, link an existing unlinked auth user by email, transfer ownership to that member, sign in as the new owner, transfer ownership back, remove that non-owner member, then confirm the member no longer reaches household-scoped routes.
-29. Open `/manifest.webmanifest` and confirm install icons are served.
+23. Open `/dashboard`.
+24. Confirm current week, planning status, grocery status, next best action, needs-attention queue, and wrap-up entry are reasonable.
+25. After finalizing or starting shopping, change an approved planned meal, confirm Plan Week shows pending grocery changes, apply the reviewed grocery updates, and confirm manual items/check state are preserved where applicable.
+26. Open the weekly wrap-up, save one meal outcome with leftover context if prompted, acknowledge unused groceries with a future staple adjustment if prompted, confirm Settings opens a review banner instead of changing staples automatically, or dismiss it.
+27. Open `/settings/baby`, track a Try This food when one is available, and confirm it becomes a normal baby food status without adding it to groceries automatically.
+28. Open `/settings/foods`, create a household food with defaults, archive it, and restore it.
+29. Open `/settings/household` as the owner, link an existing unlinked auth user by email, transfer ownership to that member, sign in as the new owner, transfer ownership back, remove that non-owner member, then confirm the member no longer reaches household-scoped routes.
+30. Open `/manifest.webmanifest` and confirm install icons are served.
 
 ## Known Local Environment Note
 
@@ -112,7 +114,7 @@ These are intentionally out of scope for the current MVP unless a future task ex
 - H-E-B integration, H-E-B-specific export, aisle mapping, or price behavior
 - Native iPhone or Android apps
 - Full pantry inventory, barcode scanning, expiration tracking, or reminders
-- Recipe photos and full recipe-link import
+- Recipe photos, full recipe-link automation, and public Chrome Web Store extension release
 - Full macro tracking, calorie targets, strict warnings, or nutrition dashboards
 - Baby nutrition, milk intake, and reaction tracking
 - Email-delivered household invitations, role editing beyond owner transfer, and multi-household switching

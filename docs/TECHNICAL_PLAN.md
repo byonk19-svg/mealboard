@@ -400,6 +400,8 @@ recipes (
   repeat_rule recipe_repeat_rule,
   instructions text,
   notes text,
+  source_url text,
+  source_title text,
   estimated_calories_per_serving integer,
   estimated_protein_grams_per_serving integer,
   nutrition_confidence estimate_confidence,
@@ -1486,6 +1488,8 @@ GroceryLifecycleActions
 RecipeCard
 RecipeFilters
 RecipeForm
+RecipeImportForm
+RecipeImportReview
 IngredientPasteParser
 StructuredIngredientRow
 ProfileApprovalSelector

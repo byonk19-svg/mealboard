@@ -61,12 +61,20 @@ export default async function RecipesPage({ searchParams }: RecipesPageProps) {
             estimates, and profile approvals.
           </p>
         </div>
-        <Link
-          className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-          href="/recipes/new"
-        >
-          Add recipe
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            className="rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            href="/recipes/import"
+          >
+            Import recipe
+          </Link>
+          <Link
+            className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            href="/recipes/new"
+          >
+            Add recipe
+          </Link>
+        </div>
       </div>
 
       {message ? <RecipeMessage message={message} /> : null}

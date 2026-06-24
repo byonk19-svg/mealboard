@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>MealBoard Sectioned Fixture</title>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebPage",
+            "name": "Synthetic sectioned recipe page"
+          },
+          {
+            "@type": "Recipe",
+            "name": "Synthetic Sheet Pan Beans",
+            "recipeYield": ["4", "servings"],
+            "prepTime": "PT10M",
+            "cookTime": "PT25M",
+            "recipeIngredient": [
+              "2 cans white beans, drained",
+              "1 cup chopped tomatoes",
+              "1 tbsp olive oil"
+            ],
+            "recipeInstructions": [
+              {
+                "@type": "HowToSection",
+                "name": "Prep",
+                "itemListElement": [
+                  {
+                    "@type": "HowToStep",
+                    "text": "Spread beans and tomatoes on a sheet pan."
+                  }
+                ]
+              },
+              {
+                "@type": "HowToSection",
+                "name": "Roast",
+                "itemListElement": [
+                  {
+                    "@type": "HowToStep",
+                    "text": "Roast until the edges are browned."
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <main>
+      <h1>Synthetic Sheet Pan Beans</h1>
+      <p>This fixture exercises JSON-LD graph and HowToSection shapes.</p>
+    </main>
+  </body>
+</html>

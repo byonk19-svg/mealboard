@@ -98,12 +98,23 @@ async function requireHousehold(path: string) {
   return householdContext.household;
 }
 
+function resolveRecipeFormPath(formData: FormData, fallback: string) {
+  const path = textOrNull(formData.get("recipeFormPath"));
+
+  if (path === "/recipes/import" || path === "/recipes/new") {
+    return path;
+  }
+
+  return fallback;
+}
+
 function parseRecipePayload(formData: FormData, path: string) {
   const name = textOrNull(formData.get("name"));
   const status = String(formData.get("status") ?? "");
   const mealType = String(formData.get("mealType") ?? "");
   const nutritionConfidence = textOrNull(formData.get("nutritionConfidence"));
   const repeatRule = textOrNull(formData.get("repeatRule"));
+  const sourceUrl = textOrNull(formData.get("sourceUrl"));
 
   if (!name) {
     recipeRedirect(path, "Recipe name is required.");
@@ -119,6 +130,10 @@ function parseRecipePayload(formData: FormData, path: string) {
 
   if (repeatRule && !isRecipeRepeatRule(repeatRule)) {
     recipeRedirect(path, "Choose a valid repeat rule.");
+  }
+
+  if (sourceUrl && !/^https?:\/\//i.test(sourceUrl)) {
+    recipeRedirect(path, "Recipe source URL must start with http:// or https://.");
   }
 
   const servings = parseOptionalNumber(formData.get("servings"), "Servings", {
@@ -177,6 +192,8 @@ function parseRecipePayload(formData: FormData, path: string) {
     repeat_rule: repeatRule,
     instructions: textOrNull(formData.get("instructions")),
     notes: textOrNull(formData.get("notes")),
+    source_title: textOrNull(formData.get("sourceTitle")),
+    source_url: sourceUrl,
     estimated_calories_per_serving: calories.value,
     estimated_protein_grams_per_serving: protein.value,
     nutrition_confidence: nutritionConfidence
@@ -264,7 +281,7 @@ function parseApprovedProfileIds(formData: FormData) {
 }
 
 export async function createRecipe(formData: FormData) {
-  const path = "/recipes/new";
+  const path = resolveRecipeFormPath(formData, "/recipes/new");
   const household = await requireHousehold(path);
   const recipePayload = parseRecipePayload(formData, path);
   const parsedIngredients = parseIngredients(formData, path);

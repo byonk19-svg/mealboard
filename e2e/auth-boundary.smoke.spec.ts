@@ -3,6 +3,8 @@ import { expect, test } from "@playwright/test";
 const protectedRoutes = [
   "/dashboard",
   "/recipes",
+  "/recipes/import",
+  "/recipes/import/review?source=e2e&draft=missing",
   "/plan-week",
   "/grocery-list",
   "/settings/household",

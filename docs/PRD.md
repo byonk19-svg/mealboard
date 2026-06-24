@@ -90,7 +90,7 @@ The MVP should **not** include:
 * Full cooking mode with checkable steps.
 * Public multi-household signup flow.
 * Complex ingredient alias logic.
-* Full recipe-link import.
+* Full recipe-link import that tries to automatically clean up every website without review.
 * Photo/screenshot recipe extraction.
 * Full baby feeding/milk/formula tracker.
 * Detailed medical/reaction tracker for baby foods.
@@ -625,10 +625,11 @@ MVP should support:
 
 * Manual recipe entry.
 * Pasted recipe text.
+* Review-first structured recipe URL import and private Chrome capture when explicit recipe data is available.
 
 Future phases should support:
 
-* Recipe link import.
+* Broader recipe link import with stronger cleanup across inconsistent sites.
 * Photo/screenshot extraction.
 
 ### 17.2 Add Recipe Form

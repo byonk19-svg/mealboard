@@ -1296,7 +1296,8 @@ weekly wrap-up staple review handoff, recipe filters, recipe import smoke
 coverage, owner-only household member linking/removal/ownership transfer,
 bounded grocery item-state retry with manual recovery, generic grocery-list copy,
 review-informed suggestion scoring, baby Try This status handoff, ingredient
-merge/split review controls, PWA install metadata, and the Next/PostCSS audit
+merge/split review controls, structured recipe URL import, private Chrome
+recipe capture extension, PWA install metadata, and the Next/PostCSS audit
 override are complete.
 For the current repo state, run focused follow-up slices in this order:
 
@@ -1306,7 +1307,7 @@ For the current repo state, run focused follow-up slices in this order:
 4. **Weekly wrap-up review depth** - support richer multi-source staple review only if real household use shows the current single-staple review handoff is too narrow.
 
 Keep H-E-B integration, AI, full pantry inventory, reminders, native apps,
-recipe photos, full macro tracking, and cloud Supabase migration pushes out of
+recipe photos, public extension release, full macro tracking, and cloud Supabase migration pushes out of
 scope unless explicitly approved.
 
 ---

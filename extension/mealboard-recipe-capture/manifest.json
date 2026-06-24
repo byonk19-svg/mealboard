@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "MealBoard Recipe Capture",
+  "version": "0.1.0",
+  "description": "Private unpacked MealBoard helper for sending the active recipe page to import review.",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": [
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "action": {
+    "default_title": "Capture recipe for MealBoard",
+    "default_popup": "src/popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://localhost/*",
+        "http://127.0.0.1/*"
+      ],
+      "js": ["src/mealboard-bridge.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

@@ -475,6 +475,8 @@ function recipe(overrides: Partial<RecipeWithDetails> = {}): RecipeWithDetails {
     prep_minutes: null,
     repeat_rule: null,
     servings: 1,
+    source_title: null,
+    source_url: null,
     status: "approved",
     tags: [],
     updated_at: "2026-06-01T00:00:00.000Z",
