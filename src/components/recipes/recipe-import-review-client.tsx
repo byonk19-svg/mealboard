@@ -7,10 +7,7 @@ import {
   RecipeForm,
   type RecipeFormInitialValues
 } from "@/components/recipes/recipe-form";
-import {
-  extractJsonLdRecipeCandidates
-} from "@/lib/recipes/import/extract-json-ld-recipes";
-import { normalizeRecipeImportDraft } from "@/lib/recipes/import/normalize-recipe-import";
+import { normalizeExtensionCapturePayload } from "@/lib/recipes/import/normalize-extension-capture";
 import type { RecipeImportDraft } from "@/lib/recipes/import/types";
 import type { GroceryCategory } from "@/lib/recipes/types";
 import type { Food, MealProfile } from "@/lib/settings/types";
@@ -84,9 +81,11 @@ export function RecipeImportReviewClient({
         return;
       }
 
-      const normalizedDraft = normalizeExtensionPayload(data.payload, foods);
+      const normalizedDraft = normalizeExtensionCapturePayload(data.payload, foods);
       if (!normalizedDraft) {
-        setMessage("The extension did not find structured recipe data.");
+        setMessage(
+          "The extension did not find structured recipe data. Select the recipe text on the page and capture again, or use manual entry."
+        );
         return;
       }
 
@@ -196,7 +195,7 @@ function normalizeUnknownDraft(value: unknown, foods: Food[]) {
   }
 
   if (Array.isArray(value.jsonLd)) {
-    return normalizeExtensionPayload(value, foods);
+    return normalizeExtensionCapturePayload(value, foods);
   }
 
   if (isRecord(value.fields) && Array.isArray(value.ingredients)) {
@@ -204,29 +203,6 @@ function normalizeUnknownDraft(value: unknown, foods: Food[]) {
   }
 
   return null;
-}
-
-function normalizeExtensionPayload(value: unknown, foods: Food[]) {
-  if (!isRecord(value) || !Array.isArray(value.jsonLd)) {
-    return null;
-  }
-
-  const html = value.jsonLd
-    .filter((script): script is string => typeof script === "string")
-    .map((script) => `<script type="application/ld+json">${script}</script>`)
-    .join("\n");
-  const candidate = extractJsonLdRecipeCandidates(html)[0];
-
-  if (!candidate) {
-    return null;
-  }
-
-  return normalizeRecipeImportDraft({
-    candidate,
-    foods,
-    sourceTitle: typeof value.sourceTitle === "string" ? value.sourceTitle : null,
-    sourceUrl: typeof value.sourceUrl === "string" ? value.sourceUrl : null
-  });
 }
 
 function fromFieldDraft(value: Record<string, unknown>): RecipeImportDraft {

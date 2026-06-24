@@ -1,6 +1,7 @@
 import { buildIngredientReviewRows } from "../ingredient-review";
 import { parseIngredientText } from "../parse-ingredient-lines";
 import type { Food } from "@/lib/settings/types";
+import { cleanRecipeSourceAttribution } from "./source-attribution";
 import type {
   ImportConfidence,
   RawRecipeCandidate,
@@ -33,10 +34,15 @@ export function normalizeRecipeImportDraft({
     ...missingFieldWarnings(candidate),
     ...candidate.extractionWarnings
   ];
+  const source = cleanRecipeSourceAttribution({
+    recipeName: candidate.name,
+    sourceTitle,
+    sourceUrl
+  });
 
   return {
-    sourceUrl,
-    sourceTitle,
+    sourceUrl: source.sourceUrl,
+    sourceTitle: source.sourceTitle,
     name: candidate.name ?? "",
     description: candidate.description,
     servings: candidate.servings,

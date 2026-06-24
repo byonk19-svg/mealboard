@@ -190,6 +190,54 @@ test.describe("Recipe import and filters", () => {
       page.getByRole("link", { name: "MealBoard Synthetic Recipe Fixture" })
     ).toHaveAttribute("href", draft.sourceUrl);
   });
+
+  test("loads an extension selected-text fallback draft into review", async ({
+    page
+  }) => {
+    const draftKey = `mealboard-recipe-draft:e2e-${Date.now()}`;
+
+    await signIn(page);
+    await page.goto(
+      `/recipes/import/review?source=extension&draft=${encodeURIComponent(draftKey)}`
+    );
+    await expect(page.getByText("Waiting for the recipe capture extension")).toBeVisible();
+
+    await page.evaluate((key) => {
+      window.postMessage(
+        {
+          draftKey: key,
+          payload: {
+            jsonLd: [],
+            selectedText:
+              "Ingredients: 1 cup beans. Instructions: Simmer until warm.",
+            sourceTitle: "Fallback Recipe | Example Site",
+            sourceUrl:
+              "https://example.test/fallback-recipe?utm_source=extension#comments"
+          },
+          source: "mealboard-recipe-capture-extension",
+          type: "MEALBOARD_RECIPE_CAPTURE_DRAFT"
+        },
+        window.location.origin
+      );
+    }, draftKey);
+
+    await expect(
+      page.getByRole("heading", { name: "Review imported recipe" })
+    ).toBeVisible();
+    await expect(page.getByLabel("Recipe name")).toHaveValue("Fallback Recipe");
+    await expect(page.getByLabel("Instructions")).toHaveValue(
+      "Ingredients: 1 cup beans. Instructions: Simmer until warm."
+    );
+    await expect(page.getByLabel("Source title")).toHaveValue("Fallback Recipe");
+    await expect(page.getByLabel("Source URL")).toHaveValue(
+      "https://example.test/fallback-recipe"
+    );
+    await expect(
+      page.getByText(
+        "Selected page text was added to instructions. Review the title, ingredients, servings, and nutrition before saving."
+      )
+    ).toBeVisible();
+  });
 });
 
 async function signIn(page: Page) {

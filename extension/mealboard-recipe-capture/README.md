@@ -54,6 +54,11 @@ Do not add recipe-site host permissions. If a private deployed MealBoard origin 
    - `draftKey`
 8. Confirm the extension removes the one-time draft from `chrome.storage.local` after that acknowledgement.
 
+If a recipe site blocks structured data or the review page says no structured
+recipe data was found, select the recipe text on the page and capture again.
+MealBoard will put selected text into the review form as low-confidence
+instructions so the recipe can still be cleaned up manually before saving.
+
 ## App Integration Contract
 
 The extension stores the draft in `chrome.storage.local` under the draft key in the review URL. On configured MealBoard origins, `src/mealboard-bridge.js` reads that key and posts the captured payload to `window`.

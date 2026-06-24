@@ -113,4 +113,17 @@ describe("normalizeRecipeImportDraft", () => {
 
     expect(draft.warnings).toContain("Recipe yield could not be parsed.");
   });
+
+  it("cleans source attribution before building a draft", () => {
+    const draft = normalizeRecipeImportDraft({
+      candidate: completeCandidate,
+      foods: [],
+      sourceTitle: "Skillet Rice Bowls - Example Food",
+      sourceUrl:
+        "https://example.test/rice-bowls?utm_source=email&gclid=abc&print=1#recipe"
+    });
+
+    expect(draft.sourceTitle).toBe("Skillet Rice Bowls");
+    expect(draft.sourceUrl).toBe("https://example.test/rice-bowls?print=1");
+  });
 });
