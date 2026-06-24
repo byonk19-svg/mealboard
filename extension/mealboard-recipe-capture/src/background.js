@@ -84,6 +84,12 @@ async function captureTab(tabId) {
     throw new Error("The active page did not return a capture payload.");
   }
 
+  if (payload.blockedPage && !payload.selectedText && payload.jsonLd.length === 0 && !payload.visibleRecipe) {
+    throw new Error(
+      "This site is showing a browser-check page, not the recipe. Open the page normally, wait until the recipe is visible, then capture again."
+    );
+  }
+
   return payload;
 }
 

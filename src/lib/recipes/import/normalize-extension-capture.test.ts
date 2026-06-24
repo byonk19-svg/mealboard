@@ -61,6 +61,58 @@ describe("normalizeExtensionCapturePayload", () => {
     expect(draft?.ingredientReviewRows).toEqual([]);
   });
 
+  it("normalizes visible recipe DOM capture when JSON-LD is unavailable", () => {
+    const draft = normalizeExtensionCapturePayload(
+      {
+        jsonLd: [],
+        sourceTitle: "Visible Chicken Tacos - Example",
+        sourceUrl: "https://example.test/tacos?utm_campaign=social#recipe",
+        visibleRecipe: {
+          cookTimeText: "20 minutes",
+          ingredients: ["1 lb chicken thighs", "8 tortillas"],
+          instructions: ["Season the chicken.", "Serve in tortillas."],
+          prepTimeText: "10 minutes",
+          servingsText: "4 servings",
+          title: "Visible Chicken Tacos"
+        }
+      },
+      []
+    );
+
+    expect(draft).toMatchObject({
+      cookMinutes: 20,
+      ingredientLines: ["1 lb chicken thighs", "8 tortillas"],
+      instructions: "Season the chicken.\n\nServe in tortillas.",
+      name: "Visible Chicken Tacos",
+      prepMinutes: 10,
+      servings: 4,
+      sourceTitle: "Visible Chicken Tacos",
+      sourceUrl: "https://example.test/tacos",
+      warnings: [
+        "The extension captured visible recipe text instead of structured recipe data. Review imported fields before saving."
+      ]
+    });
+  });
+
+  it("carries a blocked-page warning when visible recipe text was captured after a block signal", () => {
+    const draft = normalizeExtensionCapturePayload(
+      {
+        blockedPage: true,
+        jsonLd: [],
+        sourceTitle: "Blocked Recipe",
+        visibleRecipe: {
+          ingredients: ["1 cup beans"],
+          instructions: ["Simmer beans."]
+        }
+      },
+      []
+    );
+
+    expect(draft?.warnings).toContain(
+      "The extension captured visible recipe text after a site block signal. Review every field before saving."
+    );
+  });
+
   it("returns null when there is no structured recipe and no selected text", () => {
     expect(
       normalizeExtensionCapturePayload(

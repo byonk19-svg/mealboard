@@ -238,6 +238,66 @@ test.describe("Recipe import and filters", () => {
       )
     ).toBeVisible();
   });
+
+  test("loads an extension visible-recipe draft into review", async ({
+    page
+  }) => {
+    const draftKey = `mealboard-recipe-draft:e2e-visible-${Date.now()}`;
+
+    await signIn(page);
+    await page.goto(
+      `/recipes/import/review?source=extension&draft=${encodeURIComponent(draftKey)}`
+    );
+    await expect(page.getByText("Waiting for the recipe capture extension")).toBeVisible();
+
+    await page.evaluate((key) => {
+      window.postMessage(
+        {
+          draftKey: key,
+          payload: {
+            jsonLd: [],
+            sourceTitle: "Visible Chicken Tacos - Example",
+            sourceUrl: "https://example.test/tacos?utm_medium=social#recipe",
+            visibleRecipe: {
+              cookTimeText: "20 minutes",
+              ingredients: ["1 lb chicken thighs", "8 tortillas"],
+              instructions: ["Season the chicken.", "Serve in tortillas."],
+              prepTimeText: "10 minutes",
+              servingsText: "4 servings",
+              title: "Visible Chicken Tacos"
+            }
+          },
+          source: "mealboard-recipe-capture-extension",
+          type: "MEALBOARD_RECIPE_CAPTURE_DRAFT"
+        },
+        window.location.origin
+      );
+    }, draftKey);
+
+    await expect(
+      page.getByRole("heading", { name: "Review imported recipe" })
+    ).toBeVisible();
+    await expect(page.getByLabel("Recipe name")).toHaveValue(
+      "Visible Chicken Tacos"
+    );
+    await expect(page.getByLabel("Recipe servings")).toHaveValue("4");
+    await expect(page.getByLabel("Prep minutes")).toHaveValue("10");
+    await expect(page.getByLabel("Cook minutes")).toHaveValue("20");
+    await expect(page.getByLabel("Ingredient 1 display name")).toHaveValue(
+      /chicken thighs/i
+    );
+    await expect(page.getByLabel("Instructions")).toHaveValue(
+      /Serve in tortillas/
+    );
+    await expect(page.getByLabel("Source URL")).toHaveValue(
+      "https://example.test/tacos"
+    );
+    await expect(
+      page.getByText(
+        "The extension captured visible recipe text instead of structured recipe data. Review imported fields before saving."
+      )
+    ).toBeVisible();
+  });
 });
 
 async function signIn(page: Page) {

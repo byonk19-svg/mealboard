@@ -110,6 +110,14 @@ async function fetchRecipeHtml(startUrl: URL): Promise<
         continue;
       }
 
+      if (response.status === 401 || response.status === 403) {
+        return {
+          error:
+            "This recipe site blocked URL import. Open the recipe in Chrome, wait until the recipe is visible, then use the MealBoard capture extension.",
+          ok: false
+        };
+      }
+
       if (!response.ok) {
         return { error: "MealBoard could not load that recipe page.", ok: false };
       }

@@ -7,6 +7,7 @@ Private unpacked Chrome extension for sending the active recipe page to MealBoar
 - Page URL
 - Page title
 - Text from `script[type="application/ld+json"]`
+- Visible recipe-card text from common recipe layouts
 - Current selected text as a fallback
 
 It does not capture images, cookies, comments, ads, full page HTML, or background pages. Capture runs only after the user clicks the extension action.
@@ -54,10 +55,17 @@ Do not add recipe-site host permissions. If a private deployed MealBoard origin 
    - `draftKey`
 8. Confirm the extension removes the one-time draft from `chrome.storage.local` after that acknowledgement.
 
-If a recipe site blocks structured data or the review page says no structured
-recipe data was found, select the recipe text on the page and capture again.
-MealBoard will put selected text into the review form as low-confidence
-instructions so the recipe can still be cleaned up manually before saving.
+The extension tries capture in this order:
+
+1. Structured JSON-LD recipe data from the visible tab.
+2. Visible recipe-card text from common recipe layouts.
+3. User-selected text as a low-confidence fallback.
+
+If a site is still showing a browser-check page such as "Just a moment...",
+wait until the actual recipe is visible and capture again. If structured capture
+is still incomplete, select the visible recipe text on the page and capture
+again. MealBoard will put selected text into the review form as low-confidence
+instructions so the recipe can be cleaned up manually before saving.
 
 ## App Integration Contract
 
@@ -71,7 +79,16 @@ Expected payload shape:
   "sourceUrl": "https://example.test/recipe",
   "sourceTitle": "Recipe page title",
   "jsonLd": ["...raw JSON-LD script text..."],
+  "visibleRecipe": {
+    "title": "Visible recipe title",
+    "ingredients": ["1 cup beans"],
+    "instructions": ["Simmer beans."],
+    "servingsText": "4 servings",
+    "prepTimeText": "10 minutes",
+    "cookTimeText": "20 minutes"
+  },
   "selectedText": "Optional selected text fallback",
+  "blockedPage": false,
   "capturedAt": "2026-06-24T00:00:00.000Z"
 }
 ```
