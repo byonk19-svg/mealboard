@@ -12,7 +12,7 @@ import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 export const runtime = "nodejs";
 
 const maxRedirects = 3;
-const maxResponseBytes = 800_000;
+const maxResponseBytes = 2_000_000;
 const requestTimeoutMs = 8_000;
 
 export async function POST(request: Request) {

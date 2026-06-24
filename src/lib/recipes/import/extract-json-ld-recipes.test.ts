@@ -61,6 +61,70 @@ describe("extractJsonLdRecipeCandidates", () => {
     expect(extractJsonLdRecipeCandidates(html)).toEqual([]);
   });
 
+  it("does not corrupt valid JSON-LD that contains HTML entities in text", () => {
+    const html = `
+      <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "Recipe",
+              "name": "Banana &amp; Walnut Bread",
+              "description": "Use the &quot;ripe&quot; bananas.",
+              "recipeYield": ["8"],
+              "recipeIngredient": ["2 cups mashed banana", "1&#xBD; cups flour"],
+              "recipeInstructions": [
+                {"@type": "HowToStep", "text": "Bake until golden &amp; set."}
+              ]
+            }
+          ]
+        }
+      </script>
+    `;
+
+    expect(extractJsonLdRecipeCandidates(html)[0]).toMatchObject({
+      name: "Banana & Walnut Bread",
+      description: 'Use the "ripe" bananas.',
+      servings: 8,
+      ingredients: ["2 cups mashed banana", "1½ cups flour"],
+      instructions: ["Bake until golden & set."]
+    });
+  });
+
+  it("accepts unquoted JSON-LD script type attributes", () => {
+    const html = `
+      <script type=application/ld+json class=schema-graph>
+        {
+          "@context": "https://schema.org",
+          "@type": "Recipe",
+          "name": "Banana Bread",
+          "recipeIngredient": ["2 bananas"],
+          "recipeInstructions": ["Bake."]
+        }
+      </script>
+    `;
+
+    expect(extractJsonLdRecipeCandidates(html)[0]?.name).toBe("Banana Bread");
+  });
+
+  it("leaves invalid numeric HTML entities untouched", () => {
+    const html = `
+      <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@type": "Recipe",
+          "name": "Entity Test",
+          "recipeIngredient": ["1 pinch &#9999999999; salt"],
+          "recipeInstructions": ["Stir."]
+        }
+      </script>
+    `;
+
+    expect(extractJsonLdRecipeCandidates(html)[0]?.ingredients).toEqual([
+      "1 pinch &#9999999999; salt"
+    ]);
+  });
+
   it("flattens sectioned HowTo instructions in source order", () => {
     const html = `
       <script type="application/ld+json">

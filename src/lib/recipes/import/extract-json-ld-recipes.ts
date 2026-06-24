@@ -56,19 +56,35 @@ function extractJsonLdScriptContents(html: string) {
   while ((match = scriptPattern.exec(html)) !== null) {
     const attributes = match[1] ?? "";
 
-    if (/type\s*=\s*["']application\/ld\+json["']/i.test(attributes)) {
-      scriptContents.push(decodeHtmlEntities(match[2] ?? ""));
+    if (hasJsonLdTypeAttribute(attributes)) {
+      scriptContents.push(match[2] ?? "");
     }
   }
 
   return scriptContents;
 }
 
+function hasJsonLdTypeAttribute(attributes: string) {
+  return /\btype\s*=\s*(?:"application\/ld\+json"|'application\/ld\+json'|application\/ld\+json)(?:\s|$)/i.test(
+    attributes
+  );
+}
+
 function parseJsonLd(scriptContent: string): JsonLdValue | null {
   try {
     return JSON.parse(scriptContent) as JsonLdValue;
   } catch {
-    return null;
+    const decodedScriptContent = decodeHtmlEntities(scriptContent);
+
+    if (decodedScriptContent === scriptContent) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(decodedScriptContent) as JsonLdValue;
+    } catch {
+      return null;
+    }
   }
 }
 
@@ -292,7 +308,7 @@ function firstText(value: JsonLdValue | undefined): string | null {
 }
 
 function cleanText(value: string) {
-  return value.replace(/\s+/g, " ").trim();
+  return decodeHtmlEntities(value).replace(/\s+/g, " ").trim();
 }
 
 function isRecipeType(value: JsonLdValue | undefined): boolean {
@@ -325,9 +341,32 @@ function isJsonLdObject(value: JsonLdValue | undefined): value is JsonLdObject {
 
 function decodeHtmlEntities(value: string) {
   return value
+    .replace(/&#x([0-9a-f]+);/gi, (_match, hex: string) =>
+      decodeNumericHtmlEntity(Number.parseInt(hex, 16), _match)
+    )
+    .replace(/&#(\d+);/g, (_match, decimal: string) =>
+      decodeNumericHtmlEntity(Number.parseInt(decimal, 10), _match)
+    )
     .replace(/&quot;/g, '"')
     .replace(/&#34;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&rsquo;/g, "'")
+    .replace(/&lsquo;/g, "'")
+    .replace(/&rdquo;/g, '"')
+    .replace(/&ldquo;/g, '"')
+    .replace(/&ndash;/g, "-")
+    .replace(/&mdash;/g, "-")
+    .replace(/&nbsp;/g, " ")
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">");
+}
+
+function decodeNumericHtmlEntity(codePoint: number, fallback: string) {
+  if (!Number.isInteger(codePoint) || codePoint < 0 || codePoint > 0x10ffff) {
+    return fallback;
+  }
+
+  return String.fromCodePoint(codePoint);
 }
