@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation";
 import { signInWithPassword, signUpWithPassword } from "@/app/login/actions";
+import { resolveLoginReturnPath } from "@/lib/auth/return-path";
 import { createClient } from "@/lib/supabase/server";
 
 type LoginPageProps = {
   searchParams: Promise<{
     message?: string;
+    returnTo?: string;
   }>;
 };
 
@@ -14,11 +16,13 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     data: { user }
   } = await supabase.auth.getUser();
 
+  const { message, returnTo } = await searchParams;
+  const resolvedReturnTo = resolveLoginReturnPath(returnTo);
+
   if (user) {
-    redirect("/dashboard");
+    redirect(resolvedReturnTo);
   }
 
-  const { message } = await searchParams;
   const canCreateAccount = process.env.MEALBOARD_ENABLE_PUBLIC_SIGNUP === "true";
 
   return (
@@ -43,6 +47,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         ) : null}
 
         <form className="space-y-4">
+          <input name="returnTo" type="hidden" value={resolvedReturnTo} />
           <div>
             <label className="text-sm font-medium" htmlFor="email">
               Email

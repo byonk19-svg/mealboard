@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { resolveLoginReturnPath } from "@/lib/auth/return-path";
 import { createClient } from "@/lib/supabase/server";
 
 type CredentialsResult =
@@ -25,15 +26,24 @@ function getCredentials(formData: FormData): CredentialsResult {
   return { email, password };
 }
 
-function loginRedirect(path: string, message: string): never {
-  redirect(`${path}?message=${encodeURIComponent(message)}`);
+function loginRedirect(path: string, message: string, returnTo?: string): never {
+  const params = new URLSearchParams({ message });
+
+  if (returnTo) {
+    params.set("returnTo", resolveLoginReturnPath(returnTo));
+  }
+
+  redirect(`${path}?${params.toString()}`);
 }
 
 export async function signInWithPassword(formData: FormData) {
   const credentials = getCredentials(formData);
+  const returnTo = resolveLoginReturnPath(
+    String(formData.get("returnTo") ?? "")
+  );
 
   if ("error" in credentials) {
-    loginRedirect("/login", credentials.error);
+    loginRedirect("/login", credentials.error, returnTo);
   }
 
   const supabase = await createClient();
@@ -43,21 +53,29 @@ export async function signInWithPassword(formData: FormData) {
   });
 
   if (error) {
-    loginRedirect("/login", error.message);
+    loginRedirect("/login", error.message, returnTo);
   }
 
-  redirect("/dashboard");
+  redirect(returnTo);
 }
 
 export async function signUpWithPassword(formData: FormData) {
+  const returnTo = resolveLoginReturnPath(
+    String(formData.get("returnTo") ?? "")
+  );
+
   if (process.env.MEALBOARD_ENABLE_PUBLIC_SIGNUP !== "true") {
-    loginRedirect("/login", "Account creation is disabled for this private MVP.");
+    loginRedirect(
+      "/login",
+      "Account creation is disabled for this private MVP.",
+      returnTo
+    );
   }
 
   const credentials = getCredentials(formData);
 
   if ("error" in credentials) {
-    loginRedirect("/login", credentials.error);
+    loginRedirect("/login", credentials.error, returnTo);
   }
 
   const supabase = await createClient();
@@ -67,12 +85,13 @@ export async function signUpWithPassword(formData: FormData) {
   });
 
   if (error) {
-    loginRedirect("/login", error.message);
+    loginRedirect("/login", error.message, returnTo);
   }
 
   loginRedirect(
     "/login",
-    "Account created. Add this user to the seeded household, then sign in."
+    "Account created. Add this user to the seeded household, then sign in.",
+    returnTo
   );
 }
 

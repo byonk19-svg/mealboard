@@ -16,7 +16,11 @@ test.describe("protected route auth boundary", () => {
     test(`redirects ${route} to login when unauthenticated`, async ({ page }) => {
       await page.goto(route);
 
-      await expect(page).toHaveURL(/\/login$/);
+      await expect(page).toHaveURL((url) => {
+        return (
+          url.pathname === "/login" && url.searchParams.get("returnTo") === route
+        );
+      });
       await expect(
         page.getByRole("heading", { name: "Sign in to MealBoard" })
       ).toBeVisible();

@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { AppShell } from "@/components/app-shell/app-shell";
 import { NoHouseholdState } from "@/components/shared/no-household-state";
+import { resolveLoginReturnPath } from "@/lib/auth/return-path";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 
 type ProtectedAppLayoutProps = {
@@ -13,7 +15,9 @@ export default async function ProtectedAppLayout({
   const householdContext = await getCurrentHouseholdContext();
 
   if (!householdContext.user) {
-    redirect("/login");
+    const headerStore = await headers();
+    const returnTo = resolveLoginReturnPath(headerStore.get("x-mealboard-path"));
+    redirect(`/login?returnTo=${encodeURIComponent(returnTo)}`);
   }
 
   return (
