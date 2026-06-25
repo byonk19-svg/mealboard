@@ -7,6 +7,7 @@ import {
   RecipeForm,
   type RecipeFormInitialValues
 } from "@/components/recipes/recipe-form";
+import { getRecipeImportReviewIssues } from "@/lib/recipes/import/import-review-issues";
 import { normalizeExtensionCapturePayload } from "@/lib/recipes/import/normalize-extension-capture";
 import type { RecipeImportDraft } from "@/lib/recipes/import/types";
 import type { GroceryCategory } from "@/lib/recipes/types";
@@ -110,6 +111,16 @@ export function RecipeImportReviewClient({
     () => (draft ? toRecipeFormInitialValues(draft) : null),
     [draft]
   );
+  const importReviewIssues = useMemo(
+    () => (draft ? getRecipeImportReviewIssues(draft) : []),
+    [draft]
+  );
+  const returnPath = useMemo(() => {
+    const params = searchParams.toString();
+    return params
+      ? `/recipes/import/review?${params}`
+      : "/recipes/import/review";
+  }, [searchParams]);
 
   if (!draft || !initialValues) {
     return (
@@ -160,8 +171,9 @@ export function RecipeImportReviewClient({
         categories={categories}
         foods={foods}
         initialValues={initialValues}
+        importReviewIssues={importReviewIssues}
         profiles={profiles}
-        returnPath="/recipes/import"
+        returnPath={returnPath}
         submitLabel="Save imported recipe"
       />
     </div>

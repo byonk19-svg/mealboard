@@ -21,12 +21,17 @@ import {
   type GroceryCategory,
   type RecipeWithDetails
 } from "@/lib/recipes/types";
+import {
+  requiresRecipeImportAcknowledgement,
+  type RecipeImportReviewIssue
+} from "@/lib/recipes/import/import-review-issues";
 import type { Food, MealProfile } from "@/lib/settings/types";
 
 type RecipeFormProps = {
   categories: GroceryCategory[];
   foods: Food[];
   initialValues?: RecipeFormInitialValues;
+  importReviewIssues?: RecipeImportReviewIssue[];
   profiles: MealProfile[];
   recipe?: RecipeWithDetails;
   returnPath?: string;
@@ -60,6 +65,7 @@ export function RecipeForm({
   categories,
   foods,
   initialValues,
+  importReviewIssues = [],
   profiles,
   recipe,
   returnPath,
@@ -71,6 +77,9 @@ export function RecipeForm({
       .filter((approval) => approval.approved_for_planning)
       .map((approval) => approval.meal_profile_id) ?? []
   );
+  const importAcknowledgementRequired =
+    importReviewIssues.length > 0 &&
+    requiresRecipeImportAcknowledgement(importReviewIssues);
 
   return (
     <form action={recipe ? updateRecipe : createRecipe} className="space-y-6">
@@ -278,6 +287,36 @@ export function RecipeForm({
           </div>
         </fieldset>
       </section>
+
+      {importReviewIssues.length > 0 ? (
+        <section className="rounded-lg border border-amber-300 bg-amber-50 p-5 text-amber-950 shadow-sm">
+          <h2 className="text-xl font-semibold">Review before saving</h2>
+          <ul className="mt-3 space-y-2 text-sm leading-6">
+            {importReviewIssues.map((issue, index) => (
+              <li key={`${issue.id}-${index}`}>{issue.message}</li>
+            ))}
+          </ul>
+          {importAcknowledgementRequired ? (
+            <label className="mt-4 flex items-start gap-2 text-sm font-medium">
+              <input
+                className="mt-1"
+                name="importReviewAcknowledged"
+                required
+                type="checkbox"
+                value="yes"
+              />
+              I reviewed the imported method and still want to save this recipe.
+            </label>
+          ) : null}
+          {importAcknowledgementRequired ? (
+            <input
+              name="importReviewAcknowledgementRequired"
+              type="hidden"
+              value="true"
+            />
+          ) : null}
+        </section>
+      ) : null}
 
       <button
         className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"

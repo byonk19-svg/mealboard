@@ -362,7 +362,12 @@ function IngredientRow({
         </label>
         {needsReview ? (
           <label className="flex items-center gap-2 text-sm font-medium md:col-span-3">
-            <input name="ingredientReviewed" type="checkbox" value={index} />
+            <input
+              name="ingredientReviewed"
+              required
+              type="checkbox"
+              value={index}
+            />
             I reviewed this row
           </label>
         ) : null}

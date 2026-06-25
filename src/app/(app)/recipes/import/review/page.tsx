@@ -3,8 +3,17 @@ import { getGroceryCategories } from "@/lib/recipes/data";
 import { getFoods, getMealProfiles } from "@/lib/settings/data";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 
-export default async function RecipeImportReviewPage() {
+type RecipeImportReviewPageProps = {
+  searchParams: Promise<{
+    message?: string;
+  }>;
+};
+
+export default async function RecipeImportReviewPage({
+  searchParams
+}: RecipeImportReviewPageProps) {
   const householdContext = await getCurrentHouseholdContext();
+  const { message } = await searchParams;
 
   if (!householdContext.household) {
     return null;
@@ -31,11 +40,21 @@ export default async function RecipeImportReviewPage() {
         </p>
       </div>
 
+      {message ? <RecipeImportMessage message={message} /> : null}
+
       <RecipeImportReviewClient
         categories={categories}
         foods={foods}
         profiles={profiles}
       />
     </section>
+  );
+}
+
+function RecipeImportMessage({ message }: { message: string }) {
+  return (
+    <p className="rounded-md border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
+      {message}
+    </p>
   );
 }

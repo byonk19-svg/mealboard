@@ -14,6 +14,10 @@ import {
 } from "@/lib/recipes/types";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
+import {
+  buildRecipeMessagePath,
+  resolveRecipeFormReturnPath
+} from "@/lib/recipes/recipe-form-path";
 
 type ParsedNumber =
   | {
@@ -39,7 +43,7 @@ type IngredientInput = {
 type PersistedIngredientInput = Omit<IngredientInput, "new_food_name">;
 
 function recipeRedirect(path: string, message: string): never {
-  redirect(`${path}?message=${encodeURIComponent(message)}`);
+  redirect(buildRecipeMessagePath(path, message));
 }
 
 function textOrNull(value: FormDataEntryValue | null) {
@@ -99,13 +103,21 @@ async function requireHousehold(path: string) {
 }
 
 function resolveRecipeFormPath(formData: FormData, fallback: string) {
-  const path = textOrNull(formData.get("recipeFormPath"));
+  return resolveRecipeFormReturnPath(
+    textOrNull(formData.get("recipeFormPath")),
+    fallback
+  );
+}
 
-  if (path === "/recipes/import" || path === "/recipes/new") {
-    return path;
+function requireImportReviewAcknowledgement(formData: FormData, path: string) {
+  const isRequired =
+    String(formData.get("importReviewAcknowledgementRequired") ?? "") === "true";
+  const isAcknowledged =
+    String(formData.get("importReviewAcknowledged") ?? "") === "yes";
+
+  if (isRequired && !isAcknowledged) {
+    recipeRedirect(path, "Review the import issues before saving this recipe.");
   }
-
-  return fallback;
 }
 
 function parseRecipePayload(formData: FormData, path: string) {
@@ -282,6 +294,7 @@ function parseApprovedProfileIds(formData: FormData) {
 
 export async function createRecipe(formData: FormData) {
   const path = resolveRecipeFormPath(formData, "/recipes/new");
+  requireImportReviewAcknowledgement(formData, path);
   const household = await requireHousehold(path);
   const recipePayload = parseRecipePayload(formData, path);
   const parsedIngredients = parseIngredients(formData, path);
@@ -319,14 +332,6 @@ export async function createRecipe(formData: FormData) {
   });
 
   revalidatePath("/recipes");
-  if (path === "/recipes/import") {
-    const searchParams = new URLSearchParams({
-      message: "Recipe created.",
-      q: recipePayload.name
-    });
-    redirect(`/recipes?${searchParams.toString()}`);
-  }
-
   redirect(`/recipes/${recipe.id}?message=${encodeURIComponent("Recipe created.")}`);
 }
 

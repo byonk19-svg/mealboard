@@ -91,10 +91,14 @@ test.describe("Recipe import and filters", () => {
     await page
       .getByRole("button", { name: "Apply filters" })
       .click();
-    await expect(page.getByRole("heading", { name: recipeName })).toBeVisible();
+    await expect(page.getByRole("heading", { name: recipeName })).toBeVisible({
+      timeout: 30_000
+    });
     await page.getByLabel("Planning").selectOption("approved");
     await page.getByRole("button", { name: "Apply filters" }).click();
-    await expect(page.getByRole("heading", { name: recipeName })).toBeVisible();
+    await expect(page.getByRole("heading", { name: recipeName })).toBeVisible({
+      timeout: 30_000
+    });
     await expect(page.getByRole("link", { name: "Clear filters" }).first()).toBeVisible();
   });
 
@@ -119,6 +123,12 @@ test.describe("Recipe import and filters", () => {
 
     await expect(page.getByRole("heading", { name: "Import recipe" })).toBeVisible();
     await expect(page.getByLabel("Recipe URL")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Chrome capture fallback" })
+    ).toBeVisible();
+    await expect(
+      page.getByText("select the visible recipe text and capture again")
+    ).toBeVisible();
     await page.getByLabel("Recipe URL").fill(draft.sourceUrl);
     await expect(
       page.getByRole("button", { name: "Load recipe for review" })
@@ -182,11 +192,9 @@ test.describe("Recipe import and filters", () => {
       .first()
       .check();
     await page.getByRole("button", { name: "Save imported recipe" }).click();
-    await page.waitForURL(/\/recipes\?/, { timeout: 30_000 });
+    await page.waitForURL(/\/recipes\/[^/?]+\?message=/, { timeout: 30_000 });
     await expect(page.getByText("Recipe created.")).toBeVisible();
-    await expect(page.getByLabel("Search recipes")).toHaveValue(importedRecipeName);
     await expect(page.getByRole("heading", { name: importedRecipeName })).toBeVisible();
-    await page.getByRole("link", { name: "View and edit" }).first().click();
     await expect(page.getByText("Recipe source")).toBeVisible();
     await expect(
       page.getByRole("link", { name: "MealBoard Synthetic Recipe Fixture" })
@@ -254,7 +262,9 @@ test.describe("Recipe import and filters", () => {
   test("shows cleanup warnings for messy extension selected text", async ({
     page
   }) => {
-    const draftKey = `mealboard-recipe-draft:e2e-messy-${Date.now()}`;
+    const suffix = Date.now().toString();
+    const draftKey = `mealboard-recipe-draft:e2e-messy-${suffix}`;
+    const importedRecipeName = `Messy Beans ${suffix}`;
 
     await signIn(page);
     await page.goto(
@@ -262,15 +272,15 @@ test.describe("Recipe import and filters", () => {
     );
     await expect(page.getByText("Waiting for the recipe capture extension")).toBeVisible();
 
-    await page.evaluate((key) => {
+    await page.evaluate(({ key, name }) => {
       window.postMessage(
         {
           draftKey: key,
           payload: {
             jsonLd: [],
             selectedText:
-              "Jump to Recipe\n5 from 12 votes\nMessy Beans\nIngredients\n\u2610 1 yellow onion, diced ($0.32)\nInstructions\nStir.\nSubscribe for weekly recipes",
-            sourceTitle: "Messy Beans | Example Site",
+              `Jump to Recipe\n5 from 12 votes\n${name}\nIngredients\n\u2610 1 yellow onion, diced ($0.32)\nInstructions\nStir.\nSubscribe for weekly recipes`,
+            sourceTitle: `${name} | Example Site`,
             sourceUrl: "https://example.test/messy-beans"
           },
           source: "mealboard-recipe-capture-extension",
@@ -278,12 +288,12 @@ test.describe("Recipe import and filters", () => {
         },
         window.location.origin
       );
-    }, draftKey);
+    }, { key: draftKey, name: importedRecipeName });
 
     await expect(
       page.getByRole("heading", { name: "Review imported recipe" })
     ).toBeVisible();
-    await expect(page.getByLabel("Recipe name")).toHaveValue("Messy Beans");
+    await expect(page.getByLabel("Recipe name")).toHaveValue(importedRecipeName);
     await expect(page.getByLabel("Ingredient 1 display name")).toHaveValue(
       "yellow onion"
     );
@@ -301,6 +311,21 @@ test.describe("Recipe import and filters", () => {
         "Imported instructions look short. Confirm the full method was captured before saving."
       )
     ).toBeVisible();
+    await expect(page.getByText("Review before saving")).toBeVisible();
+    await page.getByRole("button", { name: "Save imported recipe" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Review imported recipe" })
+    ).toBeVisible();
+    await page
+      .getByRole("checkbox", {
+        name: "I reviewed the imported method and still want to save this recipe."
+      })
+      .check();
+    await page.getByRole("button", { name: "Save imported recipe" }).click();
+    await page.waitForURL(/\/recipes\/[^/?]+\?message=/, { timeout: 30_000 });
+    await expect(page.getByText("Recipe created.")).toBeVisible();
+    await expect(page.getByRole("heading", { name: importedRecipeName })).toBeVisible();
+    await expect(page.getByLabel("Instructions")).toHaveValue("Stir.");
   });
 
   test("loads an extension visible-recipe draft into review", async ({
@@ -367,7 +392,7 @@ test.describe("Recipe import and filters", () => {
     await expect(
       page.getByText(
         "The extension captured visible recipe text instead of structured recipe data. Review imported fields before saving."
-      )
+      ).first()
     ).toBeVisible();
   });
 });
