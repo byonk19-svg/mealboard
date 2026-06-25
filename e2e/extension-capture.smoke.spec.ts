@@ -13,6 +13,7 @@ type CapturePayload = {
   visibleRecipe: {
     ingredients: string[];
     instructions: string[];
+    nutritionText: string;
     servingsText: string;
     title: string;
   } | null;
@@ -37,6 +38,9 @@ test.describe("Chrome recipe capture script", () => {
             <li class="wprm-recipe-instruction">Season the chicken.</li>
             <li class="wprm-recipe-instruction">Serve in tortillas.</li>
           </ol>
+          <div class="wprm-nutrition-label">
+            Calories: 420 kcal Protein: 31g
+          </div>
         </article>
       </main>
     `);
@@ -54,6 +58,7 @@ test.describe("Chrome recipe capture script", () => {
     expect(payload.visibleRecipe).toMatchObject({
       ingredients: ["1 lb chicken thighs", "8 tortillas"],
       instructions: ["Season the chicken.", "Serve in tortillas."],
+      nutritionText: "Calories: 420 kcal Protein: 31g",
       servingsText: "4 servings",
       title: "Fixture Sheet Pan Tacos"
     });

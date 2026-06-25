@@ -209,7 +209,7 @@ test.describe("Recipe import and filters", () => {
           payload: {
             jsonLd: [],
             selectedText:
-              "Ingredients: 1 cup beans. Instructions: Simmer until warm.",
+              "Ingredients: 1 cup beans. Instructions: Simmer until warm. Nutrition: Calories: 320 kcal Protein: 18g",
             sourceTitle: "Fallback Recipe | Example Site",
             sourceUrl:
               "https://example.test/fallback-recipe?utm_source=extension#comments"
@@ -231,6 +231,13 @@ test.describe("Recipe import and filters", () => {
     await expect(page.getByLabel("Ingredient 1 quantity")).toHaveValue("1");
     await expect(page.getByLabel("Ingredient 1 unit")).toHaveValue("cup");
     await expect(page.getByLabel("Instructions")).toHaveValue("Simmer until warm.");
+    await expect(
+      page.getByLabel("Estimated recipe calories per serving")
+    ).toHaveValue("320");
+    await expect(
+      page.getByLabel("Estimated recipe protein grams per serving")
+    ).toHaveValue("18");
+    await expect(page.getByLabel("Estimate confidence")).toHaveValue("medium");
     await expect(page.getByLabel("Source title")).toHaveValue("Fallback Recipe");
     await expect(page.getByLabel("Source URL")).toHaveValue(
       "https://example.test/fallback-recipe"
@@ -265,6 +272,7 @@ test.describe("Recipe import and filters", () => {
               cookTimeText: "20 minutes",
               ingredients: ["1 lb chicken thighs", "8 tortillas"],
               instructions: ["Season the chicken.", "Serve in tortillas."],
+              nutritionText: "Calories: 420 kcal Protein: 31g",
               prepTimeText: "10 minutes",
               servingsText: "4 servings",
               title: "Visible Chicken Tacos"
@@ -286,6 +294,13 @@ test.describe("Recipe import and filters", () => {
     await expect(page.getByLabel("Recipe servings")).toHaveValue("4");
     await expect(page.getByLabel("Prep minutes")).toHaveValue("10");
     await expect(page.getByLabel("Cook minutes")).toHaveValue("20");
+    await expect(
+      page.getByLabel("Estimated recipe calories per serving")
+    ).toHaveValue("420");
+    await expect(
+      page.getByLabel("Estimated recipe protein grams per serving")
+    ).toHaveValue("31");
+    await expect(page.getByLabel("Estimate confidence")).toHaveValue("medium");
     await expect(page.getByLabel("Ingredient 1 display name")).toHaveValue(
       /chicken thighs/i
     );

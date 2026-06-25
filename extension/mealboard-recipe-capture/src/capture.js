@@ -84,6 +84,12 @@
       title: trimToLimit(title, MAX_TITLE_CHARS),
       ingredients,
       instructions,
+      nutritionText: firstText([
+        root.querySelector(".wprm-nutrition-label"),
+        root.querySelector(".wprm-recipe-nutrition"),
+        root.querySelector(".tasty-recipes-nutrition"),
+        root.querySelector('[class*="nutrition" i]')
+      ]),
       servingsText:
         firstText([
           root.querySelector(".wprm-recipe-servings"),

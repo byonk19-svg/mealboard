@@ -100,6 +100,7 @@ describe("normalizeExtensionCapturePayload", () => {
           cookTimeText: "20 minutes",
           ingredients: ["1 lb chicken thighs", "8 tortillas"],
           instructions: ["Season the chicken.", "Serve in tortillas."],
+          nutritionText: "Calories: 420 kcal Protein: 31g",
           prepTimeText: "10 minutes",
           servingsText: "4 servings",
           title: "Visible Chicken Tacos"
@@ -110,9 +111,12 @@ describe("normalizeExtensionCapturePayload", () => {
 
     expect(draft).toMatchObject({
       cookMinutes: 20,
+      estimatedCaloriesPerServing: 420,
+      estimatedProteinGramsPerServing: 31,
       ingredientLines: ["1 lb chicken thighs", "8 tortillas"],
       instructions: "Season the chicken.\n\nServe in tortillas.",
       name: "Visible Chicken Tacos",
+      nutritionConfidence: "medium",
       prepMinutes: 10,
       servings: 4,
       sourceTitle: "Visible Chicken Tacos",

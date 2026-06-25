@@ -8,6 +8,7 @@ Private unpacked Chrome extension for sending the active recipe page to MealBoar
 - Page title
 - Text from `script[type="application/ld+json"]`
 - Visible recipe-card text from common recipe layouts
+- Visible calories/protein text when recipe cards expose it
 - Current selected text as a fallback
 
 It does not capture images, cookies, comments, ads, full page HTML, or background pages. Capture runs only after the user clicks the extension action.
@@ -64,8 +65,9 @@ The extension tries capture in this order:
 If a site is still showing a browser-check page such as "Just a moment...",
 wait until the actual recipe is visible and capture again. If structured capture
 is still incomplete, select the visible recipe text on the page and capture
-again. MealBoard will put selected text into the review form as low-confidence
-instructions so the recipe can be cleaned up manually before saving.
+again. MealBoard will split selected text into low-confidence ingredients,
+instructions, and explicit calories/protein when recognizable section labels
+are present, so the recipe can be cleaned up manually before saving.
 
 ## App Integration Contract
 
@@ -85,7 +87,8 @@ Expected payload shape:
     "instructions": ["Simmer beans."],
     "servingsText": "4 servings",
     "prepTimeText": "10 minutes",
-    "cookTimeText": "20 minutes"
+    "cookTimeText": "20 minutes",
+    "nutritionText": "Calories: 320 kcal Protein: 18g"
   },
   "selectedText": "Optional selected text fallback",
   "blockedPage": false,

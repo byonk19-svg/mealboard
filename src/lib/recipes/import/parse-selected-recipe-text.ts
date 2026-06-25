@@ -1,4 +1,5 @@
 import type { RawRecipeCandidate } from "./types";
+import { parseRecipeNutritionText } from "./parse-recipe-nutrition";
 
 const SECTION_LABELS = [
   "ingredients",
@@ -11,6 +12,7 @@ const SECTION_LABELS = [
 ] as const;
 
 const METADATA_LABELS = [
+  "nutrition",
   "servings",
   "serves",
   "yield",
@@ -33,6 +35,7 @@ export function parseSelectedRecipeText(
   let servings: number | null = null;
   let prepMinutes: number | null = null;
   let cookMinutes: number | null = null;
+  const nutrition = parseRecipeNutritionText(text);
 
   for (const line of lines) {
     const section = parseSectionLine(line);
@@ -77,7 +80,7 @@ export function parseSelectedRecipeText(
   }
 
   return {
-    caloriesPerServing: null,
+    caloriesPerServing: nutrition.caloriesPerServing,
     cookMinutes,
     description: null,
     extractionWarnings: [
@@ -87,7 +90,7 @@ export function parseSelectedRecipeText(
     instructions,
     name: name ?? fallbackName,
     prepMinutes,
-    proteinGramsPerServing: null,
+    proteinGramsPerServing: nutrition.proteinGramsPerServing,
     servings
   };
 }
@@ -117,7 +120,7 @@ function expandInlineLabels(text: string) {
 
 function parseSectionLine(line: string):
   | { type: "ingredients" | "instructions"; value: string }
-  | { type: "servings" | "prep" | "cook"; value: string }
+  | { type: "nutrition" | "servings" | "prep" | "cook"; value: string }
   | null {
   const match = line.match(/^([a-z ]+):?\s*(.*)$/i);
   const label = match?.[1]?.trim().toLowerCase() ?? "";
@@ -139,6 +142,10 @@ function parseSectionLine(line: string):
 
   if (label === "servings" || label === "serves" || label === "yield") {
     return { type: "servings", value };
+  }
+
+  if (label === "nutrition") {
+    return { type: "nutrition", value };
   }
 
   if (label === "prep time" || label === "preparation time") {

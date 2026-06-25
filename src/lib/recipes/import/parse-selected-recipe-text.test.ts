@@ -27,6 +27,26 @@ Instructions
     });
   });
 
+  it("extracts calories and protein from selected nutrition text", () => {
+    expect(
+      parseSelectedRecipeText(
+        `Skillet Beans
+Ingredients
+- 1 cup beans
+Instructions
+Simmer the beans.
+Nutrition
+Calories: 320 kcal
+Protein: 18g`,
+        "Fallback Title"
+      )
+    ).toMatchObject({
+      caloriesPerServing: 320,
+      instructions: ["Simmer the beans."],
+      proteinGramsPerServing: 18
+    });
+  });
+
   it("handles inline ingredient and instruction labels from short selections", () => {
     expect(
       parseSelectedRecipeText(

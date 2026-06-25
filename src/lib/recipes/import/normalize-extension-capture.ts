@@ -1,5 +1,6 @@
 import { extractJsonLdRecipeCandidates } from "./extract-json-ld-recipes";
 import { normalizeRecipeImportDraft } from "./normalize-recipe-import";
+import { parseRecipeNutritionText } from "./parse-recipe-nutrition";
 import { parseSelectedRecipeText } from "./parse-selected-recipe-text";
 import { cleanRecipeSourceAttribution } from "./source-attribution";
 import type { RawRecipeCandidate, RecipeImportDraft } from "./types";
@@ -144,6 +145,7 @@ function normalizeVisibleRecipeCapture({
 
   const ingredients = getStringArray(value.ingredients);
   const instructions = getStringArray(value.instructions);
+  const nutrition = parseRecipeNutritionText(getString(value.nutritionText) ?? "");
 
   if (ingredients.length === 0 && instructions.length === 0) {
     return null;
@@ -151,7 +153,7 @@ function normalizeVisibleRecipeCapture({
 
   const title = getString(value.title) || sourceTitle;
   const candidate: RawRecipeCandidate = {
-    caloriesPerServing: null,
+    caloriesPerServing: nutrition.caloriesPerServing,
     cookMinutes: parseLooseMinutes(getString(value.cookTimeText)),
     description: null,
     extractionWarnings: [
@@ -161,7 +163,7 @@ function normalizeVisibleRecipeCapture({
     instructions,
     name: title,
     prepMinutes: parseLooseMinutes(getString(value.prepTimeText)),
-    proteinGramsPerServing: null,
+    proteinGramsPerServing: nutrition.proteinGramsPerServing,
     servings: parseLooseNumber(getString(value.servingsText))
   };
 
