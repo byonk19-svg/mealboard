@@ -46,6 +46,11 @@ test.describe("Mobile grocery list", () => {
 
     await expect(page.getByText("Total items")).toBeVisible();
     await expect(page.getByRole("button", { name: "Copy list" })).toBeVisible();
+    await page.getByRole("button", { name: "Show emergency backup" }).click();
+    await expect(page.getByLabel("Emergency grocery backup")).toBeVisible();
+    await expect(page.getByLabel("Emergency grocery backup")).toContainText(
+      "Groceries for week"
+    );
     await page.getByRole("button", { name: "Copy list" }).click();
     await expect(
       page.getByText(/Copied grocery list\.|Copy failed\./)

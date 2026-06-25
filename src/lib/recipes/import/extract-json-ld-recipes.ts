@@ -206,10 +206,18 @@ function getInstructionLines(value: JsonLdValue | undefined): string[] {
   }
 
   if (isHowToSection(value)) {
-    return [
-      firstText(value.name),
-      ...getInstructionLines(value.itemListElement)
-    ].filter((line): line is string => Boolean(line));
+    const sectionName = firstText(value.name);
+    const sectionLines = getInstructionLines(value.itemListElement);
+
+    if (!sectionName) {
+      return sectionLines;
+    }
+
+    if (sectionLines.length === 0) {
+      return [sectionName];
+    }
+
+    return [`${sectionName}:\n${sectionLines.join("\n")}`];
   }
 
   const text = firstText(value.text) ?? firstText(value.name);

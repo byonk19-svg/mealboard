@@ -935,6 +935,7 @@ export type GroceryListStatus =
 /settings/baby
 /settings/grocery-categories
 /settings/preferred-products
+/settings/household
 ```
 
 ### 16.3 Future Routes
@@ -943,7 +944,6 @@ export type GroceryListStatus =
 /recipes/try-this
 /weekly-wrap-up/[weeklyPlanId]
 /grocery-history
-/settings/household
 /settings/invitations
 ```
 

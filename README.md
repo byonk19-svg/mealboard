@@ -14,7 +14,7 @@ MealBoard has reached a private family MVP readiness checkpoint for the
 planning and grocery loop, with rule-based suggestions, smart swaps, baby
 solids planning, an actionable dashboard queue, pending grocery-change
 review/apply handling, owner-linked household members, install metadata,
-weekly wrap-up learning, and E2E smoke coverage.
+weekly wrap-up learning, grocery recovery/history tools, and E2E smoke coverage.
 
 The current core loop is:
 
@@ -27,7 +27,7 @@ Implemented MVP surfaces include:
 - Email/password auth and household-scoped app routes
 - Household settings for owner-only linking, ownership transfer, and removal of existing member users
 - Household profiles, preferences, grocery categories, dedicated saved-food administration, and a Preferences food-create flow
-- Recipe library with structured ingredients, profile approvals, calorie/protein estimate fields, review-first structured URL import, source attribution, and a private unpacked Chrome recipe capture extension
+- Recipe library with structured ingredients, profile approvals, calorie/protein estimate fields, section-aware review-first structured URL import, source attribution, and a private unpacked Chrome recipe capture extension
 - Weekly planning with adult work/off days, Day/Profile views, planned recipe items, approval/lock/remove/swap actions, staples review, and a small nutrition estimate summary
 - Rule-based adult meal suggestion drafts with reason labels, why-this context, and recent wrap-up review signals
 - Current-week repeat awareness and too-much-leftover feedback in rule-based suggestion scoring
@@ -35,7 +35,7 @@ Implemented MVP surfaces include:
 - Staples settings CRUD, weekly staple selection, and selected staples flowing into grocery generation
 - Grocery list generation from approved planned meals, persisted approved baby foods, and selected staples
 - Pending grocery-change review/apply handling when a finalized or shopping-started list would differ from the current approved plan
-- Mobile-friendly grocery shopping list with Shopping/Profile/Meal views, source context, generic copyable plain text, manual add-ons, checked/already-have state, bounded spotty-service retry/manual recovery for item state taps, and Draft -> Finalized -> Shopping Started -> Completed lifecycle
+- Mobile-friendly grocery shopping list with Shopping/Profile/Meal views, source context, generic copyable plain text, emergency manual backup text, manual add-ons, checked/already-have state, bounded spotty-service retry/manual recovery for item state taps, recent completed-list access, and Draft -> Finalized -> Shopping Started -> Completed lifecycle
 - Baby settings with stage context, baby food statuses, Baby Meal 1/2 routine preview, Try This preview with manual status handoff, and Plan Week Baby Meal 1/2 persistence
 - Dashboard current-week summary with planning status, grocery status, next best action, setup-aware and calorie-guidance needs-attention items, and optional weekly wrap-up entry after completed shopping
 - Weekly wrap-up capture for made/skipped meals, leftovers, recipe/profile feedback, source-aware unused groceries, and explicit staple/quantity review handoff
@@ -156,6 +156,7 @@ npm run e2e:grocery-mobile
 npm run e2e:settings-foods
 npm run e2e:household-members
 npm run e2e:baby-settings
+npm run e2e:extension-capture
 npm run e2e:recipe-import
 npm run e2e:pwa
 ```

@@ -1,6 +1,6 @@
 # MealBoard MVP Readiness
 
-This document captures the current private family MVP state after the rule-based suggestions, smart swaps, Plan Week profile view, saved-food administration, Preferences food creation, actionable dashboard queue, baby weekly-plan persistence, baby Try This status handoff, pending grocery-change review/apply flow, household member lifecycle prep, owner transfer, mobile grocery spotty-service retry, generic grocery-list copy support, PWA install metadata, weekly wrap-up expansion, review-informed suggestion scoring, structured recipe URL import/private Chrome capture, hardening, and E2E smoke slices. It is a handoff snapshot for future Codex work so the next phase can build from known product truth instead of rediscovering the app.
+This document captures the current private family MVP state after the rule-based suggestions, smart swaps, Plan Week profile view, saved-food administration, Preferences food creation, actionable dashboard queue, baby weekly-plan persistence, baby Try This status handoff, pending grocery-change review/apply flow, household member lifecycle prep, owner transfer, mobile grocery spotty-service retry, generic grocery-list copy support, emergency grocery backup text, recent completed-list access, PWA install metadata, weekly wrap-up expansion, review-informed suggestion scoring, structured recipe URL import/private Chrome capture, section-aware recipe instructions, hardening, and E2E smoke slices. It is a handoff snapshot for future Codex work so the next phase can build from known product truth instead of rediscovering the app.
 
 ## Current Status
 
@@ -13,7 +13,7 @@ Recipes -> Plan Week -> Staples -> Grocery List -> Dashboard
 The latest verified flow covers:
 
 - Create and edit a recipe with structured ingredients, nutrition estimates, tags, and profile approvals.
-- Import a structured recipe URL or private Chrome capture into Recipe Import Review, correct flagged rows, and save only reviewed recipe fields plus source attribution.
+- Import a structured recipe URL or private Chrome capture into Recipe Import Review, preserve readable instruction sections when available, correct flagged rows, and save only reviewed recipe fields plus source attribution.
 - Configure the active weekly plan with adult work/off days and weekly goals.
 - Review and add rule-based adult meal suggestion drafts.
 - Let recent weekly wrap-up recipe ratings, skipped meals, too-much-leftover tags, and leftover-friendly tags influence rule-based suggestion ranking.
@@ -29,8 +29,9 @@ The latest verified flow covers:
 - Use Shopping, Profile, and Meal grocery views.
 - Add a manual grocery item with household/profile context and source note.
 - Toggle checked and already-have item states, including local pending-state preservation, bounded retry backoff, manual retry, and terminal feedback for item-state requests that can no longer apply.
-- Copy a generic plain-text grocery list grouped by category for manual use outside MealBoard.
+- Copy a generic plain-text grocery list grouped by category for manual use outside MealBoard, or reveal the emergency backup text when clipboard/PWA behavior is unreliable.
 - Advance a grocery list through Draft -> Finalized -> Shopping Started -> Completed.
+- Reopen a recent completed grocery list for source context or copying without changing current shopping state.
 - Open the optional weekly wrap-up after completed shopping.
 - Capture made/skipped meal outcomes, leftovers, source-aware unused grocery notes, and hand source-aware staple adjustment intent to Settings for explicit review before any staple changes.
 - Confirm Dashboard reflects current week planning, grocery status, next best action, setup-aware and calorie-guidance needs-attention items, and wrap-up entry when eligible.
@@ -38,7 +39,7 @@ The latest verified flow covers:
 - Link an existing auth user to the current household from `/settings/household` when signed in as an owner, transfer ownership to a non-owner member, and remove a non-owner member from that household.
 - Create, edit, archive, and restore household foods from `/settings/foods`.
 - Serve PWA install metadata and icon assets without adding offline/service-worker behavior.
-- Run unauthenticated Playwright auth-boundary smoke coverage plus credential-gated core-loop and mobile grocery smokes.
+- Run unauthenticated Playwright auth-boundary smoke coverage plus credential-gated core-loop, mobile grocery, recipe import, extension capture, and related settings smokes.
 
 ## Manual Smoke Checklist
 
@@ -115,11 +116,11 @@ These are intentionally out of scope for the current MVP unless a future task ex
 - Native iPhone or Android apps
 - Full pantry inventory, barcode scanning, expiration tracking, or reminders
 - Recipe photos, full recipe-link automation, and public Chrome Web Store extension release
-- Full macro tracking, calorie targets, strict warnings, or nutrition dashboards
+- Full macro tracking, nutrition API integrations, strict warnings, or nutrition dashboards
 - Baby nutrition, milk intake, and reaction tracking
 - Email-delivered household invitations, role editing beyond owner transfer, and multi-household switching
 - Full offline/PWA service-worker behavior
-- Grocery history intelligence
+- Grocery history intelligence beyond recent completed-list access
 
 ## Next Phase Options
 

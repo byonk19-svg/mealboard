@@ -80,6 +80,15 @@ export type GroceryList = {
   weekStartDate: string | null;
 };
 
+export type CompletedGroceryListSummary = {
+  completedAt: string | null;
+  createdAt: string;
+  id: string;
+  itemCount: number;
+  name: string | null;
+  weekStartDate: string | null;
+};
+
 type WeeklyPlanRow = {
   id: string;
   week_start_date: string;
@@ -154,11 +163,24 @@ type MealProfileNameRow = {
 };
 
 type GroceryListRow = {
+  completed_at?: string | null;
   created_at: string;
   generated_at: string | null;
   id: string;
   name: string | null;
   status: GroceryListStatus;
+  weekly_plans:
+    | { week_start_date: string }
+    | Array<{ week_start_date: string }>
+    | null;
+};
+
+type CompletedGroceryListSummaryRow = {
+  completed_at: string | null;
+  created_at: string;
+  grocery_list_items: Array<{ count: number }> | { count: number } | null;
+  id: string;
+  name: string | null;
   weekly_plans:
     | { week_start_date: string }
     | Array<{ week_start_date: string }>
@@ -512,6 +534,81 @@ export async function getLatestGroceryList(householdId: string) {
     status: groceryList.status,
     weekStartDate
   } satisfies GroceryList;
+}
+
+export async function getCompletedGroceryListById({
+  groceryListId,
+  householdId
+}: {
+  groceryListId: string;
+  householdId: string;
+}) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("grocery_lists")
+    .select(
+      "id, name, status, generated_at, created_at, weekly_plans(week_start_date)"
+    )
+    .eq("household_id", householdId)
+    .eq("id", groceryListId)
+    .eq("status", "completed")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  const groceryList = data as GroceryListRow;
+  const items = await getGroceryListItems(supabase, householdId, groceryList.id);
+  const weekStartDate =
+    getJoinedValue(groceryList.weekly_plans)?.week_start_date ?? null;
+
+  return {
+    createdAt: groceryList.created_at,
+    generatedAt: groceryList.generated_at,
+    id: groceryList.id,
+    items,
+    name: groceryList.name,
+    status: groceryList.status,
+    weekStartDate
+  } satisfies GroceryList;
+}
+
+export async function getRecentCompletedGroceryLists({
+  householdId,
+  limit = 5
+}: {
+  householdId: string;
+  limit?: number;
+}): Promise<CompletedGroceryListSummary[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("grocery_lists")
+    .select(
+      "id, name, completed_at, created_at, weekly_plans(week_start_date), grocery_list_items(count)"
+    )
+    .eq("household_id", householdId)
+    .eq("status", "completed")
+    .order("completed_at", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data ?? []) as CompletedGroceryListSummaryRow[]).map((row) => ({
+    completedAt: row.completed_at,
+    createdAt: row.created_at,
+    id: row.id,
+    itemCount: getCompletedGroceryListItemCount(row.grocery_list_items),
+    name: row.name,
+    weekStartDate: getJoinedValue(row.weekly_plans)?.week_start_date ?? null
+  }));
 }
 
 export async function getPendingGroceryChangesForWeeklyPlan({
@@ -1612,6 +1709,13 @@ function toNullableNumber(value: number | string | null) {
 
   const numberValue = Number(value);
   return Number.isFinite(numberValue) ? numberValue : null;
+}
+
+function getCompletedGroceryListItemCount(
+  value: CompletedGroceryListSummaryRow["grocery_list_items"]
+) {
+  const row = getJoinedValue(value);
+  return row?.count ?? 0;
 }
 
 function getJoinedValue<T>(value: T | T[] | null) {

@@ -50,6 +50,16 @@ Every Codex task should follow these rules:
 
 ---
 
+## Current Completion Notes
+
+The private MVP now includes section-aware structured recipe import review,
+emergency grocery backup text for manual copying, recent completed grocery list
+access from `/grocery-list`, and a named `e2e:extension-capture` smoke script.
+Future slices should not reopen those same gaps unless real dogfooding exposes
+a concrete failure.
+
+---
+
 ## Recommended Branch Naming
 
 Use branch names like:

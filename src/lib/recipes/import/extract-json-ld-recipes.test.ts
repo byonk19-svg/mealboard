@@ -125,7 +125,7 @@ describe("extractJsonLdRecipeCandidates", () => {
     ]);
   });
 
-  it("flattens sectioned HowTo instructions in source order", () => {
+  it("formats sectioned HowTo instructions as readable method blocks", () => {
     const html = `
       <script type="application/ld+json">
         {
@@ -158,11 +158,8 @@ describe("extractJsonLdRecipeCandidates", () => {
     `;
 
     expect(extractJsonLdRecipeCandidates(html)[0]?.instructions).toEqual([
-      "Prep",
-      "Heat the oven.",
-      "Cut the potatoes.",
-      "Bake",
-      "Roast until tender."
+      "Prep:\nHeat the oven.\nCut the potatoes.",
+      "Bake:\nRoast until tender."
     ]);
   });
 

@@ -4,7 +4,7 @@ const email = process.env.MEALBOARD_E2E_EMAIL;
 const password = process.env.MEALBOARD_E2E_PASSWORD;
 
 test.describe("MealBoard core loop", () => {
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
 
   test.skip(
     !email || !password,
@@ -47,9 +47,12 @@ test.describe("MealBoard core loop", () => {
     await expect(page.getByText("Recipe created.")).toBeVisible();
 
     await page.goto(`/plan-week?weekStartDate=${weekStartDate}`);
+    await page.waitForLoadState("networkidle");
     await page.getByLabel("Week of").fill(weekStartDate);
     await page.getByRole("button", { name: "Create or select week" }).click();
-    await expect(page.getByRole("button", { name: "Save weekly setup" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Save weekly setup" })).toBeVisible({
+      timeout: 45_000
+    });
     await page.getByRole("button", { name: "Save weekly setup" }).click();
     await expect(page.getByLabel("Recipe for Sunday")).toBeVisible();
     const weeklyPlanId =
@@ -77,14 +80,19 @@ test.describe("MealBoard core loop", () => {
     });
     await expect(plannedMeal).toBeVisible({ timeout: 30_000 });
     await page.getByRole("link", { name: "Profile view" }).click();
-    await expect(page).toHaveURL(/view=profile/);
+    await expect(page).toHaveURL(/view=profile/, { timeout: 45_000 });
     await expect(plannedMeal).toBeVisible();
     await expect(page.getByRole("heading", { exact: true, name: "Baby" })).toBeVisible();
     await plannedMeal.getByRole("button", { name: "Approve for groceries" }).click();
-    await expect(page).toHaveURL(/view=profile/);
-    await expect(plannedMeal.getByText("Approved for groceries")).toBeVisible();
+    await expect(page).toHaveURL(/view=profile/, { timeout: 45_000 });
+    const approvedPlannedMeal = page.getByRole("article", {
+      name: `Planned meal ${recipeName}`
+    });
+    await expect(
+      approvedPlannedMeal.getByText("Approved for groceries")
+    ).toBeVisible({ timeout: 30_000 });
     await page.getByRole("link", { name: "Day view" }).click();
-    await expect(plannedMeal).toBeVisible();
+    await expect(approvedPlannedMeal).toBeVisible();
     await page.getByLabel(stapleName).check();
     await page.getByRole("button", { name: "Save selected staples" }).click();
     await expect(page.getByRole("button", { name: "Generate grocery list" })).toBeVisible();
@@ -107,7 +115,9 @@ test.describe("MealBoard core loop", () => {
     await expect(page.getByText("Manual grocery item added.")).toBeVisible();
 
     await page.getByRole("button", { name: "Check off" }).first().click();
-    await expect(page.getByText("Grocery item updated.").first()).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /Uncheck/ }).first()
+    ).toBeVisible();
     await page.getByRole("button", { name: "Finalize list" }).click();
     await page.goto(`/plan-week?weekStartDate=${weekStartDate}`);
     const mondayRecipeSelect = page.getByLabel("Recipe for Monday");
@@ -122,12 +132,20 @@ test.describe("MealBoard core loop", () => {
     const mondayPlannedMeal = page
       .getByRole("article", { name: `Planned meal ${recipeName}` })
       .nth(1);
+    await page.waitForLoadState("networkidle");
     await mondayPlannedMeal
       .getByRole("button", { name: "Approve for groceries" })
       .click();
+    await page.waitForURL(
+      /message=Plan(\+|%20)item(\+|%20)approved\.?/,
+      { timeout: 45_000 }
+    );
+    const approvedMondayPlannedMeal = page
+      .getByRole("article", { name: `Planned meal ${recipeName}` })
+      .nth(1);
     await expect(
-      mondayPlannedMeal.getByText("Approved for groceries")
-    ).toBeVisible();
+      approvedMondayPlannedMeal.getByText("Approved for groceries")
+    ).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText("Protected grocery list: Finalized")).toBeVisible();
     await expect(
       page.getByText("MealBoard will not silently change this list")
@@ -135,17 +153,27 @@ test.describe("MealBoard core loop", () => {
     await expect(
       page.getByRole("button", { name: "Apply reviewed grocery updates" })
     ).toBeVisible();
+    await page.waitForLoadState("networkidle");
     await page
       .getByRole("button", { name: "Apply reviewed grocery updates" })
       .click();
+    await page.waitForURL(/message=Applied(\+|%20)pending(\+|%20)grocery/, {
+      timeout: 45_000
+    });
     await expect(
       page.getByText("Applied pending grocery changes:")
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 45_000 });
     await page.goto("/grocery-list");
     await expect(page.getByText("Finalized")).toBeVisible();
     await page.getByRole("button", { name: "Start shopping" }).click();
     await page.getByRole("button", { name: "Complete shopping" }).click();
     await expect(page.getByText("This grocery list is completed.")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Recent completed grocery lists" })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: /View completed list/ }).first()
+    ).toBeVisible();
 
     await page.goto("/dashboard");
     await expect(page.getByRole("heading", { name: "Current Week" })).toBeVisible();

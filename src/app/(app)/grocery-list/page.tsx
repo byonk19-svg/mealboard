@@ -1,6 +1,14 @@
 import Link from "next/link";
-import type { GroceryListItem, GroceryListStatus } from "@/lib/grocery/data";
-import { getLatestGroceryList } from "@/lib/grocery/data";
+import type {
+  CompletedGroceryListSummary,
+  GroceryListItem,
+  GroceryListStatus
+} from "@/lib/grocery/data";
+import {
+  getCompletedGroceryListById,
+  getLatestGroceryList,
+  getRecentCompletedGroceryLists
+} from "@/lib/grocery/data";
 import {
   buildGroceryListSummary,
   type GroceryListSummary
@@ -27,6 +35,7 @@ import { GroceryItemStateControls } from "./grocery-item-state-controls";
 
 type GroceryListPageProps = {
   searchParams: Promise<{
+    listId?: string;
     message?: string;
     view?: string;
   }>;
@@ -44,18 +53,27 @@ export default async function GroceryListPage({
   searchParams
 }: GroceryListPageProps) {
   const householdContext = await getCurrentHouseholdContext();
-  const { message, view: viewParam } = await searchParams;
+  const { listId, message, view: viewParam } = await searchParams;
   const view = parseGroceryListView(viewParam);
 
   if (!householdContext.household) {
     return null;
   }
 
-  const [groceryList, groceryCategories, mealProfiles] = await Promise.all([
-    getLatestGroceryList(householdContext.household.id),
-    getGroceryCategories(householdContext.household.id),
-    getMealProfiles(householdContext.household.id)
-  ]);
+  const householdId = householdContext.household.id;
+  const [groceryList, recentCompletedLists, groceryCategories, mealProfiles] =
+    await Promise.all([
+      listId
+        ? getCompletedGroceryListById({
+            groceryListId: listId,
+            householdId
+          })
+        : getLatestGroceryList(householdId),
+      getRecentCompletedGroceryLists({ householdId }),
+      getGroceryCategories(householdContext.household.id),
+      getMealProfiles(householdContext.household.id)
+    ]);
+  const isHistoricalList = Boolean(listId);
   const categoryGroups = groceryList
     ? groupItemsByCategory(groceryList.items)
     : [];
@@ -105,6 +123,7 @@ export default async function GroceryListPage({
           <GroceryListOverview
             copyText={copyText}
             groceryListId={groceryList.id}
+            isHistoricalList={isHistoricalList}
             name={groceryList.name}
             status={groceryList.status}
             summary={groceryListSummary}
@@ -115,12 +134,18 @@ export default async function GroceryListPage({
           <ManualGroceryItemForm
             groceryCategories={groceryCategories}
             groceryListId={groceryList.id}
+            isHistoricalList={isHistoricalList}
             listStatus={groceryList.status}
             mealProfiles={mealProfiles}
             view={view}
           />
 
-          <ViewSelector view={view} />
+          <ViewSelector listId={listId} view={view} />
+
+          <RecentCompletedLists
+            currentListId={groceryList.id}
+            lists={recentCompletedLists}
+          />
 
           {groceryListSummary.totalItemCount === 0 ? (
             <EmptyCurrentListState />
@@ -162,6 +187,7 @@ export default async function GroceryListPage({
 function GroceryListOverview({
   copyText,
   groceryListId,
+  isHistoricalList,
   name,
   status,
   summary,
@@ -170,6 +196,7 @@ function GroceryListOverview({
 }: {
   copyText: string;
   groceryListId: string;
+  isHistoricalList: boolean;
   name: string | null;
   status: GroceryListStatus;
   summary: GroceryListSummary;
@@ -177,7 +204,7 @@ function GroceryListOverview({
   weekStartDate: string | null;
 }) {
   return (
-    <section className="sticky top-0 z-10 rounded-lg border border-border bg-card p-5 shadow-sm">
+    <section className="rounded-lg border border-border bg-card p-5 shadow-sm lg:sticky lg:top-0 lg:z-10">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h2 className="text-xl font-semibold">
@@ -188,6 +215,12 @@ function GroceryListOverview({
               ? `Week of ${formatDisplayDate(weekStartDate)}`
               : "No weekly plan attached"}
           </p>
+          {isHistoricalList ? (
+            <p className="mt-2 rounded-md border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
+              Viewing a completed list from history. Use the current grocery
+              list for new shopping changes.
+            </p>
+          ) : null}
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="rounded-full border border-border bg-muted px-3 py-1.5 text-sm font-medium">
               {formatStatus(status)}
@@ -207,11 +240,20 @@ function GroceryListOverview({
             copyText={copyText}
             disabled={summary.totalItemCount === 0}
           />
-          <LifecycleAction
-            groceryListId={groceryListId}
-            status={status}
-            view={view}
-          />
+          {isHistoricalList ? (
+            <Link
+              className="min-h-12 rounded-md border border-border bg-card px-4 py-3 text-sm font-medium transition hover:bg-muted"
+              href="/grocery-list"
+            >
+              Back to current list
+            </Link>
+          ) : (
+            <LifecycleAction
+              groceryListId={groceryListId}
+              status={status}
+              view={view}
+            />
+          )}
         </div>
       </div>
 
@@ -272,15 +314,33 @@ function EmptyCurrentListState() {
   );
 }
 
-function ViewSelector({ view }: { view: GroceryListView }) {
+function ViewSelector({
+  listId,
+  view
+}: {
+  listId?: string;
+  view: GroceryListView;
+}) {
   const options: Array<{
     href: string;
     label: string;
     view: GroceryListView;
   }> = [
-    { href: "/grocery-list", label: "Shopping", view: "shopping" },
-    { href: "/grocery-list?view=profile", label: "Profile", view: "profile" },
-    { href: "/grocery-list?view=meal", label: "Meal", view: "meal" }
+    {
+      href: buildGroceryListHref({ listId, view: "shopping" }),
+      label: "Shopping",
+      view: "shopping"
+    },
+    {
+      href: buildGroceryListHref({ listId, view: "profile" }),
+      label: "Profile",
+      view: "profile"
+    },
+    {
+      href: buildGroceryListHref({ listId, view: "meal" }),
+      label: "Meal",
+      view: "meal"
+    }
   ];
 
   return (
@@ -310,20 +370,92 @@ function ViewSelector({ view }: { view: GroceryListView }) {
   );
 }
 
+function RecentCompletedLists({
+  currentListId,
+  lists
+}: {
+  currentListId: string;
+  lists: CompletedGroceryListSummary[];
+}) {
+  if (lists.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold">
+            Recent completed grocery lists
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Reopen completed lists for source context or copy a previous trip.
+          </p>
+        </div>
+        <span className="text-sm text-muted-foreground">
+          {formatItemCount(lists.length)}
+        </span>
+      </div>
+      <div className="mt-4 grid gap-3">
+        {lists.map((list) => (
+          <article
+            className={`rounded-md border px-3 py-3 ${
+              list.id === currentListId
+                ? "border-primary bg-primary/5"
+                : "border-border"
+            }`}
+            key={list.id}
+          >
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="font-medium">
+                  {list.name ?? "Completed grocery list"}
+                </h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {list.weekStartDate
+                    ? `Week of ${formatDisplayDate(list.weekStartDate)}`
+                    : "No weekly plan attached"}{" "}
+                  - {formatItemCount(list.itemCount)}
+                </p>
+                {list.completedAt ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Completed {formatDisplayDate(list.completedAt)}
+                  </p>
+                ) : null}
+              </div>
+              <Link
+                className="inline-flex min-h-11 items-center justify-center rounded-md border border-border px-3 py-2 text-sm font-medium transition hover:bg-muted"
+                href={buildGroceryListHref({
+                  listId: list.id,
+                  view: "shopping"
+                })}
+              >
+                View completed list
+              </Link>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function ManualGroceryItemForm({
   groceryCategories,
   groceryListId,
+  isHistoricalList,
   listStatus,
   mealProfiles,
   view
 }: {
   groceryCategories: GroceryCategory[];
   groceryListId: string;
+  isHistoricalList: boolean;
   listStatus: GroceryListStatus;
   mealProfiles: MealProfile[];
   view: GroceryListView;
 }) {
-  const canAddItems = canAddManualItems(listStatus);
+  const canAddItems = !isHistoricalList && canAddManualItems(listStatus);
 
   return (
     <details className="rounded-lg border border-border bg-card p-5 shadow-sm">
@@ -335,7 +467,9 @@ function ManualGroceryItemForm({
       </summary>
       {!canAddItems ? (
         <p className="mt-4 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-          Manual items are paused for this list status.
+          {isHistoricalList
+            ? "Manual items stay with the current grocery list, not completed history."
+            : "Manual items are paused for this list status."}
         </p>
       ) : null}
       <form action={addManualGroceryItemAction} className="mt-4 space-y-4">
@@ -672,6 +806,27 @@ function parseGroceryListView(value: string | undefined): GroceryListView {
   return "shopping";
 }
 
+function buildGroceryListHref({
+  listId,
+  view
+}: {
+  listId?: string;
+  view: GroceryListView;
+}) {
+  const params = new URLSearchParams();
+
+  if (listId) {
+    params.set("listId", listId);
+  }
+
+  if (view !== "shopping") {
+    params.set("view", view);
+  }
+
+  const query = params.toString();
+  return query ? `/grocery-list?${query}` : "/grocery-list";
+}
+
 function GroceryListMessage({ message }: { message: string }) {
   return (
     <p
@@ -800,10 +955,18 @@ function formatLifecycleAction(status: string) {
 }
 
 function formatDisplayDate(dateKey: string) {
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(dateKey)
+    ? parseDateKey(dateKey)
+    : new Date(dateKey);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown date";
+  }
+
   return new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
     timeZone: "UTC"
-  }).format(parseDateKey(dateKey));
+  }).format(date);
 }
 
 function parseDateKey(dateKey: string) {
