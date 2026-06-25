@@ -64,6 +64,46 @@ test.describe("Chrome recipe capture script", () => {
     });
   });
 
+  test("captures ordered directions when recipe cards use generic list markup", async ({
+    page
+  }) => {
+    await page.setContent(`
+      <main>
+        <article class="recipe-card">
+          <h1>Fixture Generic Pancakes</h1>
+          <section class="recipe-ingredients">
+            <h2>Ingredients</h2>
+            <ul>
+              <li>1 cup flour</li>
+            </ul>
+          </section>
+          <section>
+            <h2>Directions</h2>
+            <ol>
+              <li>Whisk the batter.</li>
+              <li>Cook until golden.</li>
+            </ol>
+          </section>
+        </article>
+      </main>
+    `);
+    await page.addScriptTag({ content: captureScript });
+
+    const payload = await page.evaluate<CapturePayload>(() =>
+      (
+        globalThis as typeof globalThis & {
+          __mealboardCaptureActiveRecipePage: () => CapturePayload;
+        }
+      ).__mealboardCaptureActiveRecipePage()
+    );
+
+    expect(payload.visibleRecipe).toMatchObject({
+      ingredients: ["1 cup flour"],
+      instructions: ["Whisk the batter.", "Cook until golden."],
+      title: "Fixture Generic Pancakes"
+    });
+  });
+
   test("marks browser-check pages as blocked", async ({ page }) => {
     await page.setContent(`
       <title>Just a moment...</title>

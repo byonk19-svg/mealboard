@@ -60,6 +60,38 @@ Protein: 18g`,
     });
   });
 
+  it("recognizes preparation and steps headings as instructions", () => {
+    expect(
+      parseSelectedRecipeText(
+        `Fixture Pancakes
+Ingredients
+1 cup flour
+Preparation
+Whisk the batter.
+Cook until golden.`,
+        "Fallback Recipe"
+      )
+    ).toMatchObject({
+      ingredients: ["1 cup flour"],
+      instructions: ["Whisk the batter.", "Cook until golden."],
+      name: "Fixture Pancakes"
+    });
+
+    expect(
+      parseSelectedRecipeText(
+        `Ingredients
+1 cup flour
+Steps
+1. Whisk the batter.
+2. Cook until golden.`,
+        "Fallback Recipe"
+      )
+    ).toMatchObject({
+      ingredients: ["1 cup flour"],
+      instructions: ["Whisk the batter.", "Cook until golden."]
+    });
+  });
+
   it("returns null for unstructured selected text", () => {
     expect(
       parseSelectedRecipeText(

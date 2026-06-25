@@ -8,7 +8,12 @@ const SECTION_LABELS = [
   "instruction",
   "directions",
   "direction",
-  "method"
+  "method",
+  "preparation",
+  "prepare",
+  "steps",
+  "step",
+  "make it"
 ] as const;
 
 const METADATA_LABELS = [
@@ -135,7 +140,12 @@ function parseSectionLine(line: string):
     label === "instructions" ||
     label === "direction" ||
     label === "directions" ||
-    label === "method"
+    label === "method" ||
+    label === "preparation" ||
+    label === "prepare" ||
+    label === "step" ||
+    label === "steps" ||
+    label === "make it"
   ) {
     return { type: "instructions", value };
   }

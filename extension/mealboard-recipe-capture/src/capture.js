@@ -66,13 +66,20 @@
     ]);
     const instructions = collectListText(root, [
       ".wprm-recipe-instruction",
+      ".wprm-recipe-instruction-text",
       ".tasty-recipes-instructions li",
       ".mv-create-instructions li",
       '[class*="instruction" i] li',
       '[class*="direction" i] li',
       '[class*="method" i] li',
+      '[class*="preparation" i] li',
+      '[class*="step" i] li',
       '[class*="instruction" i]',
-      '[class*="direction" i]'
+      '[class*="direction" i]',
+      '[class*="method" i]',
+      '[class*="preparation" i]',
+      '[class*="step" i]',
+      "ol li"
     ]);
     const rootText = normalizeText(root.innerText || root.textContent || "");
 

@@ -319,6 +319,14 @@ export async function createRecipe(formData: FormData) {
   });
 
   revalidatePath("/recipes");
+  if (path === "/recipes/import") {
+    const searchParams = new URLSearchParams({
+      message: "Recipe created.",
+      q: recipePayload.name
+    });
+    redirect(`/recipes?${searchParams.toString()}`);
+  }
+
   redirect(`/recipes/${recipe.id}?message=${encodeURIComponent("Recipe created.")}`);
 }
 

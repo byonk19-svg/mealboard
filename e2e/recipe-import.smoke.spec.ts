@@ -182,9 +182,11 @@ test.describe("Recipe import and filters", () => {
       .first()
       .check();
     await page.getByRole("button", { name: "Save imported recipe" }).click();
-    await page.waitForURL(/\/recipes\/[^/?]+\?message=/, { timeout: 30_000 });
+    await page.waitForURL(/\/recipes\?/, { timeout: 30_000 });
     await expect(page.getByText("Recipe created.")).toBeVisible();
+    await expect(page.getByLabel("Search recipes")).toHaveValue(importedRecipeName);
     await expect(page.getByRole("heading", { name: importedRecipeName })).toBeVisible();
+    await page.getByRole("link", { name: "View and edit" }).first().click();
     await expect(page.getByText("Recipe source")).toBeVisible();
     await expect(
       page.getByRole("link", { name: "MealBoard Synthetic Recipe Fixture" })
