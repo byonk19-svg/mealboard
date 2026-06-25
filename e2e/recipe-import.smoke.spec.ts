@@ -173,11 +173,19 @@ test.describe("Recipe import and filters", () => {
     await expect(page.getByLabel("Ingredient 2 display name")).toHaveValue(
       /chickpeas/i
     );
+    const editedRecipeName = `${importedRecipeName} Edited`;
+    const editedInstructions =
+      "Warm the farro and chickpeas in a skillet.\nFinish with preserved lemon and herbs.";
+    await page.getByLabel("Recipe name").fill(editedRecipeName);
+    await page.getByLabel("Instructions").fill(editedInstructions);
     await page
       .getByLabel("Ingredient 4 display name")
       .fill(`E2E Fixture Salt ${suffix}`);
     await page.getByLabel("Ingredient 4 quantity").fill("1");
     await page.getByLabel("Ingredient 4 unit").fill("tsp");
+    await page
+      .getByLabel("Ingredient 4 food to create")
+      .fill(`E2E Preserved Salt ${suffix}`);
 
     for (const checkbox of await page
       .getByRole("checkbox", { name: "I reviewed this row" })
@@ -185,6 +193,28 @@ test.describe("Recipe import and filters", () => {
       await checkbox.check();
     }
 
+    await page.getByLabel("Source URL").fill("not-a-url-yet");
+    await page.getByRole("button", { name: "Save imported recipe" }).click();
+    await expect(
+      page.getByText("Recipe source URL must start with http:// or https://.")
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByLabel("Recipe name")).toHaveValue(editedRecipeName);
+    await expect(page.getByLabel("Instructions")).toHaveValue(editedInstructions);
+    await expect(page.getByLabel("Source URL")).toHaveValue("not-a-url-yet");
+    await expect(page.getByLabel("Ingredient 4 display name")).toHaveValue(
+      `E2E Fixture Salt ${suffix}`
+    );
+    await expect(page.getByLabel("Ingredient 4 quantity")).toHaveValue("1");
+    await expect(page.getByLabel("Ingredient 4 unit")).toHaveValue("tsp");
+    await expect(page.getByLabel("Ingredient 4 food to create")).toHaveValue(
+      `E2E Preserved Salt ${suffix}`
+    );
+    await page.getByLabel("Source URL").fill(draft.sourceUrl);
+    for (const checkbox of await page
+      .getByRole("checkbox", { name: "I reviewed this row" })
+      .all()) {
+      await checkbox.check();
+    }
     await page
       .getByText("Approved for planning")
       .locator("..")
@@ -194,7 +224,7 @@ test.describe("Recipe import and filters", () => {
     await page.getByRole("button", { name: "Save imported recipe" }).click();
     await page.waitForURL(/\/recipes\/[^/?]+\?message=/, { timeout: 30_000 });
     await expect(page.getByText("Recipe created.")).toBeVisible();
-    await expect(page.getByRole("heading", { name: importedRecipeName })).toBeVisible();
+    await expect(page.getByRole("heading", { name: editedRecipeName })).toBeVisible();
     await expect(page.getByText("Recipe source")).toBeVisible();
     await expect(
       page.getByRole("link", { name: "MealBoard Synthetic Recipe Fixture" })

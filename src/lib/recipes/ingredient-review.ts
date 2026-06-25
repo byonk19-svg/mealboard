@@ -4,6 +4,7 @@ import type { Food } from "@/lib/settings/types";
 export type IngredientReviewRow = {
   display_name: string;
   food_id: string | null;
+  new_food_name?: string | null;
   quantity: number | null;
   unit: string | null;
   grocery_category_id: string | null;

@@ -324,6 +324,7 @@ function IngredientRow({
           Ingredient {index + 1} food to create
           <input
             className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            defaultValue={ingredient.new_food_name ?? ""}
             list={foodOptionsId}
             name="ingredientNewFoodName"
             placeholder="New or existing food name"

@@ -7,6 +7,7 @@ import {
   RecipeForm,
   type RecipeFormInitialValues
 } from "@/components/recipes/recipe-form";
+import { buildRecipeImportDraftFromFormData } from "@/lib/recipes/import/form-draft";
 import { getRecipeImportReviewIssues } from "@/lib/recipes/import/import-review-issues";
 import { normalizeExtensionCapturePayload } from "@/lib/recipes/import/normalize-extension-capture";
 import type { RecipeImportDraft } from "@/lib/recipes/import/types";
@@ -122,6 +123,18 @@ export function RecipeImportReviewClient({
       : "/recipes/import/review";
   }, [searchParams]);
 
+  function persistCurrentDraft(form: HTMLFormElement) {
+    if (!draft || !draftKey) {
+      return;
+    }
+
+    const nextDraft = buildRecipeImportDraftFromFormData(
+      draft,
+      new FormData(form)
+    );
+    window.sessionStorage.setItem(draftKey, JSON.stringify(nextDraft));
+  }
+
   if (!draft || !initialValues) {
     return (
       <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
@@ -172,6 +185,7 @@ export function RecipeImportReviewClient({
         foods={foods}
         initialValues={initialValues}
         importReviewIssues={importReviewIssues}
+        onBeforeSubmit={persistCurrentDraft}
         profiles={profiles}
         returnPath={returnPath}
         submitLabel="Save imported recipe"

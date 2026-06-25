@@ -32,6 +32,7 @@ type RecipeFormProps = {
   foods: Food[];
   initialValues?: RecipeFormInitialValues;
   importReviewIssues?: RecipeImportReviewIssue[];
+  onBeforeSubmit?: (form: HTMLFormElement) => void;
   profiles: MealProfile[];
   recipe?: RecipeWithDetails;
   returnPath?: string;
@@ -66,6 +67,7 @@ export function RecipeForm({
   foods,
   initialValues,
   importReviewIssues = [],
+  onBeforeSubmit,
   profiles,
   recipe,
   returnPath,
@@ -82,7 +84,11 @@ export function RecipeForm({
     requiresRecipeImportAcknowledgement(importReviewIssues);
 
   return (
-    <form action={recipe ? updateRecipe : createRecipe} className="space-y-6">
+    <form
+      action={recipe ? updateRecipe : createRecipe}
+      className="space-y-6"
+      onSubmit={(event) => onBeforeSubmit?.(event.currentTarget)}
+    >
       {recipe ? <input name="recipeId" type="hidden" value={recipe.id} /> : null}
       {returnPath ? (
         <input name="recipeFormPath" type="hidden" value={returnPath} />
@@ -185,11 +191,12 @@ export function RecipeForm({
             name="sourceTitle"
           />
           <TextField
+            autoComplete="url"
             defaultValue={initialValues?.source_url ?? recipe?.source_url ?? ""}
+            inputMode="url"
             label="Source URL"
             name="sourceUrl"
             placeholder="https://example.com/recipe"
-            type="url"
           />
         </div>
       </section>
