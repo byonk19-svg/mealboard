@@ -31,7 +31,44 @@ describe("normalizeExtensionCapturePayload", () => {
     });
   });
 
-  it("builds a low-confidence selected-text draft when JSON-LD is unavailable", () => {
+  it("builds a low-confidence selected-text draft when copied text has recipe sections", () => {
+    const draft = normalizeExtensionCapturePayload(
+      {
+        jsonLd: [],
+        selectedText:
+          "Ingredients: 1 cup beans. Instructions: Simmer until warm.",
+        sourceTitle: "Recipe Page | Example",
+        sourceUrl: "https://example.test/recipe?fbclid=abc#comments"
+      },
+      []
+    );
+
+    expect(draft).toMatchObject({
+      name: "Recipe Page",
+      sourceTitle: "Recipe Page",
+      sourceUrl: "https://example.test/recipe",
+      ingredientLines: ["1 cup beans"],
+      instructions: "Simmer until warm.",
+      confidence: {
+        ingredients: "low",
+        instructions: "low",
+        name: "low",
+        nutrition: "missing"
+      },
+      warnings: [
+        "The extension did not find structured recipe data on this page.",
+        "Selected page text was split into ingredients and instructions. Review imported fields before saving."
+      ]
+    });
+    expect(draft?.ingredientReviewRows).toHaveLength(1);
+    expect(draft?.ingredientReviewRows[0]).toMatchObject({
+      display_name: "beans",
+      quantity: 1,
+      unit: "cup"
+    });
+  });
+
+  it("keeps unstructured selected text in instructions when sections are unavailable", () => {
     const draft = normalizeExtensionCapturePayload(
       {
         jsonLd: [],
@@ -43,16 +80,8 @@ describe("normalizeExtensionCapturePayload", () => {
     );
 
     expect(draft).toMatchObject({
-      name: "Recipe Page",
-      sourceTitle: "Recipe Page",
-      sourceUrl: "https://example.test/recipe",
+      ingredientLines: [],
       instructions: "Ingredients and instructions copied from the page.",
-      confidence: {
-        ingredients: "missing",
-        instructions: "low",
-        name: "low",
-        nutrition: "missing"
-      },
       warnings: [
         "The extension did not find structured recipe data on this page.",
         "Selected page text was added to instructions. Review the title, ingredients, servings, and nutrition before saving."

@@ -225,16 +225,19 @@ test.describe("Recipe import and filters", () => {
       page.getByRole("heading", { name: "Review imported recipe" })
     ).toBeVisible();
     await expect(page.getByLabel("Recipe name")).toHaveValue("Fallback Recipe");
-    await expect(page.getByLabel("Instructions")).toHaveValue(
-      "Ingredients: 1 cup beans. Instructions: Simmer until warm."
+    await expect(page.getByLabel("Ingredient 1 display name")).toHaveValue(
+      /beans/i
     );
+    await expect(page.getByLabel("Ingredient 1 quantity")).toHaveValue("1");
+    await expect(page.getByLabel("Ingredient 1 unit")).toHaveValue("cup");
+    await expect(page.getByLabel("Instructions")).toHaveValue("Simmer until warm.");
     await expect(page.getByLabel("Source title")).toHaveValue("Fallback Recipe");
     await expect(page.getByLabel("Source URL")).toHaveValue(
       "https://example.test/fallback-recipe"
     );
     await expect(
       page.getByText(
-        "Selected page text was added to instructions. Review the title, ingredients, servings, and nutrition before saving."
+        "Selected page text was split into ingredients and instructions. Review imported fields before saving."
       )
     ).toBeVisible();
   });

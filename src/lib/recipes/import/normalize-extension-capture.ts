@@ -1,5 +1,6 @@
 import { extractJsonLdRecipeCandidates } from "./extract-json-ld-recipes";
 import { normalizeRecipeImportDraft } from "./normalize-recipe-import";
+import { parseSelectedRecipeText } from "./parse-selected-recipe-text";
 import { cleanRecipeSourceAttribution } from "./source-attribution";
 import type { RawRecipeCandidate, RecipeImportDraft } from "./types";
 import type { Food } from "@/lib/settings/types";
@@ -69,6 +70,34 @@ export function normalizeExtensionCapturePayload(
     sourceTitle,
     sourceUrl
   });
+  const selectedTextCandidate = parseSelectedRecipeText(
+    selectedText,
+    source.sourceTitle
+  );
+
+  if (selectedTextCandidate) {
+    const draft = normalizeRecipeImportDraft({
+      candidate: selectedTextCandidate,
+      foods,
+      sourceTitle,
+      sourceUrl
+    });
+
+    return {
+      ...draft,
+      confidence: {
+        ...draft.confidence,
+        ingredients: "low",
+        instructions: "low",
+        name: draft.name ? "low" : "missing",
+        nutrition: "missing"
+      },
+      warnings: [
+        "The extension did not find structured recipe data on this page.",
+        ...draft.warnings
+      ]
+    };
+  }
 
   return {
     confidence: {
