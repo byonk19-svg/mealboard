@@ -120,6 +120,79 @@ describe("parseIngredientText", () => {
     ]);
   });
 
+  it("cleans recipe-card checkbox glyphs, price notes, and footnote markers", () => {
+    expect(
+      parseIngredientText(
+        "\u2610 1 yellow onion, diced ($0.32)\n\u2611 3 green onions* sliced ($0.25)"
+      )
+    ).toEqual([
+      {
+        originalLine: "1 yellow onion, diced",
+        displayName: "yellow onion",
+        quantity: 1,
+        unit: "count",
+        preparation: "diced",
+        notes: null,
+        needsReview: false,
+        reviewReason: null
+      },
+      {
+        originalLine: "3 green onions sliced",
+        displayName: "green onions",
+        quantity: 3,
+        unit: "count",
+        preparation: "sliced",
+        notes: null,
+        needsReview: false,
+        reviewReason: null
+      }
+    ]);
+  });
+
+  it("keeps boneless skinless poultry descriptors as preparation", () => {
+    expect(
+      parseIngredientText(
+        "\u25a2 1 lb. (450 g) boneless, skinless chicken breast ($5.47)"
+      )
+    ).toEqual([
+      {
+        originalLine: "1 lb. (450 g) boneless, skinless chicken breast",
+        displayName: "chicken breast",
+        quantity: 1,
+        unit: "lb",
+        preparation: "boneless skinless",
+        notes: "450 g",
+        needsReview: false,
+        reviewReason: null
+      }
+    ]);
+  });
+
+  it("treats countable ingredients without explicit units as count", () => {
+    expect(parseIngredientText("2 large eggs\n6 eggs")).toEqual([
+      {
+        originalLine: "2 large eggs",
+        displayName: "eggs",
+        quantity: 2,
+        unit: "count",
+        preparation: "large",
+        notes: null,
+        needsReview: false,
+        reviewReason: null
+      },
+      {
+        originalLine: "6 eggs",
+        displayName: "eggs",
+        quantity: 6,
+        unit: "count",
+        preparation: null,
+        notes: null,
+        needsReview: false,
+        reviewReason: null
+      }
+    ]);
+  });
+
   it("flags vague or unparsed rows for review", () => {
     expect(parseIngredientText("- salt to taste\n\u2022 pepper")).toEqual([
       {

@@ -62,6 +62,7 @@ const preparationWords = new Set([
   "crushed",
   "diced",
   "drained",
+  "boneless",
   "fresh",
   "frozen",
   "grated",
@@ -71,6 +72,7 @@ const preparationWords = new Set([
   "minced",
   "rinsed",
   "shredded",
+  "skinless",
   "sliced",
   "small"
 ]);
@@ -78,9 +80,22 @@ const preparationWords = new Set([
 export function parseIngredientText(text: string): ParsedIngredientLine[] {
   return text
     .split(/\r?\n/)
-    .map(normalizeLine)
+    .map(cleanIngredientLine)
     .filter(Boolean)
     .map(parseIngredientLine);
+}
+
+function cleanIngredientLine(line: string) {
+  return normalizeLine(line)
+    .replace(
+      /^[-*\u2022\u25a1\u25a2\u25a3\u25aa\u25ab\u25fb-\u25fe\u2610-\u2612]\s*/,
+      ""
+    )
+    .replace(/^\d+[.)]\s*/, "")
+    .replace(/\s*\(\$[\d.,]+\)\s*/g, " ")
+    .replace(/([A-Za-z])\*/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function parseIngredientLine(line: string): ParsedIngredientLine {
@@ -90,6 +105,7 @@ function parseIngredientLine(line: string): ParsedIngredientLine {
   let remaining = normalizeUnicodeFractions(
     line.replace(/\([^)]+\)/g, " ").replace(/\s+/g, " ").trim()
   );
+  remaining = normalizeDescriptorCommas(remaining);
   const commaParts = remaining.split(",").map((part) => part.trim());
   remaining = commaParts[0] ?? remaining;
   const commaPreparation = commaParts.slice(1).join(", ") || null;
@@ -101,22 +117,30 @@ function parseIngredientLine(line: string): ParsedIngredientLine {
   const packageSizeResult = parsePackageSize(tokens, quantityResult.nextIndex);
   const unitResult = parseUnit(tokens, packageSizeResult.nextIndex);
   const words = tokens.slice(unitResult.nextIndex);
-  const extractedPreparation = extractLeadingPreparation(words);
-  const displayName = extractedPreparation.words.join(" ").trim();
+  const leadingPreparation = extractLeadingPreparation(words);
+  const trailingPreparation = extractTrailingPreparation(leadingPreparation.words);
+  const displayName = trailingPreparation.words.join(" ").trim();
+  const unit =
+    unitResult.unit ??
+    (quantityResult.value !== null && displayName.length > 0 ? "count" : null);
   const notes =
     [packageNote, packageSizeResult.note, toTasteNote]
       .filter(Boolean)
       .join("; ") || null;
-  const preparation = [extractedPreparation.preparation, commaPreparation]
+  const preparation = [
+    leadingPreparation.preparation,
+    trailingPreparation.preparation,
+    commaPreparation
+  ]
     .filter(Boolean)
     .join(", ") || null;
-  const needsReview = displayName.length === 0 || quantityResult.value === null || unitResult.unit === null;
+  const needsReview = displayName.length === 0 || quantityResult.value === null || unit === null;
 
   return {
     originalLine,
     displayName: displayName || remaining || originalLine,
     quantity: quantityResult.value,
-    unit: unitResult.unit,
+    unit,
     preparation,
     notes,
     needsReview,
@@ -134,6 +158,10 @@ function normalizeUnicodeFractions(value: string) {
       /[\u00bc\u00bd\u00be\u2153\u2154\u215b\u215c\u215d\u215e]/g,
       (fraction) => unicodeFractions[fraction] ?? fraction
     );
+}
+
+function normalizeDescriptorCommas(value: string) {
+  return value.replace(/\bboneless,\s+skinless\b/gi, "boneless skinless");
 }
 
 function normalizeLine(line: string) {
@@ -227,6 +255,27 @@ function extractLeadingPreparation(words: string[]) {
   return {
     preparation: preparation.join(" ") || null,
     words: words.slice(index)
+  };
+}
+
+function extractTrailingPreparation(words: string[]) {
+  const preparation: string[] = [];
+  let index = words.length - 1;
+
+  while (index >= 0) {
+    const word = words[index]?.toLowerCase().replace(/,$/, "") ?? "";
+
+    if (!preparationWords.has(word)) {
+      break;
+    }
+
+    preparation.unshift(words[index]);
+    index -= 1;
+  }
+
+  return {
+    preparation: preparation.join(" ") || null,
+    words: words.slice(0, index + 1)
   };
 }
 

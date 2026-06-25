@@ -92,6 +92,36 @@ describe("normalizeExtensionCapturePayload", () => {
     });
   });
 
+  it("cleans captured ingredient card markers before building review rows", () => {
+    const draft = normalizeExtensionCapturePayload(
+      {
+        jsonLd: [],
+        selectedText:
+          "Captured Onion\nIngredients\n\u2610 1 yellow onion, diced ($0.32)\n\u2611 3 green onions* sliced ($0.25)\nInstructions\nCook until softened.",
+        sourceTitle: "Captured Onion | Example",
+        sourceUrl: "https://example.test/onion"
+      },
+      []
+    );
+
+    expect(draft?.ingredientReviewRows.slice(0, 2)).toEqual([
+      expect.objectContaining({
+        display_name: "yellow onion",
+        needsReview: false,
+        preparation: "diced",
+        quantity: 1,
+        unit: "count"
+      }),
+      expect.objectContaining({
+        display_name: "green onions",
+        needsReview: false,
+        preparation: "sliced",
+        quantity: 3,
+        unit: "count"
+      })
+    ]);
+  });
+
   it("keeps unstructured selected text in instructions when sections are unavailable", () => {
     const draft = normalizeExtensionCapturePayload(
       {

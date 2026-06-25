@@ -269,7 +269,7 @@ test.describe("Recipe import and filters", () => {
           payload: {
             jsonLd: [],
             selectedText:
-              "Jump to Recipe\n5 from 12 votes\nMessy Beans\nIngredients\n1 cup beans\nInstructions\nStir.\nSubscribe for weekly recipes",
+              "Jump to Recipe\n5 from 12 votes\nMessy Beans\nIngredients\n\u2610 1 yellow onion, diced ($0.32)\nInstructions\nStir.\nSubscribe for weekly recipes",
             sourceTitle: "Messy Beans | Example Site",
             sourceUrl: "https://example.test/messy-beans"
           },
@@ -285,8 +285,11 @@ test.describe("Recipe import and filters", () => {
     ).toBeVisible();
     await expect(page.getByLabel("Recipe name")).toHaveValue("Messy Beans");
     await expect(page.getByLabel("Ingredient 1 display name")).toHaveValue(
-      /beans/i
+      "yellow onion"
     );
+    await expect(page.getByLabel("Ingredient 1 quantity")).toHaveValue("1");
+    await expect(page.getByLabel("Ingredient 1 unit")).toHaveValue("count");
+    await expect(page.getByLabel("Ingredient 1 preparation")).toHaveValue("diced");
     await expect(page.getByLabel("Instructions")).toHaveValue("Stir.");
     await expect(
       page.getByText(
