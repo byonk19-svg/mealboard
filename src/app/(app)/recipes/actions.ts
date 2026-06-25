@@ -18,6 +18,12 @@ import {
   buildRecipeMessagePath,
   resolveRecipeFormReturnPath
 } from "@/lib/recipes/recipe-form-path";
+import {
+  persistCreatedRecipeWithChildren,
+  replaceRecipeChildren,
+  type PersistedIngredientInput,
+  type RecipePersistenceClient
+} from "@/lib/recipes/persist-recipe";
 
 type ParsedNumber =
   | {
@@ -39,8 +45,6 @@ type IngredientInput = {
   optional: boolean;
   sort_order: number;
 };
-
-type PersistedIngredientInput = Omit<IngredientInput, "new_food_name">;
 
 function recipeRedirect(path: string, message: string): never {
   redirect(buildRecipeMessagePath(path, message));
@@ -301,6 +305,7 @@ export async function createRecipe(formData: FormData) {
   const tags = parseTags(formData);
   const approvedProfileIds = parseApprovedProfileIds(formData);
   const supabase = await createClient();
+  const persistenceClient = supabase as unknown as RecipePersistenceClient;
   const ingredients = await resolveIngredientFoodIds({
     householdId: household.id,
     ingredients: parsedIngredients,
@@ -308,31 +313,22 @@ export async function createRecipe(formData: FormData) {
     supabase
   });
 
-  const { data: recipe, error } = await supabase
-    .from("recipes")
-    .insert({
-      ...recipePayload,
-      household_id: household.id
-    })
-    .select("id")
-    .single();
-
-  if (error) {
-    recipeRedirect(path, error.message);
-  }
-
-  await replaceRecipeChildren({
+  const result = await persistCreatedRecipeWithChildren({
     approvedProfileIds,
     householdId: household.id,
     ingredients,
-    path,
-    recipeId: recipe.id,
+    recipePayload,
     status: recipePayload.status,
+    supabase: persistenceClient,
     tags
   });
 
+  if (!result.ok) {
+    recipeRedirect(path, result.error);
+  }
+
   revalidatePath("/recipes");
-  redirect(`/recipes/${recipe.id}?message=${encodeURIComponent("Recipe created.")}`);
+  redirect(`/recipes/${result.recipeId}?message=${encodeURIComponent("Recipe created.")}`);
 }
 
 export async function updateRecipe(formData: FormData) {
@@ -349,6 +345,7 @@ export async function updateRecipe(formData: FormData) {
   const tags = parseTags(formData);
   const approvedProfileIds = parseApprovedProfileIds(formData);
   const supabase = await createClient();
+  const persistenceClient = supabase as unknown as RecipePersistenceClient;
   const ingredients = await resolveIngredientFoodIds({
     householdId: household.id,
     ingredients: parsedIngredients,
@@ -366,99 +363,23 @@ export async function updateRecipe(formData: FormData) {
     recipeRedirect(path, error.message);
   }
 
-  await replaceRecipeChildren({
+  const childError = await replaceRecipeChildren({
     approvedProfileIds,
     householdId: household.id,
     ingredients,
-    path,
     recipeId,
     status: recipePayload.status,
+    supabase: persistenceClient,
     tags
   });
+
+  if (childError) {
+    recipeRedirect(path, childError);
+  }
 
   revalidatePath("/recipes");
   revalidatePath(path);
   recipeRedirect(path, "Recipe updated.");
-}
-
-async function replaceRecipeChildren({
-  approvedProfileIds,
-  householdId,
-  ingredients,
-  path,
-  recipeId,
-  status,
-  tags
-}: {
-  approvedProfileIds: string[];
-  householdId: string;
-  ingredients: PersistedIngredientInput[];
-  path: string;
-  recipeId: string;
-  status: RecipeStatus;
-  tags: string[];
-}) {
-  const supabase = await createClient();
-
-  for (const table of [
-    "recipe_ingredients",
-    "recipe_tags",
-    "recipe_profile_approvals"
-  ] as const) {
-    const { error } = await supabase
-      .from(table)
-      .delete()
-      .eq("household_id", householdId)
-      .eq("recipe_id", recipeId);
-
-    if (error) {
-      recipeRedirect(path, error.message);
-    }
-  }
-
-  const { error: ingredientError } = await supabase
-    .from("recipe_ingredients")
-    .insert(
-      ingredients.map((ingredient) => ({
-        ...ingredient,
-        household_id: householdId,
-        recipe_id: recipeId
-      }))
-    );
-
-  if (ingredientError) {
-    recipeRedirect(path, ingredientError.message);
-  }
-
-  if (tags.length > 0) {
-    const { error } = await supabase.from("recipe_tags").insert(
-      tags.map((tag) => ({
-        household_id: householdId,
-        recipe_id: recipeId,
-        tag
-      }))
-    );
-
-    if (error) {
-      recipeRedirect(path, error.message);
-    }
-  }
-
-  if (approvedProfileIds.length > 0) {
-    const { error } = await supabase.from("recipe_profile_approvals").insert(
-      approvedProfileIds.map((profileId) => ({
-        household_id: householdId,
-        recipe_id: recipeId,
-        meal_profile_id: profileId,
-        status,
-        approved_for_planning: true
-      }))
-    );
-
-    if (error) {
-      recipeRedirect(path, error.message);
-    }
-  }
 }
 
 async function resolveIngredientFoodIds({
