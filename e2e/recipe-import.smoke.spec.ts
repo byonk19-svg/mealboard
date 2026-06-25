@@ -251,6 +251,55 @@ test.describe("Recipe import and filters", () => {
     ).toBeVisible();
   });
 
+  test("shows cleanup warnings for messy extension selected text", async ({
+    page
+  }) => {
+    const draftKey = `mealboard-recipe-draft:e2e-messy-${Date.now()}`;
+
+    await signIn(page);
+    await page.goto(
+      `/recipes/import/review?source=extension&draft=${encodeURIComponent(draftKey)}`
+    );
+    await expect(page.getByText("Waiting for the recipe capture extension")).toBeVisible();
+
+    await page.evaluate((key) => {
+      window.postMessage(
+        {
+          draftKey: key,
+          payload: {
+            jsonLd: [],
+            selectedText:
+              "Jump to Recipe\n5 from 12 votes\nMessy Beans\nIngredients\n1 cup beans\nInstructions\nStir.\nSubscribe for weekly recipes",
+            sourceTitle: "Messy Beans | Example Site",
+            sourceUrl: "https://example.test/messy-beans"
+          },
+          source: "mealboard-recipe-capture-extension",
+          type: "MEALBOARD_RECIPE_CAPTURE_DRAFT"
+        },
+        window.location.origin
+      );
+    }, draftKey);
+
+    await expect(
+      page.getByRole("heading", { name: "Review imported recipe" })
+    ).toBeVisible();
+    await expect(page.getByLabel("Recipe name")).toHaveValue("Messy Beans");
+    await expect(page.getByLabel("Ingredient 1 display name")).toHaveValue(
+      /beans/i
+    );
+    await expect(page.getByLabel("Instructions")).toHaveValue("Stir.");
+    await expect(
+      page.getByText(
+        "Common page text was removed from the selected recipe capture."
+      )
+    ).toBeVisible();
+    await expect(
+      page.getByText(
+        "Imported instructions look short. Confirm the full method was captured before saving."
+      )
+    ).toBeVisible();
+  });
+
   test("loads an extension visible-recipe draft into review", async ({
     page
   }) => {

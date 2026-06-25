@@ -92,6 +92,29 @@ Steps
     });
   });
 
+  it("drops common page chrome from selected recipe text", () => {
+    expect(
+      parseSelectedRecipeText(
+        `Jump to Recipe
+5 from 12 votes
+Fixture Chili
+Subscribe for weekly recipes
+Ingredients
+1 lb ground beef
+Advertisement
+Directions
+Brown the beef.
+Simmer for 20 minutes.
+Leave a Comment`,
+        "Fallback Recipe"
+      )
+    ).toMatchObject({
+      ingredients: ["1 lb ground beef"],
+      instructions: ["Brown the beef.", "Simmer for 20 minutes."],
+      name: "Fixture Chili"
+    });
+  });
+
   it("returns null for unstructured selected text", () => {
     expect(
       parseSelectedRecipeText(

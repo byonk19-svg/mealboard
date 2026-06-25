@@ -32,7 +32,8 @@ export function parseSelectedRecipeText(
   text: string,
   fallbackName: string | null
 ): RawRecipeCandidate | null {
-  const lines = normalizeSelectedText(text);
+  const normalizedText = normalizeSelectedText(text);
+  const lines = normalizedText.lines;
   const ingredients: string[] = [];
   const instructions: string[] = [];
   let activeSection: ActiveSection = null;
@@ -88,9 +89,10 @@ export function parseSelectedRecipeText(
     caloriesPerServing: nutrition.caloriesPerServing,
     cookMinutes,
     description: null,
-    extractionWarnings: [
-      "Selected page text was split into ingredients and instructions. Review imported fields before saving."
-    ],
+    extractionWarnings: buildSelectedTextWarnings({
+      instructions,
+      removedPageChrome: normalizedText.removedPageChrome
+    }),
     ingredients,
     instructions,
     name: name ?? fallbackName,
@@ -101,10 +103,47 @@ export function parseSelectedRecipeText(
 }
 
 function normalizeSelectedText(text: string) {
-  return expandInlineLabels(text)
+  let removedPageChrome = false;
+  const lines = expandInlineLabels(text)
     .split(/\r?\n/)
     .map((line) => line.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .filter((line) => {
+      if (!isPageChromeLine(line)) {
+        return true;
+      }
+
+      removedPageChrome = true;
+      return false;
+    });
+
+  return { lines, removedPageChrome };
+}
+
+function buildSelectedTextWarnings({
+  instructions,
+  removedPageChrome
+}: {
+  instructions: string[];
+  removedPageChrome: boolean;
+}) {
+  const warnings = [
+    "Selected page text was split into ingredients and instructions. Review imported fields before saving."
+  ];
+
+  if (removedPageChrome) {
+    warnings.push(
+      "Common page text was removed from the selected recipe capture."
+    );
+  }
+
+  if (instructions.join(" ").split(/\s+/).filter(Boolean).length < 3) {
+    warnings.push(
+      "Imported instructions look short. Confirm the full method was captured before saving."
+    );
+  }
+
+  return warnings;
 }
 
 function expandInlineLabels(text: string) {
@@ -214,6 +253,10 @@ function looksLikeRecipeTitle(line: string) {
   );
 }
 
+function isPageChromeLine(line: string) {
+  return pageChromePatterns.some((pattern) => pattern.test(line.trim()));
+}
+
 function parseLooseNumber(value: string) {
   if (!value) {
     return null;
@@ -243,3 +286,17 @@ function parseLooseMinutes(value: string) {
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+
+const pageChromePatterns = [
+  /^advertisements?$/i,
+  /^comments?$/i,
+  /^jump to (?:recipe|video|nutrition)$/i,
+  /^leave a comment$/i,
+  /^pin this recipe$/i,
+  /^print recipe$/i,
+  /^rate this recipe$/i,
+  /^save recipe$/i,
+  /^subscribe\b/i,
+  /^newsletter\b/i,
+  /^\d+(?:\.\d+)?\s+from\s+\d+\s+votes?$/i
+];

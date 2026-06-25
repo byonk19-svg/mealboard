@@ -68,6 +68,30 @@ describe("normalizeExtensionCapturePayload", () => {
     });
   });
 
+  it("warns when selected text needed cleanup and instructions look incomplete", () => {
+    const draft = normalizeExtensionCapturePayload(
+      {
+        jsonLd: [],
+        selectedText:
+          "Jump to Recipe\nIngredients\n1 cup beans\nInstructions\nStir.\nSubscribe for weekly recipes",
+        sourceTitle: "Messy Beans | Example",
+        sourceUrl: "https://example.test/messy-beans"
+      },
+      []
+    );
+
+    expect(draft).toMatchObject({
+      ingredientLines: ["1 cup beans"],
+      instructions: "Stir.",
+      warnings: [
+        "The extension did not find structured recipe data on this page.",
+        "Selected page text was split into ingredients and instructions. Review imported fields before saving.",
+        "Common page text was removed from the selected recipe capture.",
+        "Imported instructions look short. Confirm the full method was captured before saving."
+      ]
+    });
+  });
+
   it("keeps unstructured selected text in instructions when sections are unavailable", () => {
     const draft = normalizeExtensionCapturePayload(
       {
