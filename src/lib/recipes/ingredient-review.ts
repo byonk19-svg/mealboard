@@ -64,18 +64,36 @@ export function resolveFoodMatch(
   foods: Food[],
   displayName: string
 ): FoodMatch {
-  const normalizedDisplayName = normalizeName(displayName);
+  const strictDisplayName = normalizeNameStrict(displayName);
+  const fallbackDisplayName = normalizeNameForFallback(displayName);
+  const fallbackCompactDisplayName = compactName(fallbackDisplayName);
 
-  if (!normalizedDisplayName) {
+  if (!strictDisplayName) {
     return { foodId: null, groceryCategoryId: null };
   }
 
   const exactMatch = foods.find(
-    (food) => normalizeName(food.name) === normalizedDisplayName
+    (food) => normalizeNameStrict(food.name) === strictDisplayName
   );
-  const containedMatch =
+  const strictContainedMatch =
     exactMatch ??
-    foods.find((food) => normalizedDisplayName.includes(normalizeName(food.name)));
+    foods.find((food) =>
+      containsNameTokens(strictDisplayName, normalizeNameStrict(food.name))
+    );
+  const compactMatch =
+    strictContainedMatch ??
+    foods.find(
+      (food) =>
+        compactName(normalizeNameForFallback(food.name)) ===
+        fallbackCompactDisplayName
+    );
+  const containedMatch =
+    compactMatch ??
+    foods.find((food) => {
+      const normalizedFoodName = normalizeNameForFallback(food.name);
+
+      return containsNameTokens(fallbackDisplayName, normalizedFoodName);
+    });
   const match = containedMatch ?? null;
 
   return {
@@ -188,6 +206,45 @@ function joinText(values: Array<string | null>, separator: string) {
   return joined.length > 0 ? joined : null;
 }
 
-function normalizeName(value: string) {
-  return value.trim().toLowerCase().replace(/\s+/g, " ");
+const ingredientMatchStopWords = new Set([
+  "fresh",
+  "organic",
+  "raw",
+  "washed"
+]);
+
+function normalizeNameStrict(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+function normalizeNameForFallback(value: string) {
+  return normalizeNameStrict(value)
+    .split(" ")
+    .filter((token) => token && !ingredientMatchStopWords.has(token))
+    .join(" ");
+}
+
+function compactName(value: string) {
+  return value.replace(/\s+/g, "");
+}
+
+function containsNameTokens(displayName: string, foodName: string) {
+  const displayTokens = displayName.split(" ").filter(Boolean);
+  const foodTokens = foodName.split(" ").filter(Boolean);
+
+  if (foodTokens.length === 0 || foodTokens.length > displayTokens.length) {
+    return false;
+  }
+
+  return displayTokens.some((_, index) =>
+    foodTokens.every(
+      (foodToken, foodIndex) => displayTokens[index + foodIndex] === foodToken
+    )
+  );
 }

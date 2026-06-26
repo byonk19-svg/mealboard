@@ -1,6 +1,14 @@
 import {
+  addRuleBasedMealSuggestions,
+  addWeeklyPlanItem,
+  applyBabyRoutineToWeek,
+  approveWeeklyPlanItem,
+  confirmWeeklyPlanItemSwap,
   createOrSelectWeeklyPlan,
-  saveWeeklyPlanSetup
+  removeWeeklyPlanItem,
+  saveWeeklyPlanStaples,
+  saveWeeklyPlanSetup,
+  toggleWeeklyPlanItemLock
 } from "@/app/(app)/plan-week/actions";
 import {
   applyPendingGroceryChangesForWeek,
@@ -390,6 +398,7 @@ export default async function PlanWeekPage({
           </form>
 
           <RuleBasedSuggestionsSection
+            addSuggestionsAction={addRuleBasedMealSuggestions}
             suggestions={ruleBasedSuggestions}
             weekStartDate={weekStartDate}
             weeklyPlanId={weeklyPlan.id}
@@ -397,6 +406,7 @@ export default async function PlanWeekPage({
 
           {babyRoutineSuggestions ? (
             <BabyRoutinePreviewSection
+              applyRoutineAction={applyBabyRoutineToWeek}
               stageLabel={babySummary.statusLabel}
               summary={babyRoutineSuggestions}
               weekStartDate={weekStartDate}
@@ -405,6 +415,13 @@ export default async function PlanWeekPage({
           ) : null}
 
           <ManualPlanSection
+            actions={{
+              addWeeklyPlanItem,
+              approveWeeklyPlanItem,
+              confirmWeeklyPlanItemSwap,
+              removeWeeklyPlanItem,
+              toggleWeeklyPlanItemLock
+            }}
             planItemsByProfile={planItemsByProfile}
             planItemsByDate={planItemsByDate}
             profiles={planningProfiles}
@@ -425,6 +442,7 @@ export default async function PlanWeekPage({
           />
 
           <StaplesReviewSection
+            saveStaplesAction={saveWeeklyPlanStaples}
             selectedStapleIds={
               new Set(stapleSelections.map((selection) => selection.staple_id))
             }

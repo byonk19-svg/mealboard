@@ -117,7 +117,11 @@ export default async function GroceryListPage({
       {message ? <GroceryListMessage message={message} /> : null}
 
       {!groceryList ? (
-        <EmptyGroceryListState />
+        isHistoricalList ? (
+          <UnavailableHistoricalListState lists={recentCompletedLists} />
+        ) : (
+          <EmptyGroceryListState />
+        )
       ) : (
         <>
           <GroceryListOverview
@@ -314,6 +318,56 @@ function EmptyCurrentListState() {
   );
 }
 
+function UnavailableHistoricalListState({
+  lists
+}: {
+  lists: CompletedGroceryListSummary[];
+}) {
+  return (
+    <div className="space-y-4">
+      <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+        <h2 className="text-xl font-semibold">
+          Completed grocery list unavailable
+        </h2>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          This completed grocery list link no longer matches an available
+          completed list. It may have been deleted, replaced, or it may still be
+          the current shopping list.
+        </p>
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+          <Link
+            className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+            href="/grocery-list"
+          >
+            Open current grocery list
+          </Link>
+          {lists.length > 0 ? (
+            <a
+              className="inline-flex min-h-11 items-center justify-center rounded-md border border-border px-4 py-2 text-sm font-medium transition hover:bg-muted"
+              href="#recent-completed-grocery-lists"
+            >
+              Review recent completed lists
+            </a>
+          ) : null}
+        </div>
+      </section>
+
+      {lists.length > 0 ? (
+        <RecentCompletedLists currentListId={null} lists={lists} />
+      ) : (
+        <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+          <h2 className="text-xl font-semibold">
+            No completed grocery history yet
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Complete a current grocery list to make it available here later.
+          </p>
+        </section>
+      )}
+    </div>
+  );
+}
+
 function ViewSelector({
   listId,
   view
@@ -374,7 +428,7 @@ function RecentCompletedLists({
   currentListId,
   lists
 }: {
-  currentListId: string;
+  currentListId?: string | null;
   lists: CompletedGroceryListSummary[];
 }) {
   if (lists.length === 0) {
@@ -383,6 +437,9 @@ function RecentCompletedLists({
 
   return (
     <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+      <span className="sr-only" id="recent-completed-grocery-lists">
+        Recent completed grocery lists
+      </span>
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-semibold">

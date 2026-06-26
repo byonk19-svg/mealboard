@@ -1,10 +1,3 @@
-import {
-  confirmWeeklyPlanItemSwap,
-  addWeeklyPlanItem,
-  approveWeeklyPlanItem,
-  removeWeeklyPlanItem,
-  toggleWeeklyPlanItemLock
-} from "@/app/(app)/plan-week/actions";
 import Link from "next/link";
 import type { SwapGroceryImpact } from "@/lib/grocery/data";
 import type { RuleBasedSwapSuggestion } from "@/lib/meal-planning/rule-based-suggestions";
@@ -32,7 +25,16 @@ const planMealTypes = [
   "other"
 ] as const satisfies readonly MealType[];
 
+type PlanWeekActions = {
+  addWeeklyPlanItem: (formData: FormData) => void | Promise<void>;
+  approveWeeklyPlanItem: (formData: FormData) => void | Promise<void>;
+  confirmWeeklyPlanItemSwap: (formData: FormData) => void | Promise<void>;
+  removeWeeklyPlanItem: (formData: FormData) => void | Promise<void>;
+  toggleWeeklyPlanItemLock: (formData: FormData) => void | Promise<void>;
+};
+
 export function ManualPlanSection({
+  actions,
   planItemsByProfile,
   planItemsByDate,
   profiles,
@@ -45,6 +47,7 @@ export function ManualPlanSection({
   weekStartDate,
   weeklyPlanId
 }: {
+  actions: PlanWeekActions;
   planItemsByProfile: PlanItemProfileGroup[];
   planItemsByDate: Map<string, WeeklyPlanItem[]>;
   profiles: MealProfile[];
@@ -86,6 +89,7 @@ export function ManualPlanSection({
 
       {view === "profile" ? (
         <ProfilePlanView
+          actions={actions}
           groups={planItemsByProfile}
           selectedSwapItemId={selectedSwapItemId}
           swapGroceryImpacts={swapGroceryImpacts}
@@ -94,6 +98,7 @@ export function ManualPlanSection({
         />
       ) : (
         <DayPlanView
+          actions={actions}
           canAddItems={canAddItems}
           planItemsByDate={planItemsByDate}
           profiles={profiles}
@@ -111,6 +116,7 @@ export function ManualPlanSection({
 }
 
 function DayPlanView({
+  actions,
   canAddItems,
   planItemsByDate,
   profiles,
@@ -122,6 +128,7 @@ function DayPlanView({
   weekStartDate,
   weeklyPlanId
 }: {
+  actions: PlanWeekActions;
   canAddItems: boolean;
   planItemsByDate: Map<string, WeeklyPlanItem[]>;
   profiles: MealProfile[];
@@ -151,6 +158,7 @@ function DayPlanView({
             {(planItemsByDate.get(date.dateKey) ?? []).length > 0 ? (
               (planItemsByDate.get(date.dateKey) ?? []).map((item) => (
                   <PlanItemCard
+                    actions={actions}
                     item={item}
                     key={item.id}
                     selectedSwapItemId={selectedSwapItemId}
@@ -169,6 +177,7 @@ function DayPlanView({
 
           {canAddItems ? (
             <AddPlanItemForm
+              action={actions.addWeeklyPlanItem}
               date={date}
               profiles={profiles}
               recipeOptions={recipeOptions}
@@ -183,12 +192,14 @@ function DayPlanView({
 }
 
 function ProfilePlanView({
+  actions,
   groups,
   selectedSwapItemId,
   swapGroceryImpacts,
   swapSuggestions,
   weekStartDate
 }: {
+  actions: PlanWeekActions;
   groups: PlanItemProfileGroup[];
   selectedSwapItemId: string | null;
   swapGroceryImpacts: SwapGroceryImpact[];
@@ -216,6 +227,7 @@ function ProfilePlanView({
             {group.items.length > 0 ? (
               group.items.map(({ item, slotLabel }) => (
                 <PlanItemCard
+                  actions={actions}
                   contextLabel={`${formatDisplayDate(item.plan_date)} - ${formatSlotLabel(slotLabel)}`}
                   item={item}
                   key={item.id}
@@ -286,12 +298,14 @@ function PlanViewSelector({
 }
 
 function AddPlanItemForm({
+  action,
   date,
   profiles,
   recipeOptions,
   weekStartDate,
   weeklyPlanId
 }: {
+  action: (formData: FormData) => void | Promise<void>;
   date: WeekDate;
   profiles: MealProfile[];
   recipeOptions: PlanRecipeOption[];
@@ -300,7 +314,7 @@ function AddPlanItemForm({
 }) {
   return (
     <form
-      action={addWeeklyPlanItem}
+      action={action}
       className="mt-4 grid gap-3 rounded-md border border-dashed border-border p-3 md:grid-cols-[1fr_1fr_1.3fr_auto]"
     >
       <input name="planDate" type="hidden" value={date.dateKey} />
@@ -363,6 +377,7 @@ function AddPlanItemForm({
 }
 
 function PlanItemCard({
+  actions,
   contextLabel,
   item,
   selectedSwapItemId,
@@ -371,6 +386,7 @@ function PlanItemCard({
   view,
   weekStartDate
 }: {
+  actions: PlanWeekActions;
   contextLabel?: string;
   item: WeeklyPlanItem;
   selectedSwapItemId: string | null;
@@ -437,7 +453,7 @@ function PlanItemCard({
         <div className="flex flex-wrap gap-2">
           {!item.is_approved ? (
             <PlanItemActionForm
-              action={approveWeeklyPlanItem}
+              action={actions.approveWeeklyPlanItem}
               buttonLabel="Approve for groceries"
               itemId={item.id}
               view={view}
@@ -445,7 +461,7 @@ function PlanItemCard({
             />
           ) : null}
           <PlanItemActionForm
-            action={toggleWeeklyPlanItemLock}
+            action={actions.toggleWeeklyPlanItemLock}
             buttonLabel={item.is_locked ? "Unlock" : "Lock"}
             itemId={item.id}
             view={view}
@@ -464,7 +480,7 @@ function PlanItemCard({
             </Link>
           ) : null}
           <PlanItemActionForm
-            action={removeWeeklyPlanItem}
+            action={actions.removeWeeklyPlanItem}
             buttonLabel="Remove"
             itemId={item.id}
             tone="danger"
@@ -476,6 +492,7 @@ function PlanItemCard({
 
       {isSwapOpen ? (
         <MealSwapPanel
+          actions={actions}
           item={item}
           swapGroceryImpacts={swapGroceryImpacts}
           suggestions={swapSuggestions}
@@ -488,12 +505,14 @@ function PlanItemCard({
 }
 
 function MealSwapPanel({
+  actions,
   item,
   swapGroceryImpacts,
   suggestions,
   view,
   weekStartDate
 }: {
+  actions: PlanWeekActions;
   item: WeeklyPlanItem;
   swapGroceryImpacts: SwapGroceryImpact[];
   suggestions: RuleBasedSwapSuggestion[];
@@ -556,7 +575,7 @@ function MealSwapPanel({
                     impact={groceryImpactByRecipeId.get(suggestion.recipeId) ?? null}
                   />
                 </div>
-                <form action={confirmWeeklyPlanItemSwap}>
+                <form action={actions.confirmWeeklyPlanItemSwap}>
                   <input name="weekStartDate" type="hidden" value={weekStartDate} />
                   <input name="weeklyPlanItemId" type="hidden" value={item.id} />
                   <input name="recipeId" type="hidden" value={suggestion.recipeId} />

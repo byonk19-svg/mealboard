@@ -5,10 +5,33 @@ const ownerEmail = process.env.MEALBOARD_E2E_EMAIL;
 const memberEmail =
   process.env.MEALBOARD_E2E_MEMBER_EMAIL ??
   "mealboard-e2e-member-local@example.test";
+const memberPassword =
+  process.env.MEALBOARD_E2E_MEMBER_PASSWORD ??
+  "Mealboard-e2e-member-local-12345!";
 const databaseContainer =
   process.env.MEALBOARD_E2E_DB_CONTAINER ?? "supabase_db_mealboard";
 
 const env = { ...process.env };
+env.MEALBOARD_E2E_MEMBER_EMAIL = memberEmail;
+env.MEALBOARD_E2E_MEMBER_PASSWORD = memberPassword;
+let bootstrapError = null;
+
+try {
+  execFileSync(process.execPath, ["scripts/bootstrap-local-e2e-user.mjs"], {
+    env: {
+      ...process.env,
+      MEALBOARD_E2E_EMAIL: memberEmail,
+      MEALBOARD_E2E_PASSWORD: memberPassword,
+      MEALBOARD_E2E_SKIP_MEMBERSHIP: "true"
+    },
+    stdio: "inherit"
+  });
+} catch (error) {
+  bootstrapError = error;
+  console.warn(
+    `Could not seed local household member auth user: ${getErrorMessage(error)}`
+  );
+}
 
 if (!env.MEALBOARD_LOCAL_AUTH_USER_LOOKUP) {
   try {
@@ -39,11 +62,24 @@ if (!env.MEALBOARD_LOCAL_AUTH_USER_LOOKUP) {
         .filter((row) => row.length === 2)
     );
 
+    if (memberEmail && !usersByEmail[memberEmail.toLowerCase()]) {
+      console.error(
+        `Household member smoke setup could not find auth user ${memberEmail}.`
+      );
+      process.exit(1);
+    }
+
     if (Object.keys(usersByEmail).length > 0) {
       env.MEALBOARD_LOCAL_AUTH_USER_LOOKUP = JSON.stringify(usersByEmail);
     }
-  } catch {
-    // Production-like environments can still pass if Supabase auth admin works.
+  } catch (error) {
+    console.warn(
+      `Could not build local auth lookup for household member smoke: ${getErrorMessage(error)}`
+    );
+
+    if (bootstrapError) {
+      process.exit(1);
+    }
   }
 }
 
@@ -71,4 +107,8 @@ process.exit(result.status ?? 1);
 
 function sqlString(value) {
   return `'${value.replaceAll("'", "''")}'`;
+}
+
+function getErrorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
 }

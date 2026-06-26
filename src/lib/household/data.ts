@@ -152,9 +152,9 @@ export async function removeHouseholdMember({
     throw new Error(decision.reason);
   }
 
-  const { error: deleteError } = await admin
+  const { count: deletedCount, error: deleteError } = await admin
     .from("household_memberships")
-    .delete()
+    .delete({ count: "exact" })
     .eq("household_id", householdId)
     .eq("id", decision.membershipId)
     .eq("user_id", decision.userId);
@@ -162,6 +162,11 @@ export async function removeHouseholdMember({
   if (deleteError) {
     throw new Error(deleteError.message);
   }
+
+  assertSingleRowAffected(
+    deletedCount,
+    "That household member is no longer available."
+  );
 }
 
 export async function transferHouseholdOwnership({
@@ -208,9 +213,9 @@ export async function transferHouseholdOwnership({
     throw new Error(decision.reason);
   }
 
-  const { error: promoteError } = await admin
+  const { count: promotedCount, error: promoteError } = await admin
     .from("household_memberships")
-    .update({ role: "owner" })
+    .update({ role: "owner" }, { count: "exact" })
     .eq("household_id", householdId)
     .eq("id", decision.newOwnerMembershipId)
     .eq("user_id", decision.newOwnerUserId);
@@ -219,22 +224,35 @@ export async function transferHouseholdOwnership({
     throw new Error(promoteError.message);
   }
 
-  const { error: demoteError } = await admin
+  assertSingleRowAffected(
+    promotedCount,
+    "That household member is no longer available."
+  );
+
+  const { count: demotedCount, error: demoteError } = await admin
     .from("household_memberships")
-    .update({ role: "member" })
+    .update({ role: "member" }, { count: "exact" })
     .eq("household_id", householdId)
     .eq("id", decision.previousOwnerMembershipId)
     .eq("user_id", actorUserId);
 
-  if (demoteError) {
+  if (demoteError || demotedCount !== 1) {
     await admin
       .from("household_memberships")
-      .update({ role: "member" })
+      .update({ role: "member" }, { count: "exact" })
       .eq("household_id", householdId)
       .eq("id", decision.newOwnerMembershipId)
       .eq("user_id", decision.newOwnerUserId);
 
-    throw new Error(demoteError.message);
+    throw new Error(
+      demoteError?.message ?? "Resolve household ownership before transferring ownership."
+    );
+  }
+}
+
+function assertSingleRowAffected(count: number | null, reason: string) {
+  if (count !== 1) {
+    throw new Error(reason);
   }
 }
 

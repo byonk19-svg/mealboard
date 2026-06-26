@@ -1,14 +1,15 @@
-import { saveWeeklyPlanStaples } from "@/app/(app)/plan-week/actions";
 import { formatStapleFrequency } from "@/lib/settings/staples";
 import type { Staple } from "@/lib/settings/types";
 import { groupStaplesForWeeklyReview } from "@/lib/weekly-plans/staples-review";
 
 export function StaplesReviewSection({
+  saveStaplesAction,
   selectedStapleIds,
   staples,
   weekStartDate,
   weeklyPlanId
 }: {
+  saveStaplesAction: (formData: FormData) => void | Promise<void>;
   selectedStapleIds: Set<string>;
   staples: Staple[];
   weekStartDate: string;
@@ -41,7 +42,7 @@ export function StaplesReviewSection({
           Add active staples in Settings before reviewing them for the week.
         </div>
       ) : (
-        <form action={saveWeeklyPlanStaples} className="mt-5 space-y-5">
+        <form action={saveStaplesAction} className="mt-5 space-y-5">
           <input name="weekStartDate" type="hidden" value={weekStartDate} />
           <input name="weeklyPlanId" type="hidden" value={weeklyPlanId} />
 

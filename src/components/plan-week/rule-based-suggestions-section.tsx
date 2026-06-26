@@ -1,14 +1,15 @@
-import { addRuleBasedMealSuggestions } from "@/app/(app)/plan-week/actions";
 import { formatMealType } from "@/lib/recipes/types";
 import type { RuleBasedMealSuggestion } from "@/lib/meal-planning/rule-based-suggestions";
 
 type RuleBasedSuggestionsSectionProps = {
+  addSuggestionsAction: (formData: FormData) => void | Promise<void>;
   suggestions: RuleBasedMealSuggestion[];
   weekStartDate: string;
   weeklyPlanId: string;
 };
 
 export function RuleBasedSuggestionsSection({
+  addSuggestionsAction,
   suggestions,
   weekStartDate,
   weeklyPlanId
@@ -24,7 +25,7 @@ export function RuleBasedSuggestionsSection({
             stay unapproved until reviewed.
           </p>
         </div>
-        <form action={addRuleBasedMealSuggestions}>
+        <form action={addSuggestionsAction}>
           <input name="weekStartDate" type="hidden" value={weekStartDate} />
           <input name="weeklyPlanId" type="hidden" value={weeklyPlanId} />
           <button

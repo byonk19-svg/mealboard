@@ -54,9 +54,11 @@ Every Codex task should follow these rules:
 
 The private MVP now includes section-aware structured recipe import review,
 emergency grocery backup text for manual copying, recent completed grocery list
-access from `/grocery-list`, and a named `e2e:extension-capture` smoke script.
-Future slices should not reopen those same gaps unless real dogfooding exposes
-a concrete failure.
+access from `/grocery-list`, explicit stale completed-list recovery, deterministic
+ingredient alias cleanup for common punctuation/spacing variants, guarded
+household member row-count handling, and named E2E smoke scripts for extension
+capture and household member lifecycle. Future slices should not reopen those
+same gaps unless real dogfooding exposes a concrete failure.
 
 ---
 
