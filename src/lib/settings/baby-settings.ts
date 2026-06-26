@@ -50,7 +50,7 @@ export function buildBabySettingsSummary(
 
   return {
     nextStepText:
-      "Stage setup is ready. Baby food statuses and meal ideas can be added in later slices.",
+      "Stage setup is ready. Track baby food statuses, review Try This ideas, and add routine Baby Meal 1/2 rows from Plan Week.",
     resolution,
     statusLabel: resolution.stageName ?? "Stage not matched yet",
     supportText: resolution.usedOverride

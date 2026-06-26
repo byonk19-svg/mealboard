@@ -60,7 +60,7 @@ describe("buildBabySettingsSummary", () => {
         "2026-06-15"
       )
     ).toMatchObject({
-      nextStepText: "Stage setup is ready. Baby food statuses and meal ideas can be added in later slices.",
+      nextStepText: "Stage setup is ready. Track baby food statuses, review Try This ideas, and add routine Baby Meal 1/2 rows from Plan Week.",
       statusLabel: "Texture building"
     });
   });

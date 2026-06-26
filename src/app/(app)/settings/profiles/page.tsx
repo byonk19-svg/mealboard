@@ -137,7 +137,8 @@ function ProfileCard({ profile }: { profile: MealProfile }) {
           </div>
         ) : (
           <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
-            Shared-family planning details stay read-only in this slice.
+            Shared-family planning details are managed through recipes,
+            staples, and weekly plans.
           </p>
         )}
 

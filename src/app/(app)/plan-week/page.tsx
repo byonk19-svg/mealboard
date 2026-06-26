@@ -360,8 +360,8 @@ export default async function PlanWeekPage({
             <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
               <h2 className="text-xl font-semibold">Weekly goals</h2>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Save high-level goal tags for the selected week. Goal-specific
-                recipe suggestions come later.
+                Save high-level goal tags for the selected week. Rule-based
+                suggestions use these goals to explain draft meal ideas.
               </p>
               <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {weeklyGoalTypes.map((goal) => (

@@ -83,7 +83,7 @@ export default function SettingsPage() {
           <h2 className="mt-2 text-xl font-semibold">Baby</h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Review Baby age/stage context and update birthdate or manual stage
-            override for future solids planning.
+            override for solids planning.
           </p>
         </Link>
 

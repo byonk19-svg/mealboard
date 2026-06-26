@@ -72,8 +72,9 @@ export default async function StaplesPage({
           Staples
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
-          Manage reusable household and profile staples. These are settings
-          only in this slice; weekly review and grocery generation come later.
+          Manage reusable household and profile staples. Plan Week can review
+          active staples before groceries, and wrap-up notes can send staple
+          changes here for explicit review.
         </p>
       </div>
 

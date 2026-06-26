@@ -196,8 +196,8 @@ Local Studio is available after `supabase start`; check your CLI output for the 
 
 After the first owner can sign in, open `/settings/household` to link additional
 existing auth users by email, transfer ownership to another household member,
-or remove a non-owner member. This MVP prep slice does not send email
-invitations or support multiple households per login yet.
+or remove a non-owner member. MealBoard still does not send email invitations
+or support multiple households per login.
 
 ## Verification
 
