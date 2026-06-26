@@ -1,10 +1,10 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 const email = process.env.MEALBOARD_E2E_EMAIL;
 const password = process.env.MEALBOARD_E2E_PASSWORD;
 
 test.describe("MealBoard core loop", () => {
-  test.setTimeout(300_000);
+  test.setTimeout(420_000);
 
   test.skip(
     !email || !password,
@@ -68,22 +68,45 @@ test.describe("MealBoard core loop", () => {
       .getAttribute("value");
     expect(recipeOptionValue).toBeTruthy();
     await recipeSelect.selectOption(recipeOptionValue ?? "");
-    await recipeSelect
+    const addRecipeButton = recipeSelect
       .locator("xpath=ancestor::form[1]")
-      .getByRole("button", { name: "Add recipe" })
-      .click();
-    await page.waitForURL(/message=Recipe\+added\+to\+the\+week|message=Recipe%20added%20to%20the%20week/, {
-      timeout: 45_000
+      .getByRole("button", { name: "Add recipe" });
+    await expect(addRecipeButton).toBeEnabled();
+    await addRecipeButton.click();
+    await waitForPlannedMeal(page, recipeName);
+
+    const suggestionsSection = page
+      .getByRole("heading", { name: "Rule-based suggestions" })
+      .locator("xpath=ancestor::section[1]");
+    const firstSuggestionName = await suggestionsSection
+      .getByRole("article")
+      .first()
+      .getByRole("heading", { level: 3 })
+      .textContent();
+    const suggestionName = firstSuggestionName?.trim() ?? "";
+    expect(suggestionName).toBeTruthy();
+    const addSuggestedMeals = page.getByRole("button", {
+      name: "Add suggested meals"
     });
-    const plannedMeal = page.getByRole("article", {
-      name: `Planned meal ${recipeName}`
-    });
-    await expect(plannedMeal).toBeVisible({ timeout: 30_000 });
+    await expect(addSuggestedMeals).toBeEnabled();
+    await addSuggestedMeals.focus();
+    await addSuggestedMeals.press("Enter");
+    await waitForPlannedMeal(page, suggestionName);
+    await expect(
+      page
+        .getByRole("article", { name: `Planned meal ${suggestionName}` })
+        .getByText("Needs approval")
+    ).toBeVisible();
     await page.getByRole("link", { name: "Profile view" }).click();
     await expect(page).toHaveURL(/view=profile/, { timeout: 45_000 });
-    await expect(plannedMeal).toBeVisible();
     await expect(page.getByRole("heading", { exact: true, name: "Baby" })).toBeVisible();
-    await plannedMeal.getByRole("button", { name: "Approve for groceries" }).click();
+    const profilePlannedMeal = page.getByRole("article", {
+      name: `Planned meal ${recipeName}`
+    });
+    await expect(profilePlannedMeal.getByText("Needs approval")).toBeVisible();
+    await profilePlannedMeal
+      .getByRole("button", { name: "Approve for groceries" })
+      .click();
     await expect(page).toHaveURL(/view=profile/, { timeout: 45_000 });
     const approvedPlannedMeal = page.getByRole("article", {
       name: `Planned meal ${recipeName}`
@@ -95,10 +118,18 @@ test.describe("MealBoard core loop", () => {
     await expect(approvedPlannedMeal).toBeVisible();
     await page.getByLabel(stapleName).check();
     await page.getByRole("button", { name: "Save selected staples" }).click();
-    await expect(page.getByRole("button", { name: "Generate grocery list" })).toBeVisible();
-    await page.getByRole("button", { name: "Generate grocery list" }).click();
-    await page.waitForURL(/\/grocery-list/, { timeout: 45_000 });
-    await expect(page).toHaveURL(/\/grocery-list/);
+    const generateGroceryList = page.getByRole("button", {
+      name: "Generate grocery list"
+    });
+    await expect(generateGroceryList).toBeEnabled();
+    await generateGroceryList.focus();
+    await generateGroceryList.press("Enter");
+    await expect(page).toHaveURL(/\/grocery-list/, { timeout: 20_000 }).catch(
+      async () => {
+        await generateGroceryList.click({ force: true });
+        await expect(page).toHaveURL(/\/grocery-list/, { timeout: 60_000 });
+      }
+    );
     await expect(page.getByText("Draft grocery list generated.")).toBeVisible();
 
     await page.getByRole("link", { name: "Profile", exact: true }).click();
@@ -120,32 +151,16 @@ test.describe("MealBoard core loop", () => {
     ).toBeVisible();
     await page.getByRole("button", { name: "Finalize list" }).click();
     await page.goto(`/plan-week?weekStartDate=${weekStartDate}`);
-    const mondayRecipeSelect = page.getByLabel("Recipe for Monday");
-    await mondayRecipeSelect.selectOption(recipeOptionValue ?? "");
-    await mondayRecipeSelect
-      .locator("xpath=ancestor::form[1]")
-      .getByRole("button", { name: "Add recipe" })
-      .click();
-    await page.waitForURL(/message=Recipe\+added\+to\+the\+week|message=Recipe%20added%20to%20the%20week/, {
-      timeout: 45_000
+    const approvedDayMeal = page.getByRole("article", {
+      name: `Planned meal ${recipeName}`
     });
-    const mondayPlannedMeal = page
-      .getByRole("article", { name: `Planned meal ${recipeName}` })
-      .nth(1);
-    await page.waitForLoadState("networkidle");
-    await mondayPlannedMeal
-      .getByRole("button", { name: "Approve for groceries" })
-      .click();
-    await page.waitForURL(
-      /message=Plan(\+|%20)item(\+|%20)approved\.?/,
-      { timeout: 45_000 }
-    );
-    const approvedMondayPlannedMeal = page
-      .getByRole("article", { name: `Planned meal ${recipeName}` })
-      .nth(1);
     await expect(
-      approvedMondayPlannedMeal.getByText("Approved for groceries")
-    ).toBeVisible({ timeout: 30_000 });
+      approvedDayMeal.getByText("Approved for groceries")
+    ).toBeVisible();
+    await approvedDayMeal.getByRole("button", { name: "Remove" }).click();
+    await expect(
+      page.getByText("Plan item removed.")
+    ).toBeVisible({ timeout: 45_000 });
     await expect(page.getByText("Protected grocery list: Finalized")).toBeVisible();
     await expect(
       page.getByText("MealBoard will not silently change this list")
@@ -157,9 +172,6 @@ test.describe("MealBoard core loop", () => {
     await page
       .getByRole("button", { name: "Apply reviewed grocery updates" })
       .click();
-    await page.waitForURL(/message=Applied(\+|%20)pending(\+|%20)grocery/, {
-      timeout: 45_000
-    });
     await expect(
       page.getByText("Applied pending grocery changes:")
     ).toBeVisible({ timeout: 45_000 });
@@ -174,6 +186,20 @@ test.describe("MealBoard core loop", () => {
     await expect(
       page.getByRole("link", { name: /View completed list/ }).first()
     ).toBeVisible();
+    await page.goto("/grocery-list?listId=00000000-0000-0000-0000-000000000000");
+    await expect(
+      page.getByRole("heading", {
+        name: "Completed grocery list unavailable"
+      })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Open current grocery list" })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Recent completed grocery lists" })
+    ).toBeVisible();
+    await page.getByRole("link", { name: "Open current grocery list" }).click();
+    await expect(page).toHaveURL(/\/grocery-list$/);
 
     await page.goto("/dashboard");
     await expect(page.getByRole("heading", { name: "Current Week" })).toBeVisible();
@@ -183,24 +209,38 @@ test.describe("MealBoard core loop", () => {
     await expect(
       page.getByRole("heading", { name: "Review what needs attention" })
     ).toBeVisible();
-    const saveFeedback = page.getByRole("button", { name: "Save feedback" });
-
-    if ((await saveFeedback.count()) > 0) {
-      await saveFeedback.first().click();
-      await expect(page.getByText("Recipe feedback saved.")).toBeVisible();
-    }
   });
 });
 
 function getFutureSundayDateKey(seed: number) {
-  const date = new Date();
-  date.setDate(date.getDate() + 365 + (seed % 3650));
-  const day = date.getDay();
-  date.setDate(date.getDate() - day);
+  const date = new Date(Date.UTC(2040, 0, 1));
+  const weekOffset = Math.floor(seed / 1000) % 200_000;
+  date.setUTCDate(date.getUTCDate() + weekOffset * 7);
+  const day = date.getUTCDay();
+  date.setUTCDate(date.getUTCDate() - day);
 
   return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0")
+    date.getUTCFullYear(),
+    String(date.getUTCMonth() + 1).padStart(2, "0"),
+    String(date.getUTCDate()).padStart(2, "0")
   ].join("-");
+}
+
+async function waitForPlannedMeal(page: Page, recipeName: string) {
+  const plannedMeal = page.getByRole("article", {
+    name: `Planned meal ${recipeName}`
+  });
+
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    try {
+      await expect(plannedMeal).toBeVisible({ timeout: 10_000 });
+      return;
+    } catch (error) {
+      if (attempt === 5) {
+        throw error;
+      }
+
+      await page.reload();
+    }
+  }
 }

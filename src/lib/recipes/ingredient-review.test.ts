@@ -26,6 +26,13 @@ const foods: Food[] = [
     household_id: "household-1",
     id: "food-spinach",
     name: "Baby spinach"
+  },
+  {
+    default_grocery_category_id: "cat-pantry",
+    default_unit: "tbsp",
+    household_id: "household-1",
+    id: "food-coconut-oil",
+    name: "Coconut oil"
   }
 ];
 
@@ -63,6 +70,79 @@ describe("ingredient review helpers", () => {
     expect(resolveFoodMatch(foods, "washed baby spinach")).toMatchObject({
       foodId: "food-spinach",
       groceryCategoryId: "cat-produce"
+    });
+  });
+
+  it("matches punctuation and spacing variants for imported ingredient names", () => {
+    expect(resolveFoodMatch(foods, "washed baby-spinach")).toMatchObject({
+      foodId: "food-spinach",
+      groceryCategoryId: "cat-produce"
+    });
+    expect(resolveFoodMatch(foods, "Organic CoconutOil, raw")).toMatchObject({
+      foodId: "food-coconut-oil",
+      groceryCategoryId: "cat-pantry"
+    });
+  });
+
+  it("does not match food names inside unrelated ingredient tokens", () => {
+    const collisionFoods: Food[] = [
+      {
+        default_grocery_category_id: "cat-meat",
+        default_unit: "oz",
+        household_id: "household-1",
+        id: "food-ham",
+        name: "Ham"
+      },
+      {
+        default_grocery_category_id: "cat-snacks",
+        default_unit: "count",
+        household_id: "household-1",
+        id: "food-graham-cracker",
+        name: "Graham cracker"
+      }
+    ];
+
+    expect(
+      resolveFoodMatch(collisionFoods, "graham cracker crumbs")
+    ).toMatchObject({
+      foodId: "food-graham-cracker",
+      groceryCategoryId: "cat-snacks"
+    });
+    expect(
+      resolveFoodMatch(collisionFoods.slice(0, 1), "graham cracker crumbs")
+    ).toMatchObject({
+      foodId: null,
+      groceryCategoryId: null
+    });
+  });
+
+  it("preserves semantic words before descriptor fallback matching", () => {
+    const honeyFoods: Food[] = [
+      {
+        default_grocery_category_id: "cat-pantry",
+        default_unit: "tbsp",
+        household_id: "household-1",
+        id: "food-honey",
+        name: "Honey"
+      },
+      {
+        default_grocery_category_id: "cat-pantry",
+        default_unit: "tbsp",
+        household_id: "household-1",
+        id: "food-raw-honey",
+        name: "Raw honey"
+      }
+    ];
+
+    expect(resolveFoodMatch(honeyFoods, "raw honey")).toMatchObject({
+      foodId: "food-raw-honey",
+      groceryCategoryId: "cat-pantry"
+    });
+    expect(
+      resolveFoodMatch([...honeyFoods].reverse(), "raw honey")
+    ).toMatchObject({
+      foodId: "food-raw-honey",
+      groceryCategoryId: "cat-pantry"
     });
   });
 

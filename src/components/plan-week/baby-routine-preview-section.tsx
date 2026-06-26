@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { applyBabyRoutineToWeek } from "@/app/(app)/plan-week/actions";
 import type { BabyMealSuggestionSummary } from "@/lib/baby/generate-baby-meals";
 
 type BabyRoutinePreviewSectionProps = {
+  applyRoutineAction: (formData: FormData) => void | Promise<void>;
   stageLabel: string;
   summary: BabyMealSuggestionSummary;
   weekStartDate: string;
@@ -10,6 +10,7 @@ type BabyRoutinePreviewSectionProps = {
 };
 
 export function BabyRoutinePreviewSection({
+  applyRoutineAction,
   stageLabel,
   summary,
   weekStartDate,
@@ -38,7 +39,7 @@ export function BabyRoutinePreviewSection({
           >
             Edit baby foods
           </Link>
-          <form action={applyBabyRoutineToWeek}>
+          <form action={applyRoutineAction}>
             <input name="weekStartDate" type="hidden" value={weekStartDate} />
             <input name="weeklyPlanId" type="hidden" value={weeklyPlanId} />
             <button
