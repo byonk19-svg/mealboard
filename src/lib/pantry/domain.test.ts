@@ -4,6 +4,7 @@ import {
   buildPantryEventTypes,
   classifyExpirationDate,
   getEffectiveStockStatus,
+  getHouseholdDateString,
   normalizePantryItemInput,
   searchPantryItems
 } from "./domain";
@@ -71,6 +72,12 @@ describe("normalizePantryItemInput", () => {
         pantryInput({ isOpen: false, openedAt: "2026-06-27T12:00:00Z" })
       )
     ).toThrow("Only open pantry items can have an opened date.");
+  });
+
+  it("rejects impossible calendar dates before they reach the database", () => {
+    expect(() =>
+      normalizePantryItemInput(pantryInput({ expirationDate: "2026-02-31" }))
+    ).toThrow("Expiration date must be a valid date.");
   });
 });
 
@@ -141,6 +148,17 @@ describe("classifyExpirationDate", () => {
         today: "2026-06-27"
       })
     ).toBe("not_expiring");
+  });
+});
+
+describe("getHouseholdDateString", () => {
+  it("uses the household timezone instead of UTC boundaries", () => {
+    expect(
+      getHouseholdDateString({
+        date: new Date("2026-06-28T04:30:00.000Z"),
+        timeZone: "America/Chicago"
+      })
+    ).toBe("2026-06-27");
   });
 });
 

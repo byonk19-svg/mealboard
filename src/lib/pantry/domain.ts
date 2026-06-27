@@ -18,6 +18,7 @@ export const pantryStockStatuses = [
 ] as const satisfies readonly PantryStockStatus[];
 
 export const defaultExpiringSoonDays = 7;
+export const defaultHouseholdTimeZone = "America/Chicago";
 
 export function normalizePantryItemInput(
   input: PantryItemInput
@@ -128,6 +129,30 @@ export function classifyExpirationDate({
   return daysUntilExpiration <= expiringSoonDays
     ? "expiring_soon"
     : "not_expiring";
+}
+
+export function getHouseholdDateString({
+  date = new Date(),
+  timeZone = defaultHouseholdTimeZone
+}: {
+  date?: Date;
+  timeZone?: string;
+} = {}) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone,
+    year: "numeric"
+  }).formatToParts(date);
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+
+  if (!year || !month || !day) {
+    throw new Error("Household date could not be resolved.");
+  }
+
+  return `${year}-${month}-${day}`;
 }
 
 export function searchPantryItems(items: PantryItem[], query: string) {
@@ -354,7 +379,7 @@ function normalizeDate(value: string | null, label: string) {
     return null;
   }
 
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(text) || Number.isNaN(Date.parse(text))) {
+  if (!isValidDateString(text)) {
     throw new Error(`${label} must be a valid date.`);
   }
 
@@ -386,4 +411,19 @@ function unitsMatch(first: string | null, second: string | null) {
 function dateToUtcDay(value: string) {
   const [year, month, day] = value.split("-").map(Number);
   return Date.UTC(year ?? 0, (month ?? 1) - 1, day ?? 1) / 86_400_000;
+}
+
+function isValidDateString(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year ?? 0, (month ?? 1) - 1, day ?? 1));
+
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === (month ?? 1) - 1 &&
+    date.getUTCDate() === day
+  );
 }

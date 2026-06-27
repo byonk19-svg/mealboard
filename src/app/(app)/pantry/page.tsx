@@ -3,10 +3,12 @@ import {
   buildPantryCategoryGroups,
   classifyExpirationDate,
   getEffectiveStockStatus,
+  getHouseholdDateString,
   searchPantryItems
 } from "@/lib/pantry/domain";
 import {
   getPantryItems,
+  getPantryEventsByItemIds,
   getRecentPantryEvents
 } from "@/lib/pantry/data";
 import type {
@@ -57,7 +59,11 @@ export default async function PantryPage({ searchParams }: PantryPageProps) {
       getGroceryCategories(householdId),
       getMealProfiles(householdId)
     ]);
-  const today = getTodayDateString();
+  const today = getHouseholdDateString();
+  const pantryEventsByItemId = await getPantryEventsByItemIds({
+    householdId,
+    pantryItemIds: pantryItems.map((item) => item.id)
+  });
   const searchedItems = searchPantryItems(pantryItems, q ?? "");
   const categoryFilteredItems = categoryId
     ? searchedItems.filter((item) => item.groceryCategoryId === categoryId)
@@ -123,13 +129,15 @@ export default async function PantryPage({ searchParams }: PantryPageProps) {
             />
           ) : (
             groups.map((group) => (
-              <PantryCategorySection
-                foods={foods}
-                groceryCategories={groceryCategories}
-                group={group}
-                key={group.categoryId ?? "uncategorized"}
-                mealProfiles={mealProfiles}
-              />
+          <PantryCategorySection
+            foods={foods}
+            groceryCategories={groceryCategories}
+            group={group}
+            key={group.categoryId ?? "uncategorized"}
+            mealProfiles={mealProfiles}
+            pantryEventsByItemId={pantryEventsByItemId}
+            today={today}
+          />
             ))
           )}
         </section>
@@ -230,12 +238,16 @@ function PantryCategorySection({
   foods,
   groceryCategories,
   group,
-  mealProfiles
+  mealProfiles,
+  pantryEventsByItemId,
+  today
 }: {
   foods: Food[];
   groceryCategories: GroceryCategory[];
   group: PantryCategoryGroup;
   mealProfiles: MealProfile[];
+  pantryEventsByItemId: Map<string, PantryEvent[]>;
+  today: string;
 }) {
   return (
     <section className="space-y-3">
@@ -254,7 +266,9 @@ function PantryCategorySection({
             groceryCategories={groceryCategories}
             key={rollup.foodId}
             mealProfiles={mealProfiles}
+            pantryEventsByItemId={pantryEventsByItemId}
             rollup={rollup}
+            today={today}
           />
         ))}
       </div>
@@ -266,12 +280,16 @@ function PantryRollupCard({
   foods,
   groceryCategories,
   mealProfiles,
-  rollup
+  pantryEventsByItemId,
+  rollup,
+  today
 }: {
   foods: Food[];
   groceryCategories: GroceryCategory[];
   mealProfiles: MealProfile[];
+  pantryEventsByItemId: Map<string, PantryEvent[]>;
   rollup: PantryItemRollup;
+  today: string;
 }) {
   return (
     <article className="rounded-lg border border-border bg-card p-5 shadow-sm">
@@ -301,6 +319,8 @@ function PantryRollupCard({
             item={pantryItem}
             key={pantryItem.id}
             mealProfiles={mealProfiles}
+            pantryEvents={pantryEventsByItemId.get(pantryItem.id) ?? []}
+            today={today}
           />
         ))}
       </div>
@@ -312,12 +332,16 @@ function PantryItemDetails({
   foods,
   groceryCategories,
   item,
-  mealProfiles
+  mealProfiles,
+  pantryEvents,
+  today
 }: {
   foods: Food[];
   groceryCategories: GroceryCategory[];
   item: PantryItem;
   mealProfiles: MealProfile[];
+  pantryEvents: PantryEvent[];
+  today: string;
 }) {
   return (
     <details className="rounded-lg border border-border bg-background p-4">
@@ -327,7 +351,7 @@ function PantryItemDetails({
             <div className="flex flex-wrap items-center gap-2">
               <h4 className="font-semibold">{item.displayName}</h4>
               <StatusBadge status={getEffectiveStockStatus(item)} />
-              <ExpirationBadge item={item} />
+              <ExpirationBadge item={item} today={today} />
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
               {formatPantryItemDetails(item)}
@@ -366,6 +390,8 @@ function PantryItemDetails({
             Discard from active pantry
           </button>
         </form>
+
+        <PantryItemEventHistory events={pantryEvents} />
       </div>
     </details>
   );
@@ -670,6 +696,46 @@ function RecentPantryEvents({ events }: { events: PantryEvent[] }) {
   );
 }
 
+function PantryItemEventHistory({ events }: { events: PantryEvent[] }) {
+  return (
+    <section className="mt-5 space-y-3 border-t border-border pt-4">
+      <div>
+        <h5 className="font-semibold">Item history</h5>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Recent pantry events for this stock lot.
+        </p>
+      </div>
+
+      {events.length === 0 ? (
+        <p className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+          No item events yet.
+        </p>
+      ) : (
+        <div className="grid gap-2">
+          {events.map((event) => (
+            <article
+              className="rounded-lg border border-border bg-muted/30 p-3 text-sm"
+              key={event.id}
+            >
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <p className="font-semibold text-primary">
+                  {formatEventType(event.eventType)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {formatDateTime(event.createdAt)}
+                </p>
+              </div>
+              {event.note ? (
+                <p className="mt-2 text-muted-foreground">{event.note}</p>
+              ) : null}
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function StatusBadge({ status }: { status: PantryStockStatus }) {
   const labels: Record<PantryStockStatus, string> = {
     in_stock: "In stock",
@@ -693,10 +759,10 @@ function StatusBadge({ status }: { status: PantryStockStatus }) {
   );
 }
 
-function ExpirationBadge({ item }: { item: PantryItem }) {
+function ExpirationBadge({ item, today }: { item: PantryItem; today: string }) {
   const status = classifyExpirationDate({
     expirationDate: item.expirationDate,
-    today: getTodayDateString()
+    today
   });
 
   if (status === "missing" || status === "not_expiring") {
@@ -841,8 +907,4 @@ function formatDateTime(value: string) {
     dateStyle: "medium",
     timeStyle: "short"
   }).format(new Date(value));
-}
-
-function getTodayDateString() {
-  return new Date().toISOString().slice(0, 10);
 }

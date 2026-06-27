@@ -7,6 +7,7 @@ import {
   discardPantryItem,
   updatePantryItem
 } from "@/lib/pantry/data";
+import { normalizePantryItemInput } from "@/lib/pantry/domain";
 import type { PantryItemInput } from "@/lib/pantry/types";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
@@ -36,6 +37,7 @@ export async function createPantryItemAction(formData: FormData) {
   const household = await requireHousehold();
 
   try {
+    validatePantryInputBeforeFoodCreation(formData);
     const foodId = await resolvePantryFoodId({
       formData,
       householdId: household.id
@@ -63,6 +65,7 @@ export async function updatePantryItemAction(formData: FormData) {
   }
 
   try {
+    validatePantryInputBeforeFoodCreation(formData);
     const foodId = await resolvePantryFoodId({
       formData,
       householdId: household.id
@@ -104,6 +107,19 @@ export async function discardPantryItemAction(formData: FormData) {
 
   revalidatePath(pantryPath);
   pantryRedirect("Pantry item discarded.");
+}
+
+function validatePantryInputBeforeFoodCreation(formData: FormData) {
+  const selectedFoodId = textOrNull(formData.get("foodId"));
+  const newFoodName = textOrNull(formData.get("newFoodName"));
+
+  if (!selectedFoodId && !newFoodName) {
+    throw new Error("Choose a household item.");
+  }
+
+  normalizePantryItemInput(
+    buildPantryItemInput(formData, selectedFoodId ?? "pending-new-food")
+  );
 }
 
 async function resolvePantryFoodId({

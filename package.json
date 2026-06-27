@@ -23,7 +23,8 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "verify:pantry-rls": "node scripts/verify-pantry-rls.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",

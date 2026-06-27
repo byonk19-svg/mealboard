@@ -62,7 +62,13 @@ test.describe("Smart Pantry", () => {
     await itemDetails.getByLabel("Event note").fill("Marked low during smoke.");
     await itemDetails.getByRole("button", { name: "Save pantry item" }).click();
     await expect(page.getByText("Pantry item updated.")).toBeVisible();
-    await expect(page.getByText("Status changed").first()).toBeVisible();
+    await openItemDetails(page, displayName);
+    const updatedItemDetails = page
+      .getByRole("heading", { exact: true, name: displayName })
+      .locator("xpath=ancestor::details[1]");
+    await expect(
+      updatedItemDetails.getByText("Status changed").first()
+    ).toBeVisible();
 
     await page.getByLabel("Search pantry").fill("fridge");
     await page.getByRole("button", { name: "Apply" }).click();
@@ -100,14 +106,57 @@ test.describe("Smart Pantry", () => {
   });
 
   test("keeps the pantry route usable at mobile width", async ({ page }) => {
+    const suffix = Date.now();
+    const foodName = `E2E Mobile Pantry ${suffix}`;
+    const displayName = `${foodName} pouch`;
+
     await page.setViewportSize({ width: 390, height: 844 });
     await signIn(page);
     await page.goto("/pantry");
     await expect(
       page.getByRole("heading", { exact: true, name: "Pantry" })
     ).toBeVisible();
-    await expect(page.getByRole("button", { name: "Add pantry item" })).toBeVisible();
     await expect(page.getByLabel("Search pantry")).toBeVisible();
+
+    const addSection = page
+      .getByRole("heading", { name: "Add pantry item" })
+      .locator("xpath=ancestor::section[1]");
+    await addSection.getByLabel("Or create household item").fill(foodName);
+    await addSection.getByLabel("Pantry display name").fill(displayName);
+    await addSection.getByRole("spinbutton", { name: "Quantity" }).fill("1");
+    await addSection
+      .getByRole("textbox", { exact: true, name: "Unit" })
+      .fill("count");
+    await addSection.getByLabel("Low threshold", { exact: true }).fill("2");
+    await addSection.getByLabel("Threshold unit", { exact: true }).fill("count");
+    await addSection.getByLabel("Expiration").fill(getDateOffset(2));
+    await addSection.getByLabel("Storage").fill("Kitchen drawer");
+    await addSection.getByRole("button", { name: "Add pantry item" }).click();
+    await expect(page.getByText("Pantry item created.")).toBeVisible();
+
+    await page.getByLabel("Search pantry").fill("drawer");
+    await page.getByRole("button", { name: "Apply" }).click();
+    await expect(
+      page.getByRole("heading", { exact: true, name: foodName })
+    ).toBeVisible();
+
+    await openItemDetails(page, displayName);
+    const itemDetails = page
+      .getByRole("heading", { exact: true, name: displayName })
+      .locator("xpath=ancestor::details[1]");
+    await itemDetails.getByLabel("Status").selectOption("low");
+    await itemDetails.getByRole("button", { name: "Save pantry item" }).click();
+    await expect(page.getByText("Pantry item updated.")).toBeVisible();
+
+    await page.getByRole("link", { name: "Low & out" }).click();
+    await expect(
+      page.getByRole("heading", { exact: true, name: foodName })
+    ).toBeVisible();
+
+    await page.getByRole("link", { name: "Expiring soon" }).click();
+    await expect(
+      page.getByRole("heading", { exact: true, name: foodName })
+    ).toBeVisible();
   });
 });
 
