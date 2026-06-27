@@ -335,6 +335,7 @@ function comparePantryItems(a: PantryItemView, b: PantryItemView) {
 function hasAdjustmentChange(before: PantryItem, after: PantryItem) {
   return (
     before.displayName !== after.displayName ||
+    before.foodId !== after.foodId ||
     before.packageDetail !== after.packageDetail ||
     before.quantity !== after.quantity ||
     before.unit !== after.unit ||

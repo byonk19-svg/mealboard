@@ -291,6 +291,15 @@ describe("buildPantryEventTypes", () => {
       })
     ).toEqual(["discarded"]);
   });
+
+  it("records a correction event when only household item identity changes", () => {
+    expect(
+      buildPantryEventTypes({
+        after: item({ foodId: "food-2", foodName: "Sour cream" }),
+        before: item({ foodId: "food-1", foodName: "Yogurt" })
+      })
+    ).toEqual(["adjusted"]);
+  });
 });
 
 function pantryInput(
