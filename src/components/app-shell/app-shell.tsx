@@ -14,16 +14,19 @@ export function AppShell({
   userEmail
 }: AppShellProps) {
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-border bg-card">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <Link href="/dashboard" className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-base font-bold text-primary-foreground">
+    <div className="flex min-h-screen flex-col">
+      <header className="sticky top-0 z-50 border-b border-border/80 bg-background/92 backdrop-blur-xl">
+        <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-4 px-5 py-4 md:px-12">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <Link
+              href="/dashboard"
+              className="group flex w-fit items-center gap-3"
+            >
+              <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground shadow-[0_8px_24px_rgba(22,56,38,0.16)]">
                 MB
               </span>
               <span>
-                <span className="block text-lg font-semibold leading-tight">
+                <span className="block font-headline text-xl font-bold leading-tight text-primary">
                   MealBoard
                 </span>
                 <span className="block text-sm leading-tight text-muted-foreground">
@@ -32,20 +35,22 @@ export function AppShell({
               </span>
             </Link>
 
-            <div className="flex flex-col items-start gap-2 text-sm text-muted-foreground sm:items-end">
-              <div>
+            <div className="flex flex-col items-start gap-3 md:items-end">
+              <div className="text-sm text-muted-foreground">
                 {householdName ? (
-                  <span className="font-medium text-foreground">
+                  <span className="font-semibold text-primary">
                     {householdName}
                   </span>
                 ) : (
                   <span>No household linked</span>
                 )}
-                {userEmail ? <span> - {userEmail}</span> : null}
+                {userEmail ? (
+                  <span className="hidden sm:inline"> - {userEmail}</span>
+                ) : null}
               </div>
               <form action={signOut}>
                 <button
-                  className="rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  className="min-h-10 rounded-lg border border-primary/35 bg-card px-4 py-2 text-sm font-semibold text-primary hover:border-primary hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                   type="submit"
                 >
                   Sign out
@@ -58,9 +63,21 @@ export function AppShell({
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+      <main className="mx-auto w-full max-w-[1200px] flex-1 px-5 py-8 md:px-12 md:py-10">
         {children}
       </main>
+
+      <footer className="border-t border-border/80 bg-card/60">
+        <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-3 px-5 py-6 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between md:px-12">
+          <span className="font-semibold text-primary">MealBoard</span>
+          <span>Private family meal plans, recipe memory, and grocery lists.</span>
+          <nav className="flex flex-wrap gap-4" aria-label="Footer navigation">
+            <Link href="/settings/profiles">Profiles</Link>
+            <Link href="/settings/baby">Baby setup</Link>
+            <Link href="/settings/staples">Staples</Link>
+          </nav>
+        </div>
+      </footer>
     </div>
   );
 }

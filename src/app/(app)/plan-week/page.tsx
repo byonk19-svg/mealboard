@@ -10,6 +10,7 @@ import {
   saveWeeklyPlanSetup,
   toggleWeeklyPlanItemLock
 } from "@/app/(app)/plan-week/actions";
+import Image from "next/image";
 import {
   applyPendingGroceryChangesForWeek,
   generateGroceryListForWeek
@@ -74,6 +75,9 @@ import {
   type AdultDayType
 } from "@/lib/weekly-plans/types";
 import { getWeekDates, getWeekStartDate } from "@/lib/weekly-plans/week-dates";
+
+const planWeekImageUrl =
+  "https://lh3.googleusercontent.com/aida-public/AB6AXuDCTgosnQ9ZPeRUgUEGAA_6hf2j05Ng5cZ_LoI7SRoBCpqKsVvRDd5Kg9rAC6NHPJAemS2EzJsT-JQMjum_tg471Ko7Jx8FL2SD4nmAGtHtNgky09F7m6NHvA_hEgFUGdQkbWSWEPcyVdp9NP-LzU8FwDXU7FzHAVxMV943rNyNFBVnaFq-7ljvh3UHXKertZJACN8wAeDfa4c---E180gX8Mmd0osNrA7jqnLO6cY4rWTCXDVisRgvwA";
 
 type PlanWeekPageProps = {
   searchParams: Promise<{
@@ -235,10 +239,10 @@ export default async function PlanWeekPage({
   });
 
   return (
-    <section className="space-y-6">
+    <section className="space-y-7">
       <div>
-        <p className="text-sm font-medium text-muted-foreground">Plan Week</p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-normal">
+        <p className="calm-eyebrow">Plan Week</p>
+        <h1 className="calm-heading mt-3 text-4xl md:text-[40px] md:leading-[48px]">
           Weekly Planning
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
@@ -267,30 +271,50 @@ export default async function PlanWeekPage({
 
       <form
         action={createOrSelectWeeklyPlan}
-        className="rounded-lg border border-border bg-card p-5 shadow-sm"
+        className="calm-card overflow-hidden"
       >
-        <h2 className="text-xl font-semibold">Choose week</h2>
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
-          <label className="block text-sm font-medium">
-            Week of
-            <input
-              className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-              defaultValue={weekStartDate}
-              name="weekStartDate"
-              type="date"
+        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="p-6 md:p-8">
+            <p className="calm-eyebrow">Choose week</p>
+            <h2 className="calm-heading mt-3 text-3xl">
+              Your week is a blank canvas
+            </h2>
+            <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
+              Create or select the planning week, then mark work/off days,
+              goals, meals, staples, and grocery readiness.
+            </p>
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end">
+              <label className="block text-sm font-bold text-primary">
+                Week of
+                <input
+                  className="mt-2 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  defaultValue={weekStartDate}
+                  name="weekStartDate"
+                  type="date"
+                />
+              </label>
+              <button
+                className="min-h-11 rounded-lg bg-primary px-5 py-3 text-sm font-bold text-primary-foreground shadow-[0_12px_28px_rgba(22,56,38,0.16)] hover:bg-primary/95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                type="submit"
+              >
+                Create or select week
+              </button>
+            </div>
+            <p className="mt-3 text-sm text-muted-foreground">
+              MealBoard weeks start on Sunday. Selected week starts{" "}
+              {formatDisplayDate(weekStartDate)}.
+            </p>
+          </div>
+          <div className="relative min-h-64 overflow-hidden bg-secondary">
+            <Image
+              alt="A calm kitchen table with a blank planning notebook."
+              className="h-full w-full object-cover"
+              fill
+              sizes="(min-width: 1024px) 320px, 100vw"
+              src={planWeekImageUrl}
             />
-          </label>
-          <button
-            className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-            type="submit"
-          >
-            Create or select week
-          </button>
+          </div>
         </div>
-        <p className="mt-3 text-sm text-muted-foreground">
-          MealBoard weeks start on Sunday. Selected week starts{" "}
-          {formatDisplayDate(weekStartDate)}.
-        </p>
       </form>
 
       {weeklyPlan ? (
@@ -303,10 +327,10 @@ export default async function PlanWeekPage({
               <PlanWeekSummaryPanel summary={planWeekSummary} />
             ) : null}
 
-            <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+            <section className="calm-card p-5">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <h2 className="text-xl font-semibold">Adult day types</h2>
+                  <h2 className="calm-heading text-xl">Adult day types</h2>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">
                     Mark Brianna and Elaine as work or off days for this week.
                   </p>
@@ -314,14 +338,14 @@ export default async function PlanWeekPage({
                     Scroll the day grid sideways to see the full week.
                   </p>
                 </div>
-                <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
+                <p className="rounded-full bg-secondary px-4 py-2 text-sm font-bold text-secondary-foreground">
                   Status: {weeklyPlan.status}
                 </p>
               </div>
 
               <div className="mt-5 overflow-x-auto pb-2">
-                <div className="min-w-[720px] rounded-md border border-border">
-                  <div className="grid grid-cols-[140px_repeat(7,minmax(78px,1fr))] border-b border-border bg-muted/60 text-sm font-medium">
+                <div className="min-w-[720px] overflow-hidden rounded-lg border border-border">
+                  <div className="grid grid-cols-[140px_repeat(7,minmax(78px,1fr))] border-b border-border bg-muted/80 text-sm font-bold text-primary">
                     <div className="p-3">Profile</div>
                     {weekDates.map((date) => (
                       <div className="p-3 text-center" key={date.dateKey}>
@@ -365,8 +389,8 @@ export default async function PlanWeekPage({
               </div>
             </section>
 
-            <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
-              <h2 className="text-xl font-semibold">Weekly goals</h2>
+            <section className="calm-card p-5">
+              <h2 className="calm-heading text-xl">Weekly goals</h2>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 Save high-level goal tags for the selected week. Rule-based
                 suggestions use these goals to explain draft meal ideas.
@@ -374,7 +398,7 @@ export default async function PlanWeekPage({
               <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {weeklyGoalTypes.map((goal) => (
                   <label
-                    className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm"
+                    className="flex min-h-11 items-center gap-2 rounded-lg border border-border bg-background/70 px-3 py-2 text-sm font-medium"
                     key={goal}
                   >
                     <input
@@ -390,7 +414,7 @@ export default async function PlanWeekPage({
             </section>
 
             <button
-              className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              className="rounded-lg bg-primary px-5 py-3 text-sm font-bold text-primary-foreground shadow-[0_12px_28px_rgba(22,56,38,0.16)] hover:bg-primary/95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               type="submit"
             >
               Save weekly setup
@@ -464,8 +488,8 @@ export default async function PlanWeekPage({
           />
         </>
       ) : (
-        <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
-          <h2 className="text-xl font-semibold">Create this week first</h2>
+        <div className="calm-card p-5">
+          <h2 className="calm-heading text-xl">Create this week first</h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Create or select the week above before saving work/off days and
             goals.
@@ -478,13 +502,11 @@ export default async function PlanWeekPage({
 
 function PlanWeekSummaryPanel({ summary }: { summary: PlanWeekSummary }) {
   return (
-    <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+    <section className="calm-card p-5">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <p className="text-sm font-medium text-muted-foreground">
-            Week at a glance
-          </p>
-          <h2 className="mt-2 text-xl font-semibold">
+          <p className="calm-eyebrow">Week at a glance</p>
+          <h2 className="calm-heading mt-2 text-xl">
             {summary.primaryAttention.label}
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
@@ -505,7 +527,7 @@ function PlanWeekSummaryPanel({ summary }: { summary: PlanWeekSummary }) {
       </dl>
 
       {summary.missingEstimateItemCount > 0 ? (
-        <p className="mt-4 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+        <p className="mt-4 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
           {summary.missingEstimateItemCount} planned{" "}
           {summary.missingEstimateItemCount === 1 ? "item is" : "items are"}{" "}
           missing calories or protein. That affects estimates only.
@@ -517,9 +539,11 @@ function PlanWeekSummaryPanel({ summary }: { summary: PlanWeekSummary }) {
 
 function SummaryMetric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-md border border-border bg-background p-3">
-      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-      <dd className="mt-1 text-xl font-semibold">{value}</dd>
+    <div className="rounded-lg border border-border bg-background/70 p-3">
+      <dt className="text-xs font-bold uppercase text-muted-foreground">
+        {label}
+      </dt>
+      <dd className="mt-1 text-xl font-bold text-primary">{value}</dd>
     </div>
   );
 }
@@ -541,10 +565,10 @@ function GroceryGenerationPanel({
   const protectedListExists = Boolean(pendingChanges);
 
   return (
-    <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+    <section className="calm-card p-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-xl font-semibold">Grocery list</h2>
+          <h2 className="calm-heading text-xl">Grocery list</h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Generate a draft grocery list from approved recipe items and
             selected staples. Existing draft lists for this week are replaced.
@@ -566,7 +590,7 @@ function GroceryGenerationPanel({
             <input name="weekStartDate" type="hidden" value={weekStartDate} />
             <input name="weeklyPlanId" type="hidden" value={weeklyPlanId} />
             <button
-              className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              className="rounded-lg bg-primary px-5 py-3 text-sm font-bold text-primary-foreground hover:bg-primary/95 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               disabled={!canGenerate}
               type="submit"
             >
@@ -585,7 +609,7 @@ function GroceryGenerationPanel({
       ) : null}
 
       {!canGenerate ? (
-        <p className="mt-4 rounded-md border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+        <p className="mt-4 rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
           Nothing is ready for groceries yet. Approve a planned recipe or select
           a staple first.
         </p>
@@ -607,7 +631,7 @@ function PendingGroceryChangesPanel({
   const applyState = getPendingGroceryChangeApplyState(changes);
 
   return (
-    <div className="mt-5 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+    <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
       <p className="font-semibold">
         Protected grocery list: {formatGroceryStatus(groceryList.status)}
       </p>
@@ -649,7 +673,7 @@ function PendingGroceryChangesPanel({
             <input name="weekStartDate" type="hidden" value={weekStartDate} />
             <input name="weeklyPlanId" type="hidden" value={weeklyPlanId} />
             <button
-              className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-lg bg-primary px-5 py-3 text-sm font-bold text-primary-foreground hover:bg-primary/95 disabled:cursor-not-allowed disabled:opacity-60"
               disabled={!applyState.canApply}
               type="submit"
             >
@@ -679,7 +703,7 @@ function PendingGroceryChangeList({
         : "border-border bg-white/70 text-amber-950";
 
   return (
-    <section className={`rounded-md border p-3 ${toneClassName}`}>
+    <section className={`rounded-lg border p-3 ${toneClassName}`}>
       <h3 className="font-semibold">
         {heading} {items.length}
       </h3>
@@ -717,7 +741,7 @@ function DayTypeSelect({
     <label className="block text-xs font-medium text-muted-foreground">
       <span className="sr-only">{dayLabel}</span>
       <select
-        className="w-full rounded-md border border-border bg-background px-2 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        className="w-full rounded-lg border border-border bg-background px-2 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         defaultValue={selected}
         name={name}
       >
@@ -731,7 +755,7 @@ function DayTypeSelect({
 
 function PlanWeekMessage({ message }: { message: string }) {
   return (
-    <p className="rounded-md border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
+    <p className="rounded-lg border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
       {message}
     </p>
   );

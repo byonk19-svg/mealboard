@@ -47,13 +47,11 @@ export default async function RecipesPage({ searchParams }: RecipesPageProps) {
     filters.nutrition !== "all";
 
   return (
-    <section className="space-y-6">
+    <section className="space-y-7">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-sm font-medium text-muted-foreground">
-            Recipe library
-          </p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-normal">
+          <p className="calm-eyebrow">Recipe library</p>
+          <h1 className="calm-heading mt-3 text-4xl md:text-[40px] md:leading-[48px]">
             Recipes
           </h1>
           <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
@@ -63,13 +61,13 @@ export default async function RecipesPage({ searchParams }: RecipesPageProps) {
         </div>
         <div className="flex flex-wrap gap-2">
           <Link
-            className="rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            className="inline-flex min-h-11 items-center rounded-lg border border-primary/30 bg-card px-4 py-2 text-sm font-bold text-primary hover:border-primary hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             href="/recipes/import"
           >
             Import recipe
           </Link>
           <Link
-            className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            className="inline-flex min-h-11 items-center rounded-lg bg-primary px-5 py-2 text-sm font-bold text-primary-foreground shadow-[0_12px_28px_rgba(22,56,38,0.16)] hover:bg-primary/95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             href="/recipes/new"
           >
             Add recipe
@@ -88,33 +86,29 @@ export default async function RecipesPage({ searchParams }: RecipesPageProps) {
       ) : null}
 
       {filteredRecipes.length > 0 ? (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
           {filteredRecipes.map((recipe) => (
             <RecipeCard key={recipe.id} recipe={recipe} />
           ))}
         </div>
       ) : hasActiveFilters ? (
-        <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
-          <p className="text-sm font-medium text-muted-foreground">
-            No matching recipes
-          </p>
-          <h2 className="mt-3 text-2xl font-semibold">Adjust filters</h2>
+        <section className="calm-card p-6">
+          <p className="calm-eyebrow">No matching recipes</p>
+          <h2 className="calm-heading mt-3 text-2xl">Adjust filters</h2>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
             Clear one or more filters to see more saved recipes.
           </p>
           <Link
-            className="mt-4 inline-flex rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors hover:bg-muted"
+            className="mt-4 inline-flex rounded-lg border border-primary/30 px-4 py-2 text-sm font-bold text-primary hover:border-primary hover:bg-muted"
             href="/recipes"
           >
             Clear filters
           </Link>
         </section>
       ) : (
-        <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
-          <p className="text-sm font-medium text-muted-foreground">
-            No recipes yet
-          </p>
-          <h2 className="mt-3 text-2xl font-semibold">Add the first recipe</h2>
+        <section className="calm-card p-6">
+          <p className="calm-eyebrow">No recipes yet</p>
+          <h2 className="calm-heading mt-3 text-2xl">Add the first recipe</h2>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
             Start with a simple meal and a few structured ingredient rows.
             Profile approvals make the recipe available for Plan Week and
@@ -136,12 +130,12 @@ function RecipeFiltersForm({
   totalCount: number;
 }) {
   return (
-    <form className="rounded-lg border border-border bg-card p-4 shadow-sm">
+    <form className="calm-card p-4">
       <div className="grid gap-3 md:grid-cols-4">
         <label className="text-sm font-medium">
           Search recipes
           <input
-            className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2"
+            className="mt-2 min-h-11 w-full rounded-lg border border-border bg-background px-3 py-2 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             defaultValue={filters.q}
             name="q"
             placeholder="Name or tag"
@@ -151,7 +145,7 @@ function RecipeFiltersForm({
         <label className="text-sm font-medium">
           Status
           <select
-            className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2"
+            className="mt-2 min-h-11 w-full rounded-lg border border-border bg-background px-3 py-2 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             defaultValue={filters.status}
             name="status"
           >
@@ -166,7 +160,7 @@ function RecipeFiltersForm({
         <label className="text-sm font-medium">
           Planning
           <select
-            className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2"
+            className="mt-2 min-h-11 w-full rounded-lg border border-border bg-background px-3 py-2 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             defaultValue={filters.planning}
             name="planning"
           >
@@ -177,7 +171,7 @@ function RecipeFiltersForm({
         <label className="text-sm font-medium">
           Nutrition
           <select
-            className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2"
+            className="mt-2 min-h-11 w-full rounded-lg border border-border bg-background px-3 py-2 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             defaultValue={filters.nutrition}
             name="nutrition"
           >
@@ -192,13 +186,13 @@ function RecipeFiltersForm({
         </p>
         <div className="flex flex-wrap gap-2">
           <button
-            className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+            className="rounded-lg bg-primary px-5 py-2 text-sm font-bold text-primary-foreground"
             type="submit"
           >
             Apply filters
           </button>
           <Link
-            className="rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors hover:bg-muted"
+            className="rounded-lg border border-primary/30 px-4 py-2 text-sm font-bold text-primary hover:border-primary hover:bg-muted"
             href="/recipes"
           >
             Clear filters
@@ -217,116 +211,127 @@ function RecipeCard({ recipe }: { recipe: RecipeWithDetails }) {
   );
 
   return (
-    <article className="rounded-lg border border-border bg-card p-5 shadow-sm">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-sm font-medium text-muted-foreground">
-            {formatMealType(recipe.meal_type)}
-          </p>
-          <h2 className="mt-1 text-2xl font-semibold">{recipe.name}</h2>
-        </div>
-        <span className="w-fit rounded-md bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground">
-          {formatRecipeStatus(recipe.status)}
-        </span>
-      </div>
-
-      {recipe.description ? (
-        <p className="mt-3 text-sm leading-6 text-muted-foreground">
-          {recipe.description}
-        </p>
-      ) : null}
-
-      <div className="mt-4 flex flex-wrap gap-2 text-xs font-medium">
-        {recipe.tags.map((tag) => (
-          <span className="rounded-md bg-muted px-2 py-1" key={tag.id}>
-            {tag.tag}
-          </span>
-        ))}
-      </div>
-
-      <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-        <div>
-          <dt className="text-muted-foreground">Ingredients</dt>
-          <dd className="font-medium">{recipe.ingredients.length}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Planning approvals</dt>
-          <dd className="font-medium">
-            {approvalDisplay.summaryLabel}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Estimated calories</dt>
-          <dd
-            className={
-              nutritionDisplay.missingFields.includes("calories")
-                ? "font-medium text-muted-foreground"
-                : "font-medium"
-            }
-          >
-            {nutritionDisplay.caloriesLabel}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Estimated protein</dt>
-          <dd
-            className={
-              nutritionDisplay.missingFields.includes("protein")
-                ? "font-medium text-muted-foreground"
-                : "font-medium"
-            }
-          >
-            {nutritionDisplay.proteinLabel}
-          </dd>
-        </div>
-      </dl>
-
-      <div className="mt-4 flex flex-wrap gap-2 text-xs font-medium">
-        <span
-          className={
-            nutritionDisplay.isComplete
-              ? "rounded-md bg-muted px-2 py-1 text-muted-foreground"
-              : "rounded-md border border-border px-2 py-1 text-muted-foreground"
-          }
-        >
-          {nutritionDisplay.statusLabel}
-        </span>
-        <span className="rounded-md bg-muted px-2 py-1 text-muted-foreground">
-          {nutritionDisplay.confidenceLabel}
-        </span>
-        {!approvalDisplay.hasApprovedProfiles ? (
-          <span className="rounded-md border border-border px-2 py-1 text-muted-foreground">
-            Add profile approval
-          </span>
-        ) : null}
-      </div>
-
-      {warningEvaluations.length > 0 ? (
-        <div className="mt-4 rounded-md border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
-          {warningEvaluations.map(({ evaluation, mealProfileId, mealProfileName }) => (
-            <p key={mealProfileId}>
-              {mealProfileName}:{" "}
-              {evaluation.blocks.length > 0
-                ? `${evaluation.blocks.length} blocker`
-                : `${evaluation.warnings.length} warning`}
+    <article className="calm-card overflow-hidden">
+      <div className="p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-muted-foreground">
+              {formatMealType(recipe.meal_type)}
             </p>
+            <h2 className="calm-heading mt-1 text-xl leading-tight">
+              {recipe.name}
+            </h2>
+          </div>
+          <span className="w-fit rounded-full bg-secondary px-3 py-1 text-xs font-bold text-secondary-foreground">
+            {formatRecipeStatus(recipe.status)}
+          </span>
+        </div>
+
+        {recipe.description ? (
+          <p className="mt-3 text-sm leading-6 text-muted-foreground">
+            {recipe.description}
+          </p>
+        ) : null}
+
+        <div className="mt-4 flex flex-wrap gap-2 text-xs font-bold">
+          {recipe.tags.map((tag) => (
+            <span
+              className="rounded-full bg-muted px-3 py-1 text-primary"
+              key={tag.id}
+            >
+              {tag.tag}
+            </span>
           ))}
         </div>
-      ) : null}
 
-      <Link
-        className="mt-5 inline-flex rounded-md border border-border bg-card px-4 py-2 text-sm font-semibold transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        href={`/recipes/${recipe.id}`}
-      >
-        View and edit
-      </Link>
+        <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+          <RecipeMetric label="Ingredients" value={recipe.ingredients.length} />
+          <RecipeMetric
+            label="Approvals"
+            value={approvalDisplay.summaryLabel}
+          />
+          <RecipeMetric
+            muted={nutritionDisplay.missingFields.includes("calories")}
+            label="Calories"
+            value={nutritionDisplay.caloriesLabel}
+          />
+          <RecipeMetric
+            muted={nutritionDisplay.missingFields.includes("protein")}
+            label="Protein"
+            value={nutritionDisplay.proteinLabel}
+          />
+        </dl>
+
+        <div className="mt-4 flex flex-wrap gap-2 text-xs font-bold">
+          <span
+            className={
+              nutritionDisplay.isComplete
+                ? "rounded-full bg-muted px-3 py-1 text-muted-foreground"
+                : "rounded-full border border-border px-3 py-1 text-muted-foreground"
+            }
+          >
+            {nutritionDisplay.statusLabel}
+          </span>
+          <span className="rounded-full bg-muted px-3 py-1 text-muted-foreground">
+            {nutritionDisplay.confidenceLabel}
+          </span>
+          {!approvalDisplay.hasApprovedProfiles ? (
+            <span className="rounded-full border border-border px-3 py-1 text-muted-foreground">
+              Add profile approval
+            </span>
+          ) : null}
+        </div>
+
+        {warningEvaluations.length > 0 ? (
+          <div className="mt-4 rounded-lg border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
+            {warningEvaluations.map(
+              ({ evaluation, mealProfileId, mealProfileName }) => (
+                <p key={mealProfileId}>
+                  {mealProfileName}:{" "}
+                  {evaluation.blocks.length > 0
+                    ? `${evaluation.blocks.length} blocker`
+                    : `${evaluation.warnings.length} warning`}
+                </p>
+              )
+            )}
+          </div>
+        ) : null}
+
+        <Link
+          className="mt-5 inline-flex min-h-11 items-center rounded-lg border border-primary/30 bg-card px-4 py-2 text-sm font-bold text-primary hover:border-primary hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          href={`/recipes/${recipe.id}`}
+        >
+          View and edit
+        </Link>
+      </div>
     </article>
+  );
+}
+
+function RecipeMetric({
+  label,
+  muted = false,
+  value
+}: {
+  label: string;
+  muted?: boolean;
+  value: number | string;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-background/70 p-3">
+      <dt className="text-xs font-semibold uppercase text-muted-foreground">
+        {label}
+      </dt>
+      <dd className={`mt-1 font-bold ${muted ? "text-muted-foreground" : ""}`}>
+        {value}
+      </dd>
+    </div>
   );
 }
 
 function RecipeMessage({ message }: { message: string }) {
   return (
-    <p className="rounded-md border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
+    <p className="rounded-lg border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
       {message}
     </p>
   );

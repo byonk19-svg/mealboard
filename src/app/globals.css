@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap");
 @import "tailwindcss";
 
 @theme inline {
@@ -21,21 +22,27 @@
 }
 
 :root {
-  --background: #fbfaf7;
-  --foreground: #211f1a;
+  --background: #f9f9f8;
+  --foreground: #1a1c1c;
   --card: #ffffff;
-  --card-foreground: #211f1a;
-  --primary: #356859;
+  --card-foreground: #1a1c1c;
+  --primary: #163826;
   --primary-foreground: #ffffff;
-  --secondary: #ede8dc;
-  --secondary-foreground: #2f2a23;
-  --muted: #f1eee7;
-  --muted-foreground: #6c665d;
-  --accent: #d96f45;
+  --secondary: #dbe5df;
+  --secondary-foreground: #2c4e3b;
+  --muted: #f3f4f3;
+  --muted-foreground: #424843;
+  --accent: #673f18;
   --accent-foreground: #ffffff;
-  --border: #ded8cb;
-  --ring: #356859;
+  --border: #dfe5dd;
+  --ring: #436651;
   --radius: 0.5rem;
+  --surface-container: #eeeeed;
+  --surface-container-high: #e8e8e7;
+  --surface-container-highest: #e2e2e2;
+  --primary-container: #2d4f3c;
+  --primary-fixed: #c5ecd2;
+  --shadow-calm: 0 4px 20px rgb(45 79 60 / 5%);
 }
 
 * {
@@ -50,9 +57,13 @@ html {
 body {
   min-height: 100vh;
   margin: 0;
-  background: var(--background);
+  background:
+    radial-gradient(circle at top left, rgb(197 236 210 / 24%), transparent 34rem),
+    var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Hanken Grotesk", Arial, Helvetica, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
 }
 
 a {
@@ -65,4 +76,74 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+a {
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+button:active,
+a:active {
+  transform: translateY(1px) scale(0.99);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: "Manrope", Arial, Helvetica, sans-serif;
+  letter-spacing: 0;
+}
+
+input,
+select,
+textarea {
+  min-height: 44px;
+}
+
+::selection {
+  background: var(--primary-fixed);
+  color: var(--primary);
+}
+
+.calm-card {
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: 1rem;
+  box-shadow: var(--shadow-calm);
+}
+
+.calm-panel {
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--muted) 72%, white);
+  border-radius: 1rem;
+}
+
+.calm-eyebrow {
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.calm-heading {
+  color: var(--primary);
+  font-family: "Manrope", Arial, Helvetica, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0;
 }

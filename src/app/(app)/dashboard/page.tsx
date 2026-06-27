@@ -1,9 +1,13 @@
 import Link from "next/link";
+import Image from "next/image";
 import type { ReactNode } from "react";
 import { getDashboardCurrentWeekSnapshot } from "@/lib/dashboard/data";
 import { formatDashboardStatus } from "@/lib/dashboard/current-week-summary";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 import { getWeekDates, getWeekStartDate } from "@/lib/weekly-plans/week-dates";
+
+const dashboardImageUrl =
+  "https://lh3.googleusercontent.com/aida-public/AB6AXuAAfqXoCZpKmZxtqR8X-rIvcVspWc_LRD4XSf2lO7gvbxcAddrje6jiiOcU8ihq742gVn5PSiP-znshDXrio6m80F4IgBTbAWqg-8Vxg38mvcTtCvoATgPHMyJwvUOYAAvtJRpJjIEneTEKI1LHYBJOPSuWk2UH7Gie7DGU7qs5J_0zL38eUpXXyUpI3fdubd3KQTbq1m0filRbFc7_AIXWmuUqL4CjpjGSAPDGcSgRV-031QCAgYP9cQ";
 
 export default async function DashboardPage() {
   const householdContext = await getCurrentHouseholdContext();
@@ -19,42 +23,80 @@ export default async function DashboardPage() {
   });
 
   return (
-    <section className="space-y-6">
+    <section className="space-y-7">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <p className="text-sm font-medium text-muted-foreground">
-            Dashboard
-          </p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-normal">
+          <p className="calm-eyebrow">Dashboard</p>
+          <h1 className="calm-heading mt-3 text-4xl md:text-[40px] md:leading-[48px]">
             Current Week
           </h1>
-          <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
+          <p className="mt-3 max-w-2xl text-base leading-7 text-muted-foreground">
             {formatWeekRange(snapshot.weekStartDate)}
           </p>
         </div>
         <Link
-          className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          className="inline-flex min-h-11 w-fit items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-bold text-primary-foreground shadow-[0_12px_28px_rgba(22,56,38,0.16)] hover:bg-primary/95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           href={snapshot.nextAction.href}
         >
           {snapshot.nextAction.label}
         </Link>
       </div>
 
-      <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
-        <p className="text-sm font-medium text-muted-foreground">
-          Next best action
-        </p>
-        <h2 className="mt-2 text-2xl font-semibold">
-          {snapshot.nextAction.label}
-        </h2>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-          {snapshot.nextAction.description}
-        </p>
-      </section>
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(280px,0.85fr)]">
+        <section className="calm-card overflow-hidden">
+          <div className="grid gap-0 md:grid-cols-[minmax(0,1fr)_240px]">
+            <div className="p-6 md:p-8">
+              <p className="calm-eyebrow">Next best action</p>
+              <h2 className="calm-heading mt-3 text-3xl leading-tight">
+                {snapshot.nextAction.label}
+              </h2>
+              <p className="mt-4 max-w-xl text-base leading-7 text-muted-foreground">
+                {snapshot.nextAction.description}
+              </p>
+              <Link
+                className="mt-6 inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-bold text-primary-foreground hover:bg-primary/95"
+                href={snapshot.nextAction.href}
+              >
+                {snapshot.nextAction.label}
+              </Link>
+            </div>
+            <div className="relative min-h-56 overflow-hidden bg-secondary md:min-h-full">
+              <Image
+                alt="Fresh ingredients arranged on a calm kitchen counter."
+                className="h-full w-full object-cover grayscale-[0.15]"
+                fill
+                sizes="(min-width: 1024px) 240px, 100vw"
+                src={dashboardImageUrl}
+              />
+            </div>
+          </div>
+        </section>
 
-      <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+        <div className="grid gap-4">
+          <StatusMiniCard
+            href="/plan-week"
+            label="Plan status"
+            title={
+              snapshot.weeklyPlan
+                ? formatDashboardStatus(snapshot.weeklyPlan.status)
+                : "No plan yet"
+            }
+          />
+          <StatusMiniCard
+            href="/grocery-list"
+            label="Grocery status"
+            title={
+              snapshot.groceryList
+                ? formatDashboardStatus(snapshot.groceryList.status)
+                : "No current list"
+            }
+          />
+        </div>
+      </div>
+
+      <section className="calm-card p-5 md:p-6">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
-          <h2 className="text-xl font-semibold">Needs attention</h2>
+          <h2 className="calm-heading text-xl">Needs attention</h2>
           <p className="text-sm text-muted-foreground">
             {snapshot.attentionItems.length}{" "}
             {snapshot.attentionItems.length === 1 ? "item" : "items"}
@@ -64,18 +106,18 @@ export default async function DashboardPage() {
           <div className="mt-4 grid gap-3">
             {snapshot.attentionItems.map((item) => (
               <article
-                className="rounded-md border border-border bg-background p-4"
+                className="rounded-lg border border-border bg-background/70 p-4"
                 key={item.id}
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <h3 className="font-semibold">{item.label}</h3>
+                    <h3 className="font-semibold text-primary">{item.label}</h3>
                     <p className="mt-1 text-sm leading-6 text-muted-foreground">
                       {item.description}
                     </p>
                   </div>
                   <Link
-                    className="w-fit rounded-md border border-border bg-card px-3 py-2 text-sm font-semibold transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                    className="w-fit rounded-lg border border-border bg-card px-4 py-2 text-sm font-bold text-primary hover:border-primary hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                     href={item.href}
                   >
                     {item.actionLabel}
@@ -85,7 +127,7 @@ export default async function DashboardPage() {
             ))}
           </div>
         ) : (
-          <p className="mt-4 rounded-md border border-dashed border-border bg-muted/30 px-3 py-4 text-sm text-muted-foreground">
+          <p className="mt-4 rounded-lg border border-dashed border-border bg-muted/50 px-4 py-5 text-sm text-muted-foreground">
             No current week items need action.
           </p>
         )}
@@ -95,13 +137,11 @@ export default async function DashboardPage() {
       snapshot.groceryList?.status === "completed" &&
       snapshot.weeklyWrapUp?.status !== "dismissed" &&
       snapshot.weeklyWrapUp?.status !== "completed" ? (
-        <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+        <section className="calm-card p-5 md:p-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">
-                Optional wrap-up
-              </p>
-              <h2 className="mt-2 text-2xl font-semibold">
+              <p className="calm-eyebrow">Optional wrap-up</p>
+              <h2 className="calm-heading mt-2 text-2xl">
                 Review this week
               </h2>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
@@ -110,7 +150,7 @@ export default async function DashboardPage() {
               </p>
             </div>
             <Link
-              className="w-fit rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+              className="w-fit rounded-lg bg-primary px-5 py-3 text-sm font-bold text-primary-foreground hover:bg-primary/95"
               href={`/weekly-wrap-up/${snapshot.weeklyPlan.id}`}
             >
               Open weekly wrap-up
@@ -228,14 +268,14 @@ function SummaryCard({
   title: string;
 }) {
   return (
-    <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+    <section className="calm-card p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-sm font-medium text-muted-foreground">{eyebrow}</p>
-          <h2 className="mt-2 text-2xl font-semibold">{title}</h2>
+          <p className="calm-eyebrow">{eyebrow}</p>
+          <h2 className="calm-heading mt-2 text-2xl">{title}</h2>
         </div>
         <Link
-          className="w-fit rounded-md border border-border bg-card px-3 py-2 text-sm font-semibold transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          className="w-fit rounded-lg border border-border bg-card px-4 py-2 text-sm font-bold text-primary hover:border-primary hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           href={actionHref}
         >
           {actionLabel}
@@ -250,8 +290,28 @@ function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <dt className="text-muted-foreground">{label}</dt>
-      <dd className="mt-1 text-lg font-semibold">{value}</dd>
+      <dd className="mt-1 text-lg font-bold text-primary">{value}</dd>
     </div>
+  );
+}
+
+function StatusMiniCard({
+  href,
+  label,
+  title
+}: {
+  href: string;
+  label: string;
+  title: string;
+}) {
+  return (
+    <Link className="calm-card block p-5 hover:bg-muted/50" href={href}>
+      <p className="calm-eyebrow">{label}</p>
+      <h2 className="calm-heading mt-2 text-xl">{title}</h2>
+      <span className="mt-4 inline-flex text-sm font-bold text-primary">
+        Open
+      </span>
+    </Link>
   );
 }
 
@@ -266,10 +326,10 @@ function ShortcutCard({
 }) {
   return (
     <Link
-      className="rounded-lg border border-border bg-card p-4 shadow-sm transition-colors hover:bg-muted/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      className="calm-card p-4 hover:bg-muted/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       href={href}
     >
-      <span className="text-sm font-semibold">{label}</span>
+      <span className="text-sm font-bold text-primary">{label}</span>
       <span className="mt-2 block text-sm leading-6 text-muted-foreground">
         {description}
       </span>
