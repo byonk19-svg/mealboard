@@ -36,6 +36,11 @@ export type SnapshotRecipeStep = {
   sortOrder: number;
 };
 
+export type RecipeStepDraft = {
+  instruction: string;
+  sectionLabel: string | null;
+};
+
 export type SnapshotRecipe = {
   id: string;
   ingredients: SnapshotRecipeIngredient[];
@@ -77,6 +82,32 @@ export type CookingSessionSnapshot = {
     sectionLabel: string | null;
     sortOrder: number;
   }>;
+};
+
+export type CookingTimerStatus =
+  | "ready"
+  | "running"
+  | "paused"
+  | "expired"
+  | "dismissed"
+  | "canceled";
+
+export type CookingTimerShape = {
+  durationSeconds: number;
+  expiresAt: string | null;
+  remainingSeconds: number | null;
+  status: CookingTimerStatus;
+};
+
+export type CookingTimerPatch = {
+  canceled_at?: string | null;
+  dismissed_at?: string | null;
+  expired_at?: string | null;
+  expires_at?: string | null;
+  paused_at?: string | null;
+  remaining_seconds?: number | null;
+  started_at?: string | null;
+  status: CookingTimerStatus;
 };
 
 export function buildCookingSessionSnapshot({
@@ -133,6 +164,26 @@ export function validateCurrentStepSortOrder(
   }
 
   return sortOrder;
+}
+
+export function buildRecipeStepDraftsFromInstructions(
+  instructions: string | null
+): RecipeStepDraft[] {
+  if (!instructions) {
+    return [];
+  }
+
+  return instructions
+    .split(/\r?\n+/)
+    .flatMap((line) => splitNumberedInstructionLine(line))
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => line.replace(/^\d+[\).\-\s]+/, "").trim())
+    .filter(Boolean)
+    .map((instruction) => ({
+      instruction,
+      sectionLabel: null
+    }));
 }
 
 export function buildCookingSessionLifecyclePatch(
@@ -212,8 +263,137 @@ export function getCookingSessionCompletionWarnings({
   };
 }
 
+export function resolveCookingTimerStatus(
+  timer: CookingTimerShape,
+  now: Date
+): {
+  effectiveRemainingSeconds: number;
+  effectiveStatus: CookingTimerStatus;
+} {
+  if (timer.status !== "running" || !timer.expiresAt) {
+    return {
+      effectiveRemainingSeconds:
+        timer.remainingSeconds ?? timer.durationSeconds,
+      effectiveStatus: timer.status
+    };
+  }
+
+  const remainingSeconds = Math.max(
+    0,
+    Math.ceil((new Date(timer.expiresAt).getTime() - now.getTime()) / 1000)
+  );
+
+  return {
+    effectiveRemainingSeconds: remainingSeconds,
+    effectiveStatus: remainingSeconds === 0 ? "expired" : "running"
+  };
+}
+
+export function buildCookingTimerStartPatch({
+  now,
+  timer
+}: {
+  now: Date;
+  timer: CookingTimerShape;
+}): CookingTimerPatch {
+  const resolved = resolveCookingTimerStatus(timer, now);
+
+  if (
+    timer.status !== "ready" &&
+    timer.status !== "paused" &&
+    resolved.effectiveStatus !== "expired"
+  ) {
+    throw new Error("Only ready or paused cooking timers can be started.");
+  }
+
+  if (resolved.effectiveStatus === "expired") {
+    throw new Error("Expired cooking timers cannot be restarted.");
+  }
+
+  const remainingSeconds = timer.remainingSeconds ?? timer.durationSeconds;
+  const expiresAt = new Date(now.getTime() + remainingSeconds * 1000);
+
+  return {
+    expires_at: expiresAt.toISOString(),
+    paused_at: null,
+    remaining_seconds: null,
+    started_at: timer.status === "ready" ? now.toISOString() : undefined,
+    status: "running"
+  };
+}
+
+export function buildCookingTimerPausePatch({
+  now,
+  timer
+}: {
+  now: Date;
+  timer: CookingTimerShape;
+}): CookingTimerPatch {
+  const resolved = resolveCookingTimerStatus(timer, now);
+
+  if (resolved.effectiveStatus !== "running") {
+    throw new Error("Only running cooking timers can be paused.");
+  }
+
+  return {
+    expires_at: null,
+    paused_at: now.toISOString(),
+    remaining_seconds: resolved.effectiveRemainingSeconds,
+    status: "paused"
+  };
+}
+
+export function buildCookingTimerExpirePatch(now: Date): CookingTimerPatch {
+  return {
+    expired_at: now.toISOString(),
+    status: "expired"
+  };
+}
+
+export function buildCookingTimerDismissPatch({
+  now,
+  timer
+}: {
+  now: Date;
+  timer: CookingTimerShape;
+}): CookingTimerPatch {
+  const resolved = resolveCookingTimerStatus(timer, now);
+
+  if (resolved.effectiveStatus !== "expired") {
+    throw new Error("Only expired cooking timers can be dismissed.");
+  }
+
+  return {
+    dismissed_at: now.toISOString(),
+    expired_at: now.toISOString(),
+    status: "dismissed"
+  };
+}
+
+export function buildCookingTimerCancelPatch(now: Date): CookingTimerPatch {
+  return {
+    canceled_at: now.toISOString(),
+    status: "canceled"
+  };
+}
+
 function compareSortOrder(left: { sortOrder: number }, right: { sortOrder: number }) {
   return left.sortOrder - right.sortOrder;
+}
+
+function splitNumberedInstructionLine(line: string) {
+  const trimmedLine = line.trim();
+
+  if (!trimmedLine) {
+    return [];
+  }
+
+  const numberedSegments = trimmedLine
+    .split(/(?=\s*\d+[\).\-\s]+[A-Z])/)
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+
+  return numberedSegments.length > 1 ? numberedSegments : [trimmedLine];
 }
 
 function resolveScaleFactor(scaleFactor: number | null) {

@@ -1,9 +1,16 @@
 import {
   assertCookingSessionCanBeEdited,
+  buildCookingTimerCancelPatch,
+  buildCookingTimerDismissPatch,
+  buildCookingTimerPausePatch,
+  buildCookingTimerStartPatch,
   buildCookingSessionLifecyclePatch,
   buildCookingSessionSnapshot,
+  buildRecipeStepDraftsFromInstructions,
   getCookingSessionCompletionWarnings,
+  resolveCookingTimerStatus,
   validateCurrentStepSortOrder,
+  type CookingTimerShape,
   type CookingSessionLifecycleAction,
   type CookingSessionStatus,
   type SnapshotPlannedMeal,
@@ -72,6 +79,7 @@ type CookingSessionRow = {
   servings_snapshot: number | string | null;
   started_at: string;
   status: CookingSessionStatus;
+  substitutions: string | null;
   updated_at: string;
   weekly_plan_item_id: string | null;
 };
@@ -121,6 +129,16 @@ type CookingTimerRow = {
 type InsertedIdRow = {
   id: string;
 };
+
+export type RecipeStepInput = {
+  id?: string;
+  instruction: string;
+  sectionLabel: string | null;
+};
+
+export function getRecipeStepDrafts(instructions: string | null) {
+  return buildRecipeStepDraftsFromInstructions(instructions);
+}
 
 export async function getCookingModeRecipe({
   householdId,
@@ -232,6 +250,18 @@ export async function startCookingSession({
     .single();
 
   if (error) {
+    if (error.code === "23505") {
+      const existingSession = await getActiveCookingSession({
+        householdId,
+        plannedMealId,
+        recipeId
+      });
+
+      if (existingSession) {
+        return existingSession;
+      }
+    }
+
     throw new Error(error.message);
   }
 
@@ -267,6 +297,35 @@ export async function startCookingSession({
   return session;
 }
 
+export async function replaceRecipeSteps({
+  householdId,
+  recipeId,
+  steps
+}: {
+  householdId: string;
+  recipeId: string;
+  steps: RecipeStepInput[];
+}) {
+  const normalizedSteps = steps
+    .map((step) => ({
+      id: step.id,
+      instruction: step.instruction.trim(),
+      sectionLabel: step.sectionLabel?.trim() || null
+    }))
+    .filter((step) => step.instruction.length > 0);
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("replace_recipe_steps", {
+    p_household_id: householdId,
+    p_recipe_id: recipeId,
+    p_steps: normalizedSteps
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
 export async function updateCookingSessionCurrentStep({
   householdId,
   sessionId,
@@ -298,6 +357,22 @@ export async function updateCookingSessionCurrentStep({
   }
 
   return requireCookingSession({ householdId, sessionId, supabase });
+}
+
+export async function getCookingSession({
+  householdId,
+  sessionId
+}: {
+  householdId: string;
+  sessionId: string;
+}) {
+  const supabase = await createClient();
+
+  return getCookingSessionById({
+    householdId,
+    sessionId,
+    supabase
+  });
 }
 
 export async function setCookingSessionIngredientReadiness({
@@ -421,11 +496,58 @@ export async function completeCookingSession({
   householdId: string;
   sessionId: string;
 }) {
-  return transitionCookingSession({
-    action: "complete",
+  const supabase = await createClient();
+  const session = await requireCookingSession({
     householdId,
-    sessionId
+    sessionId,
+    supabase
   });
+
+  if (session.status === "completed") {
+    await recordCookingSessionCompletionEvidence({
+      householdId,
+      session,
+      supabase
+    });
+
+    return requireCookingSession({ householdId, sessionId, supabase });
+  }
+
+  const patch = buildCookingSessionLifecyclePatch(
+    session.status,
+    "complete",
+    new Date().toISOString()
+  );
+  const { data, error } = await supabase
+    .from("cooking_sessions")
+    .update(patch)
+    .eq("household_id", householdId)
+    .eq("id", sessionId)
+    .eq("status", session.status)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data) {
+    throw new Error("The cooking session changed. Reload and try again.");
+  }
+
+  const completedSession = await requireCookingSession({
+    householdId,
+    sessionId,
+    supabase
+  });
+
+  await recordCookingSessionCompletionEvidence({
+    householdId,
+    session: completedSession,
+    supabase
+  });
+
+  return requireCookingSession({ householdId, sessionId, supabase });
 }
 
 export async function abandonCookingSession({
@@ -459,6 +581,162 @@ export async function getCookingSessionCompletionWarningsForSession({
   return getCookingSessionCompletionWarnings({
     ingredients: session.ingredients,
     steps: session.steps
+  });
+}
+
+export async function updateCookingSessionNotes({
+  householdId,
+  notes,
+  sessionId,
+  substitutions
+}: {
+  householdId: string;
+  notes: string | null;
+  sessionId: string;
+  substitutions: string | null;
+}) {
+  const supabase = await createClient();
+  const session = await requireCookingSession({
+    householdId,
+    sessionId,
+    supabase
+  });
+
+  assertCookingSessionCanBeEdited(session.status);
+
+  const { data, error } = await supabase
+    .from("cooking_sessions")
+    .update({
+      notes,
+      substitutions
+    })
+    .eq("household_id", householdId)
+    .eq("id", sessionId)
+    .in("status", ["active", "paused"])
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data) {
+    throw new Error("The cooking session changed. Reload and try again.");
+  }
+
+  return requireCookingSession({ householdId, sessionId, supabase });
+}
+
+export async function createCookingTimer({
+  durationSeconds,
+  householdId,
+  label,
+  sessionId,
+  stepId = null
+}: {
+  durationSeconds: number;
+  householdId: string;
+  label: string | null;
+  sessionId: string;
+  stepId?: string | null;
+}) {
+  if (!Number.isInteger(durationSeconds) || durationSeconds <= 0) {
+    throw new Error("Timer duration must be a positive whole number of seconds.");
+  }
+
+  const supabase = await createClient();
+  const session = await requireCookingSession({
+    householdId,
+    sessionId,
+    supabase
+  });
+
+  assertCookingSessionCanBeEdited(session.status);
+
+  if (stepId && !session.steps.some((step) => step.id === stepId)) {
+    throw new Error("That cooking step is no longer available.");
+  }
+
+  const { error } = await supabase.from("cooking_timers").insert({
+    cooking_session_id: sessionId,
+    cooking_session_step_id: stepId,
+    duration_seconds: durationSeconds,
+    household_id: householdId,
+    label: label?.trim() || null
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return requireCookingSession({ householdId, sessionId, supabase });
+}
+
+export async function startCookingTimer({
+  householdId,
+  sessionId,
+  timerId
+}: {
+  householdId: string;
+  sessionId: string;
+  timerId: string;
+}) {
+  return transitionCookingTimer({
+    householdId,
+    sessionId,
+    timerId,
+    transition: (timer, now) => buildCookingTimerStartPatch({ now, timer })
+  });
+}
+
+export async function pauseCookingTimer({
+  householdId,
+  sessionId,
+  timerId
+}: {
+  householdId: string;
+  sessionId: string;
+  timerId: string;
+}) {
+  return transitionCookingTimer({
+    householdId,
+    sessionId,
+    timerId,
+    transition: (timer, now) => buildCookingTimerPausePatch({ now, timer })
+  });
+}
+
+export async function dismissCookingTimer({
+  householdId,
+  sessionId,
+  timerId
+}: {
+  householdId: string;
+  sessionId: string;
+  timerId: string;
+}) {
+  return transitionCookingTimer({
+    householdId,
+    sessionId,
+    timerId,
+    transition: (timer, now) => buildCookingTimerDismissPatch({ now, timer })
+  });
+}
+
+export async function cancelCookingTimer({
+  householdId,
+  sessionId,
+  timerId
+}: {
+  householdId: string;
+  sessionId: string;
+  timerId: string;
+}) {
+  return transitionCookingTimer({
+    householdId,
+    sessionId,
+    timerId,
+    transition: (_timer, now) => buildCookingTimerCancelPatch(now)
   });
 }
 
@@ -500,6 +778,132 @@ async function transitionCookingSession({
   }
 
   return requireCookingSession({ householdId, sessionId, supabase });
+}
+
+async function transitionCookingTimer({
+  householdId,
+  sessionId,
+  timerId,
+  transition
+}: {
+  householdId: string;
+  sessionId: string;
+  timerId: string;
+  transition: (
+    timer: CookingTimerShape,
+    now: Date
+  ) => Record<string, string | number | null | undefined>;
+}) {
+  const supabase = await createClient();
+  const session = await requireCookingSession({
+    householdId,
+    sessionId,
+    supabase
+  });
+
+  assertCookingSessionCanBeEdited(session.status);
+
+  const timer = session.timers.find((candidate) => candidate.id === timerId);
+
+  if (!timer) {
+    throw new Error("That cooking timer is no longer available.");
+  }
+
+  const patch = transition(timer, new Date());
+  const { data, error } = await supabase
+    .from("cooking_timers")
+    .update(patch)
+    .eq("household_id", householdId)
+    .eq("cooking_session_id", sessionId)
+    .eq("id", timerId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data) {
+    throw new Error("That cooking timer changed. Reload and try again.");
+  }
+
+  return requireCookingSession({ householdId, sessionId, supabase });
+}
+
+async function recordCookingSessionCompletionEvidence({
+  householdId,
+  session,
+  supabase
+}: {
+  householdId: string;
+  session: CookingSession;
+  supabase: SupabaseClient;
+}) {
+  if (session.status !== "completed") {
+    return;
+  }
+
+  const madeOn = (session.completedAt ?? new Date().toISOString()).slice(0, 10);
+  const { data: existingReview, error: existingReviewError } = await supabase
+    .from("recipe_reviews")
+    .select("id")
+    .eq("household_id", householdId)
+    .eq("cooking_session_id", session.id)
+    .maybeSingle();
+
+  if (existingReviewError) {
+    throw new Error(existingReviewError.message);
+  }
+
+  if (!existingReview) {
+    const quickTags = [
+      "made",
+      session.substitutions ? "substitutions" : null
+    ].filter((tag): tag is string => Boolean(tag));
+    const notes = [session.notes, session.substitutions
+      ? `Substitutions: ${session.substitutions}`
+      : null]
+      .filter(Boolean)
+      .join("\n\n") || null;
+    const { error: reviewError } = await supabase.from("recipe_reviews").insert({
+      cooking_session_id: session.id,
+      household_id: householdId,
+      made_on: madeOn,
+      notes,
+      quick_tags: quickTags,
+      recipe_id: session.recipeId,
+      weekly_plan_item_id: session.weeklyPlanItemId
+    });
+
+    if (reviewError) {
+      throw new Error(reviewError.message);
+    }
+  }
+
+  const { error: recipeError } = await supabase
+    .from("recipes")
+    .update({
+      last_made_at: madeOn,
+      status: "tried"
+    })
+    .eq("household_id", householdId)
+    .eq("id", session.recipeId)
+    .eq("status", "idea");
+
+  if (recipeError) {
+    throw new Error(recipeError.message);
+  }
+
+  const { error: madeAtError } = await supabase
+    .from("recipes")
+    .update({ last_made_at: madeOn })
+    .eq("household_id", householdId)
+    .eq("id", session.recipeId)
+    .neq("status", "idea");
+
+  if (madeAtError) {
+    throw new Error(madeAtError.message);
+  }
 }
 
 async function getCookingModeRecipeWithClient({
@@ -735,7 +1139,7 @@ async function getCookingSessionById({
   const { data, error } = await supabase
     .from("cooking_sessions")
     .select(
-      "id, household_id, recipe_id, weekly_plan_item_id, status, current_step_sort_order, recipe_name_snapshot, servings_snapshot, scale_factor_snapshot, recipe_updated_at_snapshot, started_at, paused_at, completed_at, abandoned_at, notes, created_at, updated_at"
+      "id, household_id, recipe_id, weekly_plan_item_id, status, current_step_sort_order, recipe_name_snapshot, servings_snapshot, scale_factor_snapshot, recipe_updated_at_snapshot, started_at, paused_at, completed_at, abandoned_at, notes, substitutions, created_at, updated_at"
     )
     .eq("household_id", householdId)
     .eq("id", sessionId)
@@ -864,7 +1268,15 @@ async function getCookingSessionTimers({
     pausedAt: row.paused_at,
     remainingSeconds: row.remaining_seconds,
     startedAt: row.started_at,
-    status: row.status,
+    status: resolveCookingTimerStatus(
+      {
+        durationSeconds: row.duration_seconds,
+        expiresAt: row.expires_at,
+        remainingSeconds: row.remaining_seconds,
+        status: row.status
+      },
+      new Date()
+    ).effectiveStatus,
     updatedAt: row.updated_at
   }));
 }
@@ -893,6 +1305,7 @@ function toCookingSession(
     startedAt: row.started_at,
     status: row.status,
     steps,
+    substitutions: row.substitutions,
     timers,
     updatedAt: row.updated_at,
     weeklyPlanItemId: row.weekly_plan_item_id

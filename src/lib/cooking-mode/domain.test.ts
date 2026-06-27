@@ -3,7 +3,12 @@ import {
   assertCookingSessionCanBeEdited,
   buildCookingSessionLifecyclePatch,
   buildCookingSessionSnapshot,
+  buildCookingTimerDismissPatch,
+  buildCookingTimerPausePatch,
+  buildCookingTimerStartPatch,
+  buildRecipeStepDraftsFromInstructions,
   getCookingSessionCompletionWarnings,
+  resolveCookingTimerStatus,
   validateCurrentStepSortOrder
 } from "./domain";
 
@@ -140,6 +145,31 @@ describe("current step validation", () => {
   });
 });
 
+describe("buildRecipeStepDraftsFromInstructions", () => {
+  it("creates reviewable step drafts without accepting them as recipe steps", () => {
+    expect(
+      buildRecipeStepDraftsFromInstructions("1. Chop onion.\n2. Simmer sauce.")
+    ).toEqual([
+      {
+        instruction: "Chop onion.",
+        sectionLabel: null
+      },
+      {
+        instruction: "Simmer sauce.",
+        sectionLabel: null
+      }
+    ]);
+  });
+
+  it("splits compact numbered instructions when they are pasted on one line", () => {
+    expect(
+      buildRecipeStepDraftsFromInstructions(
+        "1. Heat the pan. 2. Add rice. 3. Rest before serving."
+      ).map((step) => step.instruction)
+    ).toEqual(["Heat the pan.", "Add rice.", "Rest before serving."]);
+  });
+});
+
 describe("cooking session lifecycle helpers", () => {
   it("builds valid lifecycle patches for pause, resume, complete, and abandon", () => {
     const now = "2026-06-27T12:00:00.000Z";
@@ -199,6 +229,80 @@ describe("getCookingSessionCompletionWarnings", () => {
     ).toEqual({
       uncheckedIngredientNames: ["Beans"],
       uncheckedStepInstructions: ["Brown turkey"]
+    });
+  });
+});
+
+describe("cooking timer helpers", () => {
+  it("resolves running timers as expired when the stored expiry is in the past", () => {
+    expect(
+      resolveCookingTimerStatus(
+        {
+          durationSeconds: 60,
+          expiresAt: "2026-06-27T12:00:00.000Z",
+          remainingSeconds: null,
+          status: "running"
+        },
+        new Date("2026-06-27T12:01:00.000Z")
+      )
+    ).toEqual({
+      effectiveRemainingSeconds: 0,
+      effectiveStatus: "expired"
+    });
+  });
+
+  it("builds start, pause, and dismiss patches for valid timer transitions", () => {
+    const now = new Date("2026-06-27T12:00:00.000Z");
+
+    expect(
+      buildCookingTimerStartPatch({
+        now,
+        timer: {
+          durationSeconds: 90,
+          expiresAt: null,
+          remainingSeconds: null,
+          status: "ready"
+        }
+      })
+    ).toEqual({
+      expires_at: "2026-06-27T12:01:30.000Z",
+      paused_at: null,
+      remaining_seconds: null,
+      started_at: "2026-06-27T12:00:00.000Z",
+      status: "running"
+    });
+
+    expect(
+      buildCookingTimerPausePatch({
+        now: new Date("2026-06-27T12:00:30.000Z"),
+        timer: {
+          durationSeconds: 90,
+          expiresAt: "2026-06-27T12:01:30.000Z",
+          remainingSeconds: null,
+          status: "running"
+        }
+      })
+    ).toEqual({
+      expires_at: null,
+      paused_at: "2026-06-27T12:00:30.000Z",
+      remaining_seconds: 60,
+      status: "paused"
+    });
+
+    expect(
+      buildCookingTimerDismissPatch({
+        now: new Date("2026-06-27T12:02:00.000Z"),
+        timer: {
+          durationSeconds: 90,
+          expiresAt: "2026-06-27T12:01:30.000Z",
+          remainingSeconds: null,
+          status: "running"
+        }
+      })
+    ).toEqual({
+      dismissed_at: "2026-06-27T12:02:00.000Z",
+      expired_at: "2026-06-27T12:02:00.000Z",
+      status: "dismissed"
     });
   });
 });

@@ -81,6 +81,11 @@ export type CookingTimer = {
   updatedAt: string;
 };
 
+export type ResolvedCookingTimer = CookingTimer & {
+  effectiveRemainingSeconds: number;
+  effectiveStatus: CookingTimerStatus;
+};
+
 export type CookingSession = {
   abandonedAt: string | null;
   completedAt: string | null;
@@ -99,6 +104,7 @@ export type CookingSession = {
   startedAt: string;
   status: CookingSessionStatus;
   steps: CookingSessionStep[];
+  substitutions: string | null;
   timers: CookingTimer[];
   updatedAt: string;
   weeklyPlanItemId: string | null;

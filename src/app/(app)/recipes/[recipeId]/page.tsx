@@ -1,5 +1,12 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { RecipeForm } from "@/components/recipes/recipe-form";
+import { RecipeStepsEditor } from "@/components/recipes/recipe-steps-editor";
+import {
+  getActiveCookingSession,
+  getCookingModeRecipe,
+  getRecipeStepDrafts
+} from "@/lib/cooking-mode/data";
 import { getGroceryCategories, getRecipe } from "@/lib/recipes/data";
 import { getFoods, getMealProfiles } from "@/lib/settings/data";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
@@ -25,8 +32,12 @@ export default async function RecipeDetailPage({
     return null;
   }
 
-  const [recipe, profiles, foods, categories] = await Promise.all([
+  const [recipe, cookingModeRecipe, profiles, foods, categories] = await Promise.all([
     getRecipe(householdContext.household.id, recipeId),
+    getCookingModeRecipe({
+      householdId: householdContext.household.id,
+      recipeId
+    }),
     getMealProfiles(householdContext.household.id),
     getFoods(householdContext.household.id),
     getGroceryCategories(householdContext.household.id)
@@ -35,6 +46,13 @@ export default async function RecipeDetailPage({
   if (!recipe) {
     notFound();
   }
+
+  const activeCookingSession = cookingModeRecipe
+    ? await getActiveCookingSession({
+        householdId: householdContext.household.id,
+        recipeId
+      })
+    : null;
 
   return (
     <section className="space-y-7">
@@ -70,6 +88,23 @@ export default async function RecipeDetailPage({
             }
           />
         </dl>
+        <div className="mt-6 flex flex-wrap gap-2">
+          {cookingModeRecipe?.canStartCooking ? (
+            <Link
+              className="rounded-lg bg-primary px-5 py-3 text-sm font-bold text-primary-foreground shadow-[0_12px_28px_rgba(22,56,38,0.16)] hover:bg-primary/95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              href={`/recipes/${recipe.id}/cook`}
+            >
+              {activeCookingSession ? "Resume cooking" : "Start cooking"}
+            </Link>
+          ) : (
+            <a
+              className="rounded-lg border border-border px-5 py-3 text-sm font-bold hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              href="#cooking-steps"
+            >
+              Review cooking steps
+            </a>
+          )}
+        </div>
       </section>
 
       {message ? <RecipeMessage message={message} /> : null}
@@ -98,6 +133,16 @@ export default async function RecipeDetailPage({
         profiles={profiles}
         recipe={recipe}
       />
+
+      {cookingModeRecipe ? (
+        <div id="cooking-steps">
+          <RecipeStepsEditor
+            draftSteps={getRecipeStepDrafts(cookingModeRecipe.instructions)}
+            recipeId={recipe.id}
+            steps={cookingModeRecipe.steps}
+          />
+        </div>
+      ) : null}
     </section>
   );
 }

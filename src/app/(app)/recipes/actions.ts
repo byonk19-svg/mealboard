@@ -24,6 +24,7 @@ import {
   type PersistedIngredientInput,
   type RecipePersistenceClient
 } from "@/lib/recipes/persist-recipe";
+import { replaceRecipeSteps } from "@/lib/cooking-mode/data";
 
 type ParsedNumber =
   | {
@@ -380,6 +381,41 @@ export async function updateRecipe(formData: FormData) {
   revalidatePath("/recipes");
   revalidatePath(path);
   recipeRedirect(path, "Recipe updated.");
+}
+
+export async function saveRecipeSteps(formData: FormData) {
+  const recipeId = textOrNull(formData.get("recipeId"));
+  const path = recipeId ? `/recipes/${recipeId}` : "/recipes";
+
+  if (!recipeId) {
+    recipeRedirect("/recipes", "Recipe is required.");
+  }
+
+  const household = await requireHousehold(path);
+  const instructions = formData.getAll("stepInstruction");
+  const sectionLabels = formData.getAll("stepSectionLabel");
+  const stepIds = formData.getAll("stepId");
+  const steps = instructions
+    .map((instruction, index) => ({
+      id: textOrNull(stepIds[index] ?? null) ?? undefined,
+      instruction: String(instruction ?? "").trim(),
+      sectionLabel: textOrNull(sectionLabels[index] ?? null)
+    }))
+    .filter((step) => step.instruction.length > 0);
+
+  if (steps.length === 0) {
+    recipeRedirect(path, "Add at least one reviewed cooking step.");
+  }
+
+  await replaceRecipeSteps({
+    householdId: household.id,
+    recipeId,
+    steps
+  });
+
+  revalidatePath("/recipes");
+  revalidatePath(path);
+  recipeRedirect(path, "Cooking steps saved.");
 }
 
 async function resolveIngredientFoodIds({
