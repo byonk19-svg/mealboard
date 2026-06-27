@@ -1,0 +1,5 @@
+# Review-First Pantry and Cooking Boundaries
+
+MealBoard will treat Smart Pantry and Cooking Mode as post-MVP domains that extend the existing recipe, grocery, staple, and weekly planning model rather than replacing it. Pantry items are current household stock lots linked to household item identity; pantry events explain changes, but the editable pantry item state remains the current source of truth. Checked grocery items, Already Have state, and checked cooking ingredients do not mutate pantry automatically; grocery completion and cooking completion create review candidates that the user confirms, edits, or skips before inventory changes are written.
+
+This favors data integrity over convenience automation. The main consequence is that Smart Pantry and Cooking Mode should ship in separate slices: first recipe-backed cooking sessions with reviewed steps, snapshots, checklists, and timers; then manual pantry stock/events with low/out restock candidates; then reviewed grocery intake and cooking consumption; and only later use-soon suggestions and pantry-aware planning boosts.
