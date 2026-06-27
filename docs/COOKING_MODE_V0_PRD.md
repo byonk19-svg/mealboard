@@ -10,7 +10,7 @@ Cooking Mode V0 should make it easier to cook from MealBoard without losing plac
 
 Cooking Mode V0 adds a recipe-backed Cooking Session. A user can start cooking from a saved recipe, optionally from a planned weekly meal, review or create structured Recipe Steps when needed, check ingredients as ready/prepped, check steps as completed, create basic in-app timers, pause/resume the session, complete it, or abandon it.
 
-The Cooking Session stores a snapshot of the effective recipe ingredients and reviewed Recipe Steps at the moment cooking starts. This snapshot includes the planned scale factor or serving adjustment when launched from a weekly plan item. Later edits to the recipe or plan do not rewrite an active session.
+The Cooking Session stores a snapshot of the effective recipe ingredients and reviewed Recipe Steps at the moment cooking starts. This snapshot includes planned meal servings or scale when launched from a weekly plan item and that data already exists. Later edits to the recipe or plan do not rewrite an active session.
 
 Cooking Mode V0 does not deduct pantry stock. Ingredient checks mean ready/prepped, step checks mean the instruction is done, and completion may record made/tried evidence or feed review/wrap-up flows, but inventory changes remain out of scope.
 
@@ -36,7 +36,7 @@ Cooking Mode V0 does not deduct pantry stock. Ingredient checks mean ready/prepp
 18. As Brianna, I want conditional cooking details to stay in step text, so that recipes can still mention alternatives without requiring branching logic.
 19. As Brianna, I want Cooking Mode to snapshot the recipe at session start, so that later recipe edits do not change what I am cooking mid-session.
 20. As Brianna, I want Cooking Mode to snapshot planned scaling, so that a half-size planned meal shows effective quantities.
-21. As Brianna, I want to adjust serving or scale before starting a direct recipe session, so that the checklist reflects what I intend to cook.
+21. As Brianna, I want direct recipe Cooking Sessions to use the recipe default servings in V0, so that the first cooking workflow stays simple.
 22. As Brianna, I want an active session to keep its own snapshot if the recipe changes elsewhere, so that I can finish the meal I started.
 23. As Brianna, I want a visible warning if the underlying recipe changed after the session started, so that I understand why a session may differ from the current recipe.
 24. As Brianna, I want to pause a Cooking Session, so that I can intentionally leave it and resume later.
@@ -96,8 +96,8 @@ Cooking Mode V0 does not deduct pantry stock. Ingredient checks mean ready/prepp
 - Recipe Steps are linear and ordered. Optional section labels are supported as lightweight grouping labels.
 - Branching, conditional step structures, and separate section records are out of scope for V0.
 - Starting a Cooking Session creates a snapshot of effective recipe ingredients and Recipe Steps.
-- When launched from a weekly plan item, the Cooking Session snapshot uses the weekly plan item scale factor.
-- When launched directly from a recipe, the Cooking Session defaults to the recipe's saved servings and scale unless the user adjusts before starting.
+- When launched from a weekly plan item, the Cooking Session snapshot uses planned meal servings or scale when that data already exists.
+- When launched directly from a recipe, the Cooking Session uses the recipe's saved servings and scale. Direct serving or scale adjustment inside Cooking Mode is out of scope for V0.
 - Later edits to recipe ingredients, recipe steps, freeform instructions, or weekly plan items do not rewrite an active or completed Cooking Session.
 - Ingredient checklist state belongs to the Cooking Session snapshot and means ready/prepped.
 - Step checklist state belongs to the Cooking Session snapshot and means completed instruction.
