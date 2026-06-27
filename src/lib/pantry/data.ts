@@ -66,6 +66,27 @@ export async function getPantryEvents(householdId: string, pantryItemId: string)
   return getPantryEventsWithClient({ householdId, pantryItemId, supabase });
 }
 
+export async function getRecentPantryEvents(
+  householdId: string,
+  options: { limit?: number } = {}
+) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("pantry_events")
+    .select(
+      "id, household_id, pantry_item_id, event_type, before_state, after_state, note, created_at"
+    )
+    .eq("household_id", householdId)
+    .order("created_at", { ascending: false })
+    .limit(options.limit ?? 20);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data ?? []) as PantryEventRow[]).map(mapPantryEventRow);
+}
+
 export async function createPantryItem({
   householdId,
   input,
