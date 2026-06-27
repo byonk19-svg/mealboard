@@ -451,6 +451,14 @@ function PlanItemCard({
         </div>
 
         <div className="flex flex-wrap gap-2">
+          {item.recipe_id ? (
+            <Link
+              className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              href={`/recipes/${item.recipe_id}/cook?plannedMealId=${item.id}`}
+            >
+              Start cooking
+            </Link>
+          ) : null}
           {!item.is_approved ? (
             <PlanItemActionForm
               action={actions.approveWeeklyPlanItem}
