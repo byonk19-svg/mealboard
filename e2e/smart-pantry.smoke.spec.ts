@@ -1,7 +1,20 @@
 import { expect, test, type Page } from "@playwright/test";
+import { execFileSync } from "node:child_process";
 
 const email = process.env.MEALBOARD_E2E_EMAIL;
 const password = process.env.MEALBOARD_E2E_PASSWORD;
+const dbContainer =
+  process.env.MEALBOARD_E2E_DB_CONTAINER ?? "supabase_db_mealboard";
+const noEditableListFixture = {
+  categoryId: "00000000-0000-4000-8000-000000009202",
+  displayName: "No-list cereal box",
+  email: "mealboard-e2e-no-list@example.test",
+  foodId: "00000000-0000-4000-8000-000000009302",
+  foodName: "No-list cereal",
+  householdId: "00000000-0000-4000-8000-000000009002",
+  pantryItemId: "00000000-0000-4000-8000-000000009402",
+  password: "Mealboard-e2e-no-list-12345!"
+};
 
 test.describe("Smart Pantry", () => {
   test.setTimeout(180_000);
@@ -141,6 +154,36 @@ test.describe("Smart Pantry", () => {
     }
   });
 
+  test("shows restock candidates as read-only when no editable grocery list exists", async ({
+    page
+  }) => {
+    seedNoEditableRestockFixture();
+
+    await signIn(page, {
+      email: noEditableListFixture.email,
+      password: noEditableListFixture.password
+    });
+    await page.goto("/pantry?view=low");
+
+    const restockSection = page
+      .getByRole("heading", { name: "Restock candidates" })
+      .locator("xpath=ancestor::section[1]");
+    const restockCandidate = restockSection
+      .getByRole("heading", {
+        exact: true,
+        name: noEditableListFixture.displayName
+      })
+      .locator("xpath=ancestor::article[1]");
+
+    await expect(restockCandidate).toBeVisible();
+    await expect(
+      restockCandidate.getByText("No editable grocery list")
+    ).toBeVisible();
+    await expect(
+      restockCandidate.getByRole("button", { name: "Add to grocery list" })
+    ).toHaveCount(0);
+  });
+
   test("keeps the pantry route usable at mobile width", async ({ page }) => {
     const suffix = Date.now();
     const foodName = `E2E Mobile Pantry ${suffix}`;
@@ -211,14 +254,131 @@ async function openItemDetails(page: Page, displayName: string) {
   await expect(details).toHaveAttribute("open", "");
 }
 
-async function signIn(page: Page) {
+async function signIn(
+  page: Page,
+  credentials: { email: string; password: string } = {
+    email: email ?? "",
+    password: password ?? ""
+  }
+) {
   await page.goto("/login");
-  await page.getByLabel("Email").fill(email ?? "");
-  await page.getByLabel("Password").fill(password ?? "");
+  await page.getByLabel("Email").fill(credentials.email);
+  await page.getByLabel("Password").fill(credentials.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(
     /\/dashboard|\/plan-week|\/recipes|\/pantry|\/grocery-list|\/settings/
   );
+}
+
+function seedNoEditableRestockFixture() {
+  runLocalSql(`
+insert into public.households (id, name)
+values (
+  ${sqlString(noEditableListFixture.householdId)},
+  'No Editable Restock E2E Household'
+)
+on conflict (id) do update
+set name = excluded.name;
+
+insert into public.grocery_categories (id, household_id, name, sort_order)
+values (
+  ${sqlString(noEditableListFixture.categoryId)},
+  ${sqlString(noEditableListFixture.householdId)},
+  'Pantry',
+  10
+)
+on conflict (id) do update
+set name = excluded.name,
+    sort_order = excluded.sort_order;
+
+insert into public.foods (
+  id,
+  household_id,
+  name,
+  default_grocery_category_id,
+  default_unit
+)
+values (
+  ${sqlString(noEditableListFixture.foodId)},
+  ${sqlString(noEditableListFixture.householdId)},
+  ${sqlString(noEditableListFixture.foodName)},
+  ${sqlString(noEditableListFixture.categoryId)},
+  'box'
+)
+on conflict (id) do update
+set name = excluded.name,
+    default_grocery_category_id = excluded.default_grocery_category_id,
+    default_unit = excluded.default_unit;
+
+delete from public.grocery_lists
+where household_id = ${sqlString(noEditableListFixture.householdId)};
+
+delete from public.pantry_items
+where id = ${sqlString(noEditableListFixture.pantryItemId)};
+
+insert into public.pantry_items (
+  id,
+  household_id,
+  food_id,
+  grocery_category_id,
+  display_name,
+  quantity,
+  unit,
+  stock_status,
+  low_stock_threshold_quantity,
+  low_stock_threshold_unit,
+  storage_location
+)
+values (
+  ${sqlString(noEditableListFixture.pantryItemId)},
+  ${sqlString(noEditableListFixture.householdId)},
+  ${sqlString(noEditableListFixture.foodId)},
+  ${sqlString(noEditableListFixture.categoryId)},
+  ${sqlString(noEditableListFixture.displayName)},
+  1,
+  'box',
+  'low',
+  2,
+  'box',
+  'No-list smoke shelf'
+);
+`);
+
+  execFileSync(process.execPath, ["scripts/bootstrap-local-e2e-user.mjs"], {
+    env: {
+      ...process.env,
+      MEALBOARD_E2E_EMAIL: noEditableListFixture.email,
+      MEALBOARD_E2E_HOUSEHOLD_ID: noEditableListFixture.householdId,
+      MEALBOARD_E2E_PASSWORD: noEditableListFixture.password
+    },
+    stdio: "inherit"
+  });
+}
+
+function runLocalSql(sql: string) {
+  execFileSync(
+    "docker",
+    [
+      "exec",
+      "-i",
+      dbContainer,
+      "psql",
+      "-U",
+      "postgres",
+      "-d",
+      "postgres",
+      "-v",
+      "ON_ERROR_STOP=1"
+    ],
+    {
+      input: `begin;\n${sql}\ncommit;\n`,
+      stdio: ["pipe", "inherit", "inherit"]
+    }
+  );
+}
+
+function sqlString(value: string) {
+  return `'${value.replaceAll("'", "''")}'`;
 }
 
 function getDateOffset(days: number) {
