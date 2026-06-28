@@ -52,6 +52,7 @@ export type PantryItem = {
   discardedAt: string | null;
   displayName: string;
   expirationDate: string | null;
+  foodDefaultGroceryCategoryId: string | null;
   foodId: string;
   foodName: string;
   groceryCategoryId: string | null;
