@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
+  addPantryRestockCandidateToGroceryList,
   createPantryItem,
   discardPantryItem,
   updatePantryItem
@@ -14,8 +15,14 @@ import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 
 const pantryPath = "/pantry";
 
-function pantryRedirect(message: string): never {
-  redirect(`${pantryPath}?message=${encodeURIComponent(message)}`);
+function pantryRedirect(message: string, view?: string): never {
+  const params = new URLSearchParams({ message });
+
+  if (view) {
+    params.set("view", view);
+  }
+
+  redirect(`${pantryPath}?${params.toString()}`);
 }
 
 function textOrNull(value: FormDataEntryValue | null) {
@@ -107,6 +114,38 @@ export async function discardPantryItemAction(formData: FormData) {
 
   revalidatePath(pantryPath);
   pantryRedirect("Pantry item discarded.");
+}
+
+export async function addPantryRestockCandidateAction(formData: FormData) {
+  const household = await requireHousehold();
+  const pantryItemId = textOrNull(formData.get("pantryItemId"));
+
+  if (!pantryItemId) {
+    pantryRedirect("Choose a restock candidate.", "low");
+  }
+
+  let message = "Restock item added to grocery list.";
+
+  try {
+    const result = await addPantryRestockCandidateToGroceryList({
+      householdId: household.id,
+      pantryItemId
+    });
+
+    message =
+      result.status === "already_on_grocery_list"
+        ? "Already on grocery list."
+        : "Restock item added to grocery list.";
+  } catch (error) {
+    pantryRedirect(
+      error instanceof Error ? error.message : "Restock item could not be added.",
+      "low"
+    );
+  }
+
+  revalidatePath(pantryPath);
+  revalidatePath("/grocery-list");
+  pantryRedirect(message, "low");
 }
 
 function validatePantryInputBeforeFoodCreation(formData: FormData) {
