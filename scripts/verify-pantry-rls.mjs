@@ -30,6 +30,39 @@ values
   ('30000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000002', 'RLS Bananas')
 on conflict (id) do nothing;
 
+insert into public.grocery_lists (id, household_id, name, status)
+values
+  ('60000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001', 'Pantry RLS List One', 'completed'),
+  ('60000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000002', 'Pantry RLS List Two', 'completed')
+on conflict (id) do nothing;
+
+insert into public.grocery_list_items (
+  id,
+  household_id,
+  grocery_list_id,
+  food_id,
+  display_name,
+  checked
+)
+values
+  (
+    '70000000-0000-4000-8000-000000000001',
+    '20000000-0000-4000-8000-000000000001',
+    '60000000-0000-4000-8000-000000000001',
+    '30000000-0000-4000-8000-000000000001',
+    'RLS apples grocery item',
+    true
+  ),
+  (
+    '70000000-0000-4000-8000-000000000002',
+    '20000000-0000-4000-8000-000000000002',
+    '60000000-0000-4000-8000-000000000002',
+    '30000000-0000-4000-8000-000000000002',
+    'RLS bananas grocery item',
+    true
+  )
+on conflict (id) do nothing;
+
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000001', true);
 
@@ -50,6 +83,23 @@ values (
   'Created during RLS smoke.'
 );
 
+insert into public.pantry_intake_decisions (
+  id,
+  household_id,
+  grocery_list_item_id,
+  status,
+  created_pantry_item_id,
+  note
+)
+values (
+  '80000000-0000-4000-8000-000000000001',
+  '20000000-0000-4000-8000-000000000001',
+  '70000000-0000-4000-8000-000000000001',
+  'confirmed',
+  '40000000-0000-4000-8000-000000000001',
+  'Confirmed during RLS smoke.'
+);
+
 select case when (
   select count(*) from public.pantry_items where id = '40000000-0000-4000-8000-000000000001'
 ) = 1 then 'ok' else ('user one item read failed ' || (select count(*) from public.pantry_items))::integer::text end as user_one_can_read_item;
@@ -57,6 +107,33 @@ select case when (
 select case when (
   select count(*) from public.pantry_events where id = '50000000-0000-4000-8000-000000000001'
 ) = 1 then 'ok' else ('user one event read failed ' || (select count(*) from public.pantry_events))::integer::text end as user_one_can_read_event;
+
+select case when (
+  select count(*) from public.pantry_intake_decisions where id = '80000000-0000-4000-8000-000000000001'
+) = 1 then 'ok' else ('user one intake decision read failed ' || (select count(*) from public.pantry_intake_decisions))::integer::text end as user_one_can_read_intake_decision;
+
+do $$
+begin
+  insert into public.pantry_intake_decisions (
+    id,
+    household_id,
+    grocery_list_item_id,
+    status,
+    note
+  )
+  values (
+    '80000000-0000-4000-8000-000000000002',
+    '20000000-0000-4000-8000-000000000001',
+    '70000000-0000-4000-8000-000000000002',
+    'skipped',
+    'This should fail because the grocery item is in another household.'
+  );
+
+  raise exception 'cross-household grocery item reference unexpectedly succeeded';
+exception
+  when foreign_key_violation then
+    null;
+end $$;
 
 select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000002', true);
 
@@ -67,6 +144,10 @@ select case when (
 select case when (
   select count(*) from public.pantry_events where id = '50000000-0000-4000-8000-000000000001'
 ) = 0 then 'ok' else ('user two event isolation failed ' || (select count(*) from public.pantry_events))::integer::text end as user_two_cannot_read_event;
+
+select case when (
+  select count(*) from public.pantry_intake_decisions where id = '80000000-0000-4000-8000-000000000001'
+) = 0 then 'ok' else ('user two intake decision isolation failed ' || (select count(*) from public.pantry_intake_decisions))::integer::text end as user_two_cannot_read_intake_decision;
 
 rollback;
 `;
