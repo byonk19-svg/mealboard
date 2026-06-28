@@ -37,7 +37,7 @@ Every Codex task should follow these rules:
 * Do not add AI features yet.
 * Do not add H-E-B integration yet.
 * Do not add recipe photos yet.
-* Do not add full pantry inventory yet.
+* Do not add automatic pantry integrations beyond reviewed Smart Pantry, restock, intake, or consumption flows.
 * Do not add reminders/notifications.
 * Do not add a native mobile app.
 * Prefer simple, readable, testable code.
@@ -120,7 +120,7 @@ Create AGENTS.md with these instructions:
 - Follow docs/PRD.md and docs/TECHNICAL_PLAN.md as source of truth.
 - Keep work in small, reviewable slices.
 - Do not implement future-phase features unless explicitly asked.
-- Do not add AI, H-E-B integration, native apps, full pantry inventory, reminders, recipe photos, or full macro tracking in MVP.
+- Do not add AI, H-E-B integration, native apps, automatic pantry integrations, reminders, recipe photos, or full macro tracking in MVP.
 - Keep business logic in src/lib where practical.
 - Add tests for pure business logic.
 - Run lint/typecheck/tests when available.
@@ -755,9 +755,9 @@ Build:
 - include selected staples in grocery list generation with source context
 
 Important boundaries:
-- Do not build full pantry inventory.
-- Do not build expiration tracking.
-- Do not build low-stock alerts.
+- Do not build automatic pantry grocery mutations.
+- Do not build pantry notifications or reminders.
+- Do not build unreviewed pantry intake or consumption flows.
 
 Run lint/typecheck/tests and report results.
 ```
@@ -1318,7 +1318,7 @@ For the current repo state, run focused follow-up slices in this order:
 3. **Email-delivered invitations** - add invitation delivery only if shared household use becomes frequent enough to justify an email flow.
 4. **Weekly wrap-up review depth** - support richer multi-source staple review only if real household use shows the current single-staple review handoff is too narrow.
 
-Keep H-E-B integration, AI, full pantry inventory, reminders, native apps,
+Keep H-E-B integration, AI, automatic pantry integrations, reminders, native apps,
 recipe photos, public extension release, full macro tracking, and cloud Supabase migration pushes out of
 scope unless explicitly approved.
 

@@ -120,8 +120,8 @@ When candidate units are compatible with a pantry item lot, confirmation may dec
 _Avoid_: Checked ingredient, completed step
 
 **Pantry Restock Candidate**:
-A reviewed suggestion to add a low or out pantry item to a grocery list. Restock candidates are not grocery items until the user adds them to a draft or active grocery list.
-The first Smart Pantry slice should prove manual pantry stock, pantry events, low/out status, and restock candidates before connecting grocery completion intake, cooking consumption, or recipe matching.
+A reviewed suggestion to add a low or out pantry item to an editable grocery list. Restock candidates are not grocery items until the user explicitly adds them, and adding one to groceries does not change pantry stock or create a Pantry Event.
+Restock candidates use Pantry Item or Household Item identity for review and dedupe; weak name matches may warn, but should not silently merge. The first restock slice should prove reviewed low/out grocery handoff before grocery intake, cooking consumption, or recipe matching.
 _Avoid_: Automatic grocery item, staple
 
 **Use Soon Suggestion**:
