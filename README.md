@@ -201,13 +201,26 @@ or support multiple households per login.
 
 ## Verification
 
-Run the available checks:
+Run the repo-standard local verification sequence:
+
+```bash
+npm run verify
+```
+
+That runs:
 
 ```bash
 npm test
 npm run lint
 npm run typecheck
 npm run build
+git diff --check
+```
+
+To include one or more credential-gated browser smokes, pass npm script names:
+
+```bash
+npm run verify -- --e2e=e2e:pantry
 ```
 
 If the Supabase CLI is installed and Docker is running, also verify the local database with:
