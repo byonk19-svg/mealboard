@@ -93,11 +93,7 @@ Run the narrowest relevant check first, then broader checks before finishing.
 Default full verification:
 
 ```bash
-npm test
-npm run lint
-npm run typecheck
-npm run build
-git diff --check
+npm run verify
 ```
 
 For schema/RLS changes, also run:
