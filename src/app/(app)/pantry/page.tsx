@@ -7,6 +7,7 @@ import {
   searchPantryItems
 } from "@/lib/pantry/domain";
 import {
+  getPantryRestockCandidates,
   getPantryItems,
   getPantryEventsByItemIds,
   getRecentPantryEvents
@@ -19,12 +20,14 @@ import type {
   PantryItemRollup,
   PantryStockStatus
 } from "@/lib/pantry/types";
+import type { PantryRestockCandidate } from "@/lib/pantry/restock-candidates";
 import { getGroceryCategories } from "@/lib/recipes/data";
 import type { GroceryCategory } from "@/lib/recipes/types";
 import { getFoods, getMealProfiles } from "@/lib/settings/data";
 import type { Food, MealProfile } from "@/lib/settings/types";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 import {
+  addPantryRestockCandidateAction,
   createPantryItemAction,
   discardPantryItemAction,
   updatePantryItemAction
@@ -51,13 +54,20 @@ export default async function PantryPage({ searchParams }: PantryPageProps) {
   }
 
   const householdId = householdContext.household.id;
-  const [pantryItems, pantryEvents, foods, groceryCategories, mealProfiles] =
-    await Promise.all([
+  const [
+    pantryItems,
+    pantryEvents,
+    foods,
+    groceryCategories,
+    mealProfiles,
+    restockCandidates
+  ] = await Promise.all([
       getPantryItems(householdId),
       getRecentPantryEvents(householdId, { limit: 16 }),
       getFoods(householdId, undefined, { limit: null }),
       getGroceryCategories(householdId),
-      getMealProfiles(householdId)
+      getMealProfiles(householdId),
+      view === "low" ? getPantryRestockCandidates(householdId) : []
     ]);
   const today = getHouseholdDateString();
   const pantryEventsByItemId = await getPantryEventsByItemIds({
@@ -119,6 +129,13 @@ export default async function PantryPage({ searchParams }: PantryPageProps) {
         view={view}
       />
 
+      {view === "low" ? (
+        <PantryRestockCandidatesSection
+          candidates={restockCandidates}
+          groceryCategories={groceryCategories}
+        />
+      ) : null}
+
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <section className="space-y-5">
           {groups.length === 0 ? (
@@ -145,6 +162,112 @@ export default async function PantryPage({ searchParams }: PantryPageProps) {
         <RecentPantryEvents events={pantryEvents} />
       </div>
     </section>
+  );
+}
+
+function PantryRestockCandidatesSection({
+  candidates,
+  groceryCategories
+}: {
+  candidates: PantryRestockCandidate[];
+  groceryCategories: GroceryCategory[];
+}) {
+  return (
+    <section className="space-y-3">
+      <div>
+        <h2 className="calm-heading text-2xl">Restock candidates</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Low and out pantry items ready for reviewed grocery handoff.
+        </p>
+      </div>
+
+      {candidates.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-border bg-card p-5 text-sm text-muted-foreground">
+          No low or out pantry items need restock.
+        </div>
+      ) : (
+        <div className="grid gap-3 lg:grid-cols-2">
+          {candidates.map((candidate) => (
+            <PantryRestockCandidateCard
+              candidate={candidate}
+              categoryName={
+                groceryCategories.find(
+                  (category) => category.id === candidate.groceryCategoryId
+                )?.name ?? null
+              }
+              key={candidate.foodId}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function PantryRestockCandidateCard({
+  candidate,
+  categoryName
+}: {
+  candidate: PantryRestockCandidate;
+  categoryName: string | null;
+}) {
+  return (
+    <article className="rounded-lg border border-border bg-card p-4 shadow-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-lg font-semibold">{candidate.displayName}</h3>
+            <StatusBadge status={candidate.stockReason} />
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {candidate.foodName}
+            {categoryName ? ` - ${categoryName}` : ""}
+            {candidate.mealProfileName ? ` - ${candidate.mealProfileName}` : ""}
+          </p>
+          {candidate.warnings.includes("display_name_match_on_grocery_list") ? (
+            <p className="mt-2 text-sm font-medium text-amber-700">
+              Similar name already appears on the grocery list.
+            </p>
+          ) : null}
+        </div>
+
+        <PantryRestockCandidateAction candidate={candidate} />
+      </div>
+    </article>
+  );
+}
+
+function PantryRestockCandidateAction({
+  candidate
+}: {
+  candidate: PantryRestockCandidate;
+}) {
+  if (candidate.status === "already_on_grocery_list") {
+    return (
+      <span className="rounded-full border border-border bg-muted px-3 py-1.5 text-sm font-semibold text-muted-foreground">
+        Already on grocery list
+      </span>
+    );
+  }
+
+  if (candidate.status === "no_editable_grocery_list") {
+    return (
+      <span className="rounded-full border border-border bg-muted px-3 py-1.5 text-sm font-semibold text-muted-foreground">
+        No editable grocery list
+      </span>
+    );
+  }
+
+  return (
+    <form action={addPantryRestockCandidateAction}>
+      <input name="pantryItemId" type="hidden" value={candidate.pantryItemId} />
+      <button
+        className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+        type="submit"
+      >
+        Add to grocery list
+      </button>
+    </form>
   );
 }
 

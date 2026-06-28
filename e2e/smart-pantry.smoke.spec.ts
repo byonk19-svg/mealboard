@@ -70,6 +70,36 @@ test.describe("Smart Pantry", () => {
       updatedItemDetails.getByText("Status changed").first()
     ).toBeVisible();
 
+    await page.goto("/pantry?view=low");
+    await expect(
+      page.getByRole("heading", { name: "Restock candidates" })
+    ).toBeVisible();
+    const restockSection = page
+      .getByRole("heading", { name: "Restock candidates" })
+      .locator("xpath=ancestor::section[1]");
+    const restockCandidate = restockSection
+      .getByRole("heading", { exact: true, name: displayName })
+      .locator("xpath=ancestor::article[1]");
+    await expect(restockCandidate).toBeVisible();
+    const addRestock = restockCandidate.getByRole("button", {
+      name: "Add to grocery list"
+    });
+    const canAddRestock = (await addRestock.count()) > 0;
+
+    if (canAddRestock) {
+      await addRestock.click();
+      await expect(
+        page.getByText("Restock item added to grocery list.")
+      ).toBeVisible();
+      await expect(
+        restockCandidate.getByText("Already on grocery list")
+      ).toBeVisible();
+    } else {
+      await expect(
+        restockCandidate.getByText("No editable grocery list")
+      ).toBeVisible();
+    }
+
     await page.getByLabel("Search pantry").fill("fridge");
     await page.getByRole("button", { name: "Apply" }).click();
     await expect(
@@ -102,7 +132,13 @@ test.describe("Smart Pantry", () => {
     await expect(page.getByText("Discarded").first()).toBeVisible();
 
     await page.goto("/grocery-list");
-    await expect(page.getByText(foodName)).toHaveCount(0);
+    if (canAddRestock) {
+      await expect(
+        page.getByRole("heading", { exact: true, level: 3, name: displayName })
+      ).toBeVisible();
+    } else {
+      await expect(page.getByText(foodName)).toHaveCount(0);
+    }
   });
 
   test("keeps the pantry route usable at mobile width", async ({ page }) => {
@@ -163,6 +199,7 @@ test.describe("Smart Pantry", () => {
 async function openItemDetails(page: Page, displayName: string) {
   const itemHeading = page.getByRole("heading", {
     exact: true,
+    level: 4,
     name: displayName
   });
   const details = itemHeading.locator("xpath=ancestor::details[1]");
