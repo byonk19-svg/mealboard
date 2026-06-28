@@ -1,4 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  buildPantryRestockGroceryAddOperation,
+  isEditablePantryRestockGroceryListStatus
+} from "./restock-add";
 import { buildPantryEventTypes, normalizePantryItemInput } from "./domain";
 import {
   buildPantryRestockCandidates,
@@ -69,6 +73,18 @@ type PantryRestockGroceryListRow = {
   status: PantryRestockGroceryList["status"];
 };
 
+export type AddPantryRestockCandidateResult =
+  | {
+      groceryListId: string;
+      groceryListItemId: string;
+      status: "added";
+    }
+  | {
+      groceryListId: string;
+      groceryListItemId: string;
+      status: "already_on_grocery_list";
+    };
+
 export async function getPantryItems(
   householdId: string,
   options: { includeDiscarded?: boolean } = {}
@@ -111,6 +127,137 @@ export async function getPantryRestockCandidates(householdId: string) {
   ]);
 
   return buildPantryRestockCandidates({ groceryLists, pantryItems });
+}
+
+export async function addPantryRestockCandidateToGroceryList({
+  householdId,
+  pantryItemId
+}: {
+  householdId: string;
+  pantryItemId: string;
+}): Promise<AddPantryRestockCandidateResult> {
+  const supabase = await createClient();
+  return addPantryRestockCandidateToGroceryListWithClient({
+    householdId,
+    pantryItemId,
+    supabase
+  });
+}
+
+export async function addPantryRestockCandidateToGroceryListWithClient({
+  householdId,
+  pantryItemId,
+  supabase
+}: {
+  householdId: string;
+  pantryItemId: string;
+  supabase: SupabaseClient;
+}): Promise<AddPantryRestockCandidateResult> {
+  const [pantryItems, groceryLists] = await Promise.all([
+    getPantryItemsWithClient({ householdId, supabase }),
+    getEditableGroceryListsWithClient({ householdId, supabase })
+  ]);
+  const candidates = buildPantryRestockCandidates({ groceryLists, pantryItems });
+  const candidate = candidates.find(
+    (restockCandidate) => restockCandidate.pantryItemId === pantryItemId
+  );
+
+  if (!candidate) {
+    throw new Error("That restock candidate is no longer available.");
+  }
+
+  if (!candidate.groceryListId) {
+    throw new Error("No editable grocery list is available.");
+  }
+
+  if (candidate.status === "already_on_grocery_list") {
+    if (!candidate.existingGroceryListItemId) {
+      throw new Error("That pantry item is already on the grocery list.");
+    }
+
+    return {
+      groceryListId: candidate.groceryListId,
+      groceryListItemId: candidate.existingGroceryListItemId,
+      status: "already_on_grocery_list"
+    };
+  }
+
+  const currentListStatus = await getRestockGroceryListStatus({
+    groceryListId: candidate.groceryListId,
+    householdId,
+    supabase
+  });
+
+  if (
+    !currentListStatus ||
+    !isEditablePantryRestockGroceryListStatus(currentListStatus)
+  ) {
+    throw new Error("That grocery list is no longer editable.");
+  }
+
+  const existingItemId = await getExistingRestockGroceryListItemId({
+    foodId: candidate.foodId,
+    groceryListId: candidate.groceryListId,
+    householdId,
+    supabase
+  });
+
+  if (existingItemId) {
+    return {
+      groceryListId: candidate.groceryListId,
+      groceryListItemId: existingItemId,
+      status: "already_on_grocery_list"
+    };
+  }
+
+  const sortOrder = await getNextRestockGroceryItemSortOrder({
+    groceryListId: candidate.groceryListId,
+    householdId,
+    supabase
+  });
+  const operation = buildPantryRestockGroceryAddOperation({
+    candidate: {
+      ...candidate,
+      groceryListStatus: currentListStatus
+    },
+    householdId,
+    sortOrder
+  });
+  const { data: insertedItem, error: itemError } = await supabase
+    .from("grocery_list_items")
+    .insert(operation.item)
+    .select("id")
+    .maybeSingle();
+
+  if (itemError) {
+    throw new Error(itemError.message);
+  }
+
+  if (!insertedItem) {
+    throw new Error("Restock grocery item could not be added.");
+  }
+
+  const { error: sourceError } = await supabase
+    .from("grocery_item_sources")
+    .insert({
+      ...operation.source,
+      grocery_list_item_id: insertedItem.id
+    });
+
+  if (sourceError) {
+    await supabase
+      .from("grocery_list_items")
+      .delete()
+      .eq("household_id", householdId)
+      .eq("id", insertedItem.id);
+    throw new Error(sourceError.message);
+  }
+
+  return {
+    groceryListId: candidate.groceryListId,
+    groceryListItemId: insertedItem.id,
+    status: "added"
+  };
 }
 
 export async function getPantryEventsByItemIds({
@@ -391,6 +538,81 @@ async function getEditableGroceryListsWithClient({
     })),
     status: list.status
   }));
+}
+
+async function getRestockGroceryListStatus({
+  groceryListId,
+  householdId,
+  supabase
+}: {
+  groceryListId: string;
+  householdId: string;
+  supabase: SupabaseClient;
+}) {
+  const { data, error } = await supabase
+    .from("grocery_lists")
+    .select("status")
+    .eq("household_id", householdId)
+    .eq("id", groceryListId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data?.status as PantryRestockGroceryList["status"] | undefined;
+}
+
+async function getExistingRestockGroceryListItemId({
+  foodId,
+  groceryListId,
+  householdId,
+  supabase
+}: {
+  foodId: string;
+  groceryListId: string;
+  householdId: string;
+  supabase: SupabaseClient;
+}) {
+  const { data, error } = await supabase
+    .from("grocery_list_items")
+    .select("id")
+    .eq("household_id", householdId)
+    .eq("grocery_list_id", groceryListId)
+    .eq("food_id", foodId)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data?.id as string | undefined;
+}
+
+async function getNextRestockGroceryItemSortOrder({
+  groceryListId,
+  householdId,
+  supabase
+}: {
+  groceryListId: string;
+  householdId: string;
+  supabase: SupabaseClient;
+}) {
+  const { data, error } = await supabase
+    .from("grocery_list_items")
+    .select("sort_order")
+    .eq("household_id", householdId)
+    .eq("grocery_list_id", groceryListId)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data ? Number(data.sort_order) + 1 : 0;
 }
 
 async function insertPantryEvents({
