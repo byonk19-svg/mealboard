@@ -1,5 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildPantryEventTypes, normalizePantryItemInput } from "./domain";
+import {
+  buildPantryRestockCandidates,
+  type PantryRestockGroceryList
+} from "./restock-candidates";
 import type {
   NormalizedPantryItemInput,
   PantryEvent,
@@ -18,7 +22,10 @@ type PantryItemRow = {
   display_name: string;
   expiration_date: string | null;
   food_id: string;
-  foods: JoinedName;
+  foods:
+    | { default_grocery_category_id: string | null; name: string }
+    | Array<{ default_grocery_category_id: string | null; name: string }>
+    | null;
   grocery_categories:
     | { name: string; sort_order: number }
     | Array<{ name: string; sort_order: number }>
@@ -53,6 +60,15 @@ type PantryEventRow = {
   pantry_item_id: string;
 };
 
+type PantryRestockGroceryListRow = {
+  created_at: string;
+  grocery_list_items:
+    | Array<{ display_name: string; food_id: string | null; id: string }>
+    | null;
+  id: string;
+  status: PantryRestockGroceryList["status"];
+};
+
 export async function getPantryItems(
   householdId: string,
   options: { includeDiscarded?: boolean } = {}
@@ -85,6 +101,16 @@ export async function getRecentPantryEvents(
   }
 
   return ((data ?? []) as PantryEventRow[]).map(mapPantryEventRow);
+}
+
+export async function getPantryRestockCandidates(householdId: string) {
+  const supabase = await createClient();
+  const [pantryItems, groceryLists] = await Promise.all([
+    getPantryItemsWithClient({ householdId, supabase }),
+    getEditableGroceryListsWithClient({ householdId, supabase })
+  ]);
+
+  return buildPantryRestockCandidates({ groceryLists, pantryItems });
 }
 
 export async function getPantryEventsByItemIds({
@@ -337,6 +363,36 @@ async function getPantryItemWithClient({
   return mapPantryItemRow(data as PantryItemRow);
 }
 
+async function getEditableGroceryListsWithClient({
+  householdId,
+  supabase
+}: {
+  householdId: string;
+  supabase: SupabaseClient;
+}): Promise<PantryRestockGroceryList[]> {
+  const { data, error } = await supabase
+    .from("grocery_lists")
+    .select("id, status, created_at, grocery_list_items(id, food_id, display_name)")
+    .eq("household_id", householdId)
+    .in("status", ["draft", "finalized", "shopping_started"])
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data ?? []) as PantryRestockGroceryListRow[]).map((list) => ({
+    createdAt: list.created_at,
+    id: list.id,
+    items: (list.grocery_list_items ?? []).map((item) => ({
+      displayName: item.display_name,
+      foodId: item.food_id,
+      id: item.id
+    })),
+    status: list.status
+  }));
+}
+
 async function insertPantryEvents({
   after,
   before,
@@ -422,7 +478,7 @@ function toPantryEventState(item: PantryItem) {
 }
 
 const pantryItemSelect =
-  "id, household_id, food_id, meal_profile_id, grocery_category_id, display_name, package_detail, quantity, unit, quantity_note, stock_status, low_stock_threshold_quantity, low_stock_threshold_unit, expiration_date, is_open, opened_at, storage_location, notes, discarded_at, created_at, updated_at, foods(name), meal_profiles(name), grocery_categories(name, sort_order)";
+  "id, household_id, food_id, meal_profile_id, grocery_category_id, display_name, package_detail, quantity, unit, quantity_note, stock_status, low_stock_threshold_quantity, low_stock_threshold_unit, expiration_date, is_open, opened_at, storage_location, notes, discarded_at, created_at, updated_at, foods(name, default_grocery_category_id), meal_profiles(name), grocery_categories(name, sort_order)";
 
 function mapPantryItemRow(row: PantryItemRow): PantryItem {
   const category = getOptionalJoinedCategory(row.grocery_categories);
@@ -431,8 +487,10 @@ function mapPantryItemRow(row: PantryItemRow): PantryItem {
     discardedAt: row.discarded_at,
     displayName: row.display_name,
     expirationDate: row.expiration_date,
+    foodDefaultGroceryCategoryId:
+      getJoinedFood(row.foods)?.default_grocery_category_id ?? null,
     foodId: row.food_id,
-    foodName: getJoinedName(row.foods),
+    foodName: getJoinedFood(row.foods)?.name ?? "Unknown",
     groceryCategoryId: row.grocery_category_id,
     groceryCategoryName: category?.name ?? null,
     groceryCategorySortOrder: category?.sort_order ?? null,
@@ -470,16 +528,20 @@ function mapPantryEventRow(row: PantryEventRow): PantryEvent {
   };
 }
 
-function getJoinedName(value: JoinedName) {
-  return getOptionalJoinedName(value) ?? "Unknown";
-}
-
 function getOptionalJoinedName(value: JoinedName) {
   if (Array.isArray(value)) {
     return value[0]?.name ?? null;
   }
 
   return value?.name ?? null;
+}
+
+function getJoinedFood(value: PantryItemRow["foods"]) {
+  if (Array.isArray(value)) {
+    return value[0] ?? null;
+  }
+
+  return value;
 }
 
 function getOptionalJoinedCategory(

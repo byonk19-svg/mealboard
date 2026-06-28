@@ -331,6 +331,7 @@ function item(overrides: Partial<PantryItem> = {}): PantryItem {
     discardedAt: null,
     displayName: "Rice",
     expirationDate: null,
+    foodDefaultGroceryCategoryId: null,
     foodId: "food-1",
     foodName: "Rice",
     groceryCategoryId: "pantry",
