@@ -3,7 +3,11 @@ import {
   buildPantryRestockGroceryAddOperation,
   isEditablePantryRestockGroceryListStatus
 } from "./restock-add";
-import { buildPantryEventTypes, normalizePantryItemInput } from "./domain";
+import {
+  buildPantryEventTypes,
+  getHouseholdDateString,
+  normalizePantryItemInput
+} from "./domain";
 import {
   buildPantryRestockCandidates,
   type PantryRestockGroceryList
@@ -20,6 +24,10 @@ import {
   type PantryConsumptionCookingSession,
   type PantryConsumptionDecision
 } from "./consumption-candidates";
+import {
+  derivePantryUseSoonSignals,
+  type PantryUseSoonSignal
+} from "./use-soon-signals";
 import {
   buildConfirmedPantryIntakeDecisionInsert,
   buildPantryItemInputFromIntakeCandidate,
@@ -227,6 +235,46 @@ export async function getPantryRestockCandidates(householdId: string) {
   ]);
 
   return buildPantryRestockCandidates({ groceryLists, pantryItems });
+}
+
+export async function getPantryUseSoonSignals({
+  expiringSoonDays,
+  householdId,
+  timeZone,
+  today
+}: {
+  expiringSoonDays?: number;
+  householdId: string;
+  timeZone?: string;
+  today?: string;
+}) {
+  const supabase = await createClient();
+  return getPantryUseSoonSignalsWithClient({
+    expiringSoonDays,
+    householdId,
+    supabase,
+    today: today ?? getHouseholdDateString({ timeZone })
+  });
+}
+
+export async function getPantryUseSoonSignalsWithClient({
+  expiringSoonDays,
+  householdId,
+  supabase,
+  today
+}: {
+  expiringSoonDays?: number;
+  householdId: string;
+  supabase: SupabaseClient;
+  today?: string;
+}): Promise<PantryUseSoonSignal[]> {
+  const pantryItems = await getPantryItemsWithClient({ householdId, supabase });
+
+  return derivePantryUseSoonSignals({
+    expiringSoonDays,
+    pantryItems,
+    today: today ?? getHouseholdDateString()
+  });
 }
 
 export async function getPantryIntakeCandidates({

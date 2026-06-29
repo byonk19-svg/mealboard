@@ -56,9 +56,11 @@ The private MVP now includes section-aware structured recipe import review,
 emergency grocery backup text for manual copying, recent completed grocery list
 access from `/grocery-list`, explicit stale completed-list recovery, deterministic
 ingredient alias cleanup for common punctuation/spacing variants, guarded
-household member row-count handling, and named E2E smoke scripts for extension
-capture and household member lifecycle. Future slices should not reopen those
-same gaps unless real dogfooding exposes a concrete failure.
+household member row-count handling, Smart Pantry stock/restock/intake review,
+Cooking Mode consumption review, actor-attributed pantry intake/consumption
+decisions, and named E2E smoke scripts for extension capture, household member
+lifecycle, pantry intake, and pantry consumption. Future slices should not
+reopen those same gaps unless real dogfooding exposes a concrete failure.
 
 ---
 
@@ -1309,16 +1311,19 @@ coverage, owner-only household member linking/removal/ownership transfer,
 bounded grocery item-state retry with manual recovery, generic grocery-list copy,
 review-informed suggestion scoring, baby Try This status handoff, ingredient
 merge/split review controls, structured recipe URL import, private Chrome
-recipe capture extension, PWA install metadata, and the Next/PostCSS audit
-override are complete.
+recipe capture extension, Smart Pantry stock/restock/intake review, Cooking Mode
+consumption review, pantry decision actor attribution, PWA install metadata, and
+the Next/PostCSS audit override are complete.
 For the current repo state, run focused follow-up slices in this order:
 
-1. **Household member lifecycle depth** - add role editing beyond ownership transfer and household switching only after shared household use proves it is needed.
-2. **PWA/mobile offline resilience** - improve grocery-list behavior beyond bounded item-state retry without adding broad offline sync.
-3. **Email-delivered invitations** - add invitation delivery only if shared household use becomes frequent enough to justify an email flow.
-4. **Weekly wrap-up review depth** - support richer multi-source staple review only if real household use shows the current single-staple review handoff is too narrow.
+1. **Pantry-aware planning/use-soon suggestions** - integrate the existing use-soon signal read model into planning or suggestion ranking with visible, reviewable explanation text.
+2. **Explicit stock application from confirmed consumption decisions** - only after product rules define lot allocation, partial quantities, undo/reversal behavior, and multi-lot matching. Do not slip automatic stock deduction into review actions.
+3. **Household member lifecycle depth** - add role editing beyond ownership transfer and household switching only after shared household use proves it is needed.
+4. **PWA/mobile offline resilience** - improve grocery-list behavior beyond bounded item-state retry without adding broad offline sync.
+5. **Email-delivered invitations** - add invitation delivery only if shared household use becomes frequent enough to justify an email flow.
+6. **Weekly wrap-up review depth** - support richer multi-source staple review only if real household use shows the current single-staple review handoff is too narrow.
 
-Keep H-E-B integration, AI, automatic pantry integrations, reminders, native apps,
+Keep H-E-B integration, AI, unreviewed pantry automation, reminders, native apps,
 recipe photos, public extension release, full macro tracking, and cloud Supabase migration pushes out of
 scope unless explicitly approved.
 

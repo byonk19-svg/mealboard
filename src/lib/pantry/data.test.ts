@@ -6,6 +6,7 @@ import {
   confirmPantryIntakeCandidateWithClient,
   getPantryConsumptionCandidatesWithClient,
   getPantryIntakeCandidatesWithClient,
+  getPantryUseSoonSignalsWithClient,
   skipPantryConsumptionCandidateWithClient,
   skipPantryIntakeCandidateWithClient
 } from "./data";
@@ -219,6 +220,58 @@ describe("addPantryRestockCandidateToGroceryListWithClient", () => {
     ).rejects.toThrow("That grocery list is no longer editable.");
 
     expect(fake.operations).not.toContain("grocery_list_items:insert");
+  });
+});
+
+describe("getPantryUseSoonSignalsWithClient", () => {
+  it("derives use-soon signals from active pantry stock without writes", async () => {
+    const fake = createFakeSupabase({
+      groceryLists: [],
+      groceryListItems: [],
+      pantryItems: [
+        pantryItemRow({
+          display_name: "Black beans",
+          expiration_date: "2026-06-30",
+          food_id: "food-beans",
+          id: "active-beans",
+          stock_status: "in_stock"
+        }),
+        pantryItemRow({
+          discarded_at: "2026-06-28T12:00:00Z",
+          display_name: "Discarded beans",
+          expiration_date: "2026-06-29",
+          food_id: "food-beans",
+          id: "discarded-beans",
+          stock_status: "in_stock"
+        }),
+        pantryItemRow({
+          display_name: "Empty tortillas",
+          expiration_date: "2026-06-29",
+          food_id: "food-tortillas",
+          id: "out-tortillas",
+          stock_status: "out"
+        })
+      ]
+    });
+
+    await expect(
+      getPantryUseSoonSignalsWithClient({
+        householdId: "household-1",
+        supabase: fake.client,
+        today: "2026-06-29"
+      })
+    ).resolves.toEqual([
+      expect.objectContaining({
+        foodId: "food-beans",
+        pantryItemIds: ["active-beans"],
+        reasonLabels: ["Use soon"],
+        useByDate: "2026-06-30"
+      })
+    ]);
+    expect(fake.operations).not.toContain("pantry_items:insert");
+    expect(fake.operations).not.toContain("pantry_items:update");
+    expect(fake.operations).not.toContain("pantry_items:delete");
+    expect(fake.operations).not.toContain("pantry_events:insert");
   });
 });
 
