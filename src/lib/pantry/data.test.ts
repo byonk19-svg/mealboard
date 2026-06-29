@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   addPantryRestockCandidateToGroceryListWithClient,
+  applyPantryConsumptionStockWithClient,
   confirmPantryConsumptionCandidateWithClient,
   confirmPantryIntakeCandidateWithClient,
   getPantryConsumptionCandidatesWithClient,
@@ -56,7 +57,16 @@ type GroceryItemSourceRow = {
   unit: string | null;
 };
 
-type PantryItemRow = ReturnType<typeof pantryItemRow>;
+type PantryItemRow = Record<string, unknown> & {
+  discarded_at: string | null;
+  food_id: string;
+  household_id: string;
+  id: string;
+  quantity: number | string | null;
+  stock_status: string;
+  unit: string | null;
+  updated_at: string;
+};
 
 type PantryIntakeDecisionRow = {
   created_pantry_item_id: string | null;
@@ -97,10 +107,37 @@ type CookingSessionIngredientRow = {
 };
 
 type PantryConsumptionDecisionRow = {
+  id?: string;
   cooking_session_ingredient_id: string;
   household_id: string;
   note?: string | null;
   status: "confirmed" | "skipped";
+};
+
+type PantryConsumptionStockApplicationRow = {
+  applied_quantity: number;
+  applied_unit: string;
+  household_id: string;
+  id: string;
+  note?: string | null;
+  pantry_consumption_decision_id: string;
+};
+
+type PantryConsumptionStockApplicationAllocationRow = {
+  applied_quantity: number;
+  household_id: string;
+  id: string;
+  pantry_item_id: string;
+  pantry_quantity_after: number;
+  pantry_quantity_before: number;
+  stock_application_id: string;
+  unit: string;
+};
+
+type PantryConsumptionStockApplicationReversalRow = {
+  household_id: string;
+  id: string;
+  stock_application_id: string;
 };
 
 describe("addPantryRestockCandidateToGroceryListWithClient", () => {
@@ -673,9 +710,817 @@ describe("pantry consumption data functions", () => {
       status: "already_skipped"
     });
   });
+
+  it("applies one confirmed consumption decision to the selected pantry lot only", async () => {
+    const fake = createFakeSupabase({
+      cookingSessionIngredients: [
+        cookingSessionIngredientRow({
+          id: "eligible-ingredient"
+        })
+      ],
+      cookingSessions: [
+        cookingSessionRow({
+          completed_at: "2026-06-28T12:00:00Z",
+          id: "completed-session",
+          status: "completed"
+        })
+      ],
+      groceryItemSources: [groceryItemSourceRow()],
+      groceryLists: [groceryListRow()],
+      groceryListItems: [groceryListItemRow()],
+      pantryConsumptionDecisions: [
+        {
+          cooking_session_ingredient_id: "eligible-ingredient",
+          household_id: "household-1",
+          id: "consumption-decision-1",
+          status: "confirmed"
+        }
+      ],
+      pantryItems: [
+        pantryItemRow({
+          display_name: "Target tortillas",
+          food_id: "food-tortillas",
+          id: "target-lot",
+          quantity: 5,
+          stock_status: "in_stock",
+          unit: "count"
+        }),
+        pantryItemRow({
+          display_name: "Untouched tortillas",
+          food_id: "food-tortillas",
+          id: "untouched-lot",
+          quantity: 3,
+          stock_status: "in_stock",
+          unit: "count"
+        })
+      ]
+    });
+    const grocerySnapshot = JSON.stringify({
+      groceryItemSources: fake.state.groceryItemSources,
+      groceryListItems: fake.state.groceryListItems,
+      groceryLists: fake.state.groceryLists
+    });
+
+    await expect(
+      applyPantryConsumptionStockWithClient({
+        cookingSessionIngredientId: "eligible-ingredient",
+        householdId: "household-1",
+        input: {
+          allocations: [
+            { pantryItemId: "target-lot", quantity: 2, unit: "COUNT" }
+          ],
+          appliedQuantity: 2,
+          appliedUnit: " count "
+        },
+        note: " Used two tortillas ",
+        supabase: fake.client
+      })
+    ).resolves.toEqual({
+      cookingSessionIngredientId: "eligible-ingredient",
+      status: "applied",
+      stockApplicationId: "stock-application-1"
+    });
+
+    expect(fake.operations).toContain("rpc:apply_pantry_consumption_stock");
+    expect(fake.state.pantryItems.find((item) => item.id === "target-lot")).toEqual(
+      expect.objectContaining({ quantity: 3 })
+    );
+    expect(
+      fake.state.pantryItems.find((item) => item.id === "untouched-lot")
+    ).toEqual(expect.objectContaining({ quantity: 3 }));
+    expect(fake.state.pantryConsumptionStockApplications).toEqual([
+      expect.objectContaining({
+        applied_quantity: 2,
+        applied_unit: "count",
+        id: "stock-application-1",
+        note: "Used two tortillas",
+        pantry_consumption_decision_id: "consumption-decision-1"
+      })
+    ]);
+    expect(fake.state.pantryConsumptionStockApplicationAllocations).toEqual([
+      expect.objectContaining({
+        applied_quantity: 2,
+        pantry_item_id: "target-lot",
+        pantry_quantity_after: 3,
+        pantry_quantity_before: 5,
+        stock_application_id: "stock-application-1",
+        unit: "count"
+      })
+    ]);
+    expect(
+      JSON.stringify({
+        groceryItemSources: fake.state.groceryItemSources,
+        groceryListItems: fake.state.groceryListItems,
+        groceryLists: fake.state.groceryLists
+      })
+    ).toBe(grocerySnapshot);
+    expect(fake.operations).not.toContain("pantry_events:insert");
+  });
+
+  it("returns already_applied on retry without deducting stock again", async () => {
+    const fake = createFakeSupabase({
+      cookingSessionIngredients: [
+        cookingSessionIngredientRow({
+          id: "eligible-ingredient"
+        })
+      ],
+      cookingSessions: [
+        cookingSessionRow({
+          completed_at: "2026-06-28T12:00:00Z",
+          id: "completed-session",
+          status: "completed"
+        })
+      ],
+      groceryLists: [],
+      groceryListItems: [],
+      pantryConsumptionDecisions: [
+        {
+          cooking_session_ingredient_id: "eligible-ingredient",
+          household_id: "household-1",
+          id: "consumption-decision-1",
+          status: "confirmed"
+        }
+      ],
+      pantryConsumptionStockApplications: [
+        {
+          applied_quantity: 2,
+          applied_unit: "count",
+          household_id: "household-1",
+          id: "existing-application",
+          note: null,
+          pantry_consumption_decision_id: "consumption-decision-1"
+        }
+      ],
+      pantryConsumptionStockApplicationAllocations: [
+        {
+          applied_quantity: 2,
+          household_id: "household-1",
+          id: "existing-allocation",
+          pantry_item_id: "target-lot",
+          pantry_quantity_after: 3,
+          pantry_quantity_before: 5,
+          stock_application_id: "existing-application",
+          unit: "count"
+        }
+      ],
+      pantryItems: [
+        pantryItemRow({
+          food_id: "food-tortillas",
+          id: "target-lot",
+          quantity: 3,
+          stock_status: "in_stock",
+          unit: "count"
+        })
+      ]
+    });
+
+    await expect(
+      applyPantryConsumptionStockWithClient({
+        cookingSessionIngredientId: "eligible-ingredient",
+        householdId: "household-1",
+        input: {
+          allocations: [
+            { pantryItemId: "target-lot", quantity: 2, unit: "count" }
+          ],
+          appliedQuantity: 2,
+          appliedUnit: "count"
+        },
+        supabase: fake.client
+      })
+    ).resolves.toEqual({
+      cookingSessionIngredientId: "eligible-ingredient",
+      status: "already_applied",
+      stockApplicationId: "existing-application"
+    });
+
+    expect(fake.state.pantryItems[0]).toEqual(expect.objectContaining({ quantity: 3 }));
+    expect(fake.state.pantryConsumptionStockApplications).toHaveLength(1);
+    expect(fake.state.pantryConsumptionStockApplicationAllocations).toHaveLength(1);
+  });
+
+  it("returns already_applied on retry after the selected lot was fully drained", async () => {
+    const fake = createFakeSupabase({
+      cookingSessionIngredients: [
+        cookingSessionIngredientRow({
+          id: "eligible-ingredient"
+        })
+      ],
+      cookingSessions: [
+        cookingSessionRow({
+          completed_at: "2026-06-28T12:00:00Z",
+          id: "completed-session",
+          status: "completed"
+        })
+      ],
+      groceryLists: [],
+      groceryListItems: [],
+      pantryConsumptionDecisions: [
+        {
+          cooking_session_ingredient_id: "eligible-ingredient",
+          household_id: "household-1",
+          id: "consumption-decision-1",
+          status: "confirmed"
+        }
+      ],
+      pantryConsumptionStockApplicationAllocations: [
+        {
+          applied_quantity: 5,
+          household_id: "household-1",
+          id: "existing-allocation",
+          pantry_item_id: "target-lot",
+          pantry_quantity_after: 0,
+          pantry_quantity_before: 5,
+          stock_application_id: "existing-application",
+          unit: "count"
+        }
+      ],
+      pantryConsumptionStockApplications: [
+        {
+          applied_quantity: 5,
+          applied_unit: "count",
+          household_id: "household-1",
+          id: "existing-application",
+          note: null,
+          pantry_consumption_decision_id: "consumption-decision-1"
+        }
+      ],
+      pantryItems: [
+        pantryItemRow({
+          food_id: "food-tortillas",
+          id: "target-lot",
+          quantity: 0,
+          stock_status: "in_stock",
+          unit: "count"
+        })
+      ]
+    });
+
+    await expect(
+      applyPantryConsumptionStockWithClient({
+        cookingSessionIngredientId: "eligible-ingredient",
+        householdId: "household-1",
+        input: {
+          allocations: [
+            { pantryItemId: "target-lot", quantity: 5, unit: "count" }
+          ],
+          appliedQuantity: 5,
+          appliedUnit: "count"
+        },
+        supabase: fake.client
+      })
+    ).resolves.toEqual({
+      cookingSessionIngredientId: "eligible-ingredient",
+      status: "already_applied",
+      stockApplicationId: "existing-application"
+    });
+
+    expect(fake.state.pantryItems[0]).toEqual(expect.objectContaining({ quantity: 0 }));
+    expect(fake.operations).toContain("rpc:apply_pantry_consumption_stock");
+  });
+
+  it("returns already_reversed without revalidating current lot state", async () => {
+    const fake = createFakeSupabase({
+      cookingSessionIngredients: [
+        cookingSessionIngredientRow({
+          id: "eligible-ingredient"
+        })
+      ],
+      cookingSessions: [
+        cookingSessionRow({
+          completed_at: "2026-06-28T12:00:00Z",
+          id: "completed-session",
+          status: "completed"
+        })
+      ],
+      groceryLists: [],
+      groceryListItems: [],
+      pantryConsumptionDecisions: [
+        {
+          cooking_session_ingredient_id: "eligible-ingredient",
+          household_id: "household-1",
+          id: "consumption-decision-1",
+          status: "confirmed"
+        }
+      ],
+      pantryConsumptionStockApplicationAllocations: [
+        {
+          applied_quantity: 2,
+          household_id: "household-1",
+          id: "existing-allocation",
+          pantry_item_id: "target-lot",
+          pantry_quantity_after: 3,
+          pantry_quantity_before: 5,
+          stock_application_id: "existing-application",
+          unit: "count"
+        }
+      ],
+      pantryConsumptionStockApplicationReversals: [
+        {
+          household_id: "household-1",
+          id: "existing-reversal",
+          stock_application_id: "existing-application"
+        }
+      ],
+      pantryConsumptionStockApplications: [
+        {
+          applied_quantity: 2,
+          applied_unit: "count",
+          household_id: "household-1",
+          id: "existing-application",
+          note: null,
+          pantry_consumption_decision_id: "consumption-decision-1"
+        }
+      ],
+      pantryItems: [
+        pantryItemRow({
+          discarded_at: "2026-06-29T12:00:00Z",
+          food_id: "food-tortillas",
+          id: "target-lot",
+          quantity: 0,
+          stock_status: "out",
+          unit: "count"
+        })
+      ]
+    });
+
+    await expect(
+      applyPantryConsumptionStockWithClient({
+        cookingSessionIngredientId: "eligible-ingredient",
+        householdId: "household-1",
+        input: {
+          allocations: [
+            { pantryItemId: "target-lot", quantity: 1, unit: "count" }
+          ],
+          appliedQuantity: 1,
+          appliedUnit: "count"
+        },
+        supabase: fake.client
+      })
+    ).resolves.toEqual({
+      cookingSessionIngredientId: "eligible-ingredient",
+      status: "already_reversed",
+      stockApplicationId: "existing-application"
+    });
+
+    expect(fake.state.pantryItems[0]).toEqual(expect.objectContaining({ quantity: 0 }));
+    expect(fake.operations).toContain("rpc:apply_pantry_consumption_stock");
+  });
+
+  it("rejects an idempotent retry with different allocation payload", async () => {
+    const fake = createFakeSupabase({
+      cookingSessionIngredients: [
+        cookingSessionIngredientRow({
+          id: "eligible-ingredient"
+        })
+      ],
+      cookingSessions: [
+        cookingSessionRow({
+          completed_at: "2026-06-28T12:00:00Z",
+          id: "completed-session",
+          status: "completed"
+        })
+      ],
+      groceryLists: [],
+      groceryListItems: [],
+      pantryConsumptionDecisions: [
+        {
+          cooking_session_ingredient_id: "eligible-ingredient",
+          household_id: "household-1",
+          id: "consumption-decision-1",
+          status: "confirmed"
+        }
+      ],
+      pantryConsumptionStockApplicationAllocations: [
+        {
+          applied_quantity: 1,
+          household_id: "household-1",
+          id: "existing-allocation",
+          pantry_item_id: "target-lot",
+          pantry_quantity_after: 4,
+          pantry_quantity_before: 5,
+          stock_application_id: "existing-application",
+          unit: "count"
+        }
+      ],
+      pantryConsumptionStockApplications: [
+        {
+          applied_quantity: 1,
+          applied_unit: "count",
+          household_id: "household-1",
+          id: "existing-application",
+          note: null,
+          pantry_consumption_decision_id: "consumption-decision-1"
+        }
+      ],
+      pantryItems: [
+        pantryItemRow({
+          food_id: "food-tortillas",
+          id: "target-lot",
+          quantity: 4,
+          stock_status: "in_stock",
+          unit: "count"
+        })
+      ]
+    });
+
+    await expect(
+      applyPantryConsumptionStockWithClient({
+        cookingSessionIngredientId: "eligible-ingredient",
+        householdId: "household-1",
+        input: {
+          allocations: [
+            { pantryItemId: "target-lot", quantity: 2, unit: "count" }
+          ],
+          appliedQuantity: 2,
+          appliedUnit: "count"
+        },
+        supabase: fake.client
+      })
+    ).rejects.toThrow(
+      "Pantry stock application already exists with different allocations."
+    );
+
+    expect(fake.state.pantryItems[0]).toEqual(expect.objectContaining({ quantity: 4 }));
+    expect(fake.state.pantryConsumptionStockApplications).toHaveLength(1);
+  });
+
+  it("applies a confirmed decision across explicitly selected lots", async () => {
+    const fake = createFakeSupabase({
+      cookingSessionIngredients: [
+        cookingSessionIngredientRow({
+          id: "eligible-ingredient"
+        })
+      ],
+      cookingSessions: [
+        cookingSessionRow({
+          completed_at: "2026-06-28T12:00:00Z",
+          id: "completed-session",
+          status: "completed"
+        })
+      ],
+      groceryLists: [],
+      groceryListItems: [],
+      pantryConsumptionDecisions: [
+        {
+          cooking_session_ingredient_id: "eligible-ingredient",
+          household_id: "household-1",
+          id: "consumption-decision-1",
+          status: "confirmed"
+        }
+      ],
+      pantryItems: [
+        pantryItemRow({
+          food_id: "food-tortillas",
+          id: "lot-a",
+          quantity: 1,
+          stock_status: "in_stock",
+          unit: "count"
+        }),
+        pantryItemRow({
+          food_id: "food-tortillas",
+          id: "lot-b",
+          quantity: 4,
+          stock_status: "in_stock",
+          unit: "count"
+        })
+      ]
+    });
+
+    await expect(
+      applyPantryConsumptionStockWithClient({
+        cookingSessionIngredientId: "eligible-ingredient",
+        householdId: "household-1",
+        input: {
+          allocations: [
+            { pantryItemId: "lot-a", quantity: 1, unit: "count" },
+            { pantryItemId: "lot-b", quantity: 1, unit: "count" }
+          ],
+          appliedQuantity: 2,
+          appliedUnit: "count"
+        },
+        supabase: fake.client
+      })
+    ).resolves.toEqual({
+      cookingSessionIngredientId: "eligible-ingredient",
+      status: "applied",
+      stockApplicationId: "stock-application-1"
+    });
+
+    expect(fake.state.pantryItems.find((item) => item.id === "lot-a")).toEqual(
+      expect.objectContaining({ quantity: 0 })
+    );
+    expect(fake.state.pantryItems.find((item) => item.id === "lot-b")).toEqual(
+      expect.objectContaining({ quantity: 3 })
+    );
+    expect(fake.state.pantryConsumptionStockApplicationAllocations).toEqual([
+      expect.objectContaining({
+        pantry_item_id: "lot-a",
+        pantry_quantity_after: 0,
+        pantry_quantity_before: 1
+      }),
+      expect.objectContaining({
+        pantry_item_id: "lot-b",
+        pantry_quantity_after: 3,
+        pantry_quantity_before: 4
+      })
+    ]);
+  });
+
+  it("rejects skipped and undecided ingredients before stock writes", async () => {
+    const skipped = createFakeSupabase({
+      cookingSessionIngredients: [],
+      cookingSessions: [],
+      groceryLists: [],
+      groceryListItems: [],
+      pantryConsumptionDecisions: [
+        {
+          cooking_session_ingredient_id: "skipped-ingredient",
+          household_id: "household-1",
+          id: "skipped-decision",
+          status: "skipped"
+        }
+      ],
+      pantryItems: []
+    });
+    const undecided = createFakeSupabase({
+      cookingSessionIngredients: [],
+      cookingSessions: [],
+      groceryLists: [],
+      groceryListItems: [],
+      pantryItems: []
+    });
+
+    await expect(
+      applyPantryConsumptionStockWithClient({
+        cookingSessionIngredientId: "skipped-ingredient",
+        householdId: "household-1",
+        input: {
+          allocations: [],
+          appliedQuantity: 1,
+          appliedUnit: "count"
+        },
+        supabase: skipped.client
+      })
+    ).rejects.toThrow("Skipped cooking ingredients cannot apply pantry stock.");
+    await expect(
+      applyPantryConsumptionStockWithClient({
+        cookingSessionIngredientId: "undecided-ingredient",
+        householdId: "household-1",
+        input: {
+          allocations: [],
+          appliedQuantity: 1,
+          appliedUnit: "count"
+        },
+        supabase: undecided.client
+      })
+    ).rejects.toThrow("Confirm this cooking ingredient before applying pantry stock.");
+    expect(skipped.operations).not.toContain("rpc:apply_pantry_consumption_stock");
+    expect(undecided.operations).not.toContain("rpc:apply_pantry_consumption_stock");
+  });
+
+  it("rejects active-session ingredients without partial stock writes", async () => {
+    const fake = createFakeSupabase({
+      cookingSessionIngredients: [
+        cookingSessionIngredientRow({
+          id: "active-ingredient"
+        })
+      ],
+      cookingSessions: [
+        cookingSessionRow({
+          id: "completed-session",
+          status: "active"
+        })
+      ],
+      groceryLists: [],
+      groceryListItems: [],
+      pantryConsumptionDecisions: [
+        {
+          cooking_session_ingredient_id: "active-ingredient",
+          household_id: "household-1",
+          id: "active-decision",
+          status: "confirmed"
+        }
+      ],
+      pantryItems: [
+        pantryItemRow({
+          food_id: "food-tortillas",
+          id: "target-lot",
+          quantity: 2,
+          stock_status: "in_stock",
+          unit: "count"
+        })
+      ]
+    });
+
+    await expect(
+      applyPantryConsumptionStockWithClient({
+        cookingSessionIngredientId: "active-ingredient",
+        householdId: "household-1",
+        input: {
+          allocations: [
+            { pantryItemId: "target-lot", quantity: 1, unit: "count" }
+          ],
+          appliedQuantity: 1,
+          appliedUnit: "count"
+        },
+        supabase: fake.client
+      })
+    ).rejects.toThrow(
+      "That cooking ingredient is not available for pantry stock application."
+    );
+
+    expect(fake.state.pantryItems[0]).toEqual(expect.objectContaining({ quantity: 2 }));
+    expect(fake.state.pantryConsumptionStockApplications).toEqual([]);
+    expect(fake.operations).not.toContain("rpc:apply_pantry_consumption_stock");
+  });
+
+  it("rejects cross-household and incompatible lot allocations before stock writes", async () => {
+    const fake = createFakeSupabase({
+      cookingSessionIngredients: [
+        cookingSessionIngredientRow({
+          id: "eligible-ingredient"
+        })
+      ],
+      cookingSessions: [
+        cookingSessionRow({
+          completed_at: "2026-06-28T12:00:00Z",
+          id: "completed-session",
+          status: "completed"
+        })
+      ],
+      groceryLists: [],
+      groceryListItems: [],
+      pantryConsumptionDecisions: [
+        {
+          cooking_session_ingredient_id: "eligible-ingredient",
+          household_id: "household-1",
+          id: "consumption-decision-1",
+          status: "confirmed"
+        }
+      ],
+      pantryItems: [
+        pantryItemRow({
+          food_id: "food-tortillas",
+          household_id: "household-2",
+          id: "other-household-lot",
+          quantity: 2,
+          stock_status: "in_stock",
+          unit: "count"
+        }),
+        pantryItemRow({
+          food_id: "food-tortillas",
+          id: "wrong-unit-lot",
+          quantity: 2,
+          stock_status: "in_stock",
+          unit: "bag"
+        })
+      ]
+    });
+
+    await expect(
+      applyPantryConsumptionStockWithClient({
+        cookingSessionIngredientId: "eligible-ingredient",
+        householdId: "household-1",
+        input: {
+          allocations: [
+            { pantryItemId: "other-household-lot", quantity: 1, unit: "count" }
+          ],
+          appliedQuantity: 1,
+          appliedUnit: "count"
+        },
+        supabase: fake.client
+      })
+    ).rejects.toThrow("One selected pantry lot is no longer available.");
+    await expect(
+      applyPantryConsumptionStockWithClient({
+        cookingSessionIngredientId: "eligible-ingredient",
+        householdId: "household-1",
+        input: {
+          allocations: [
+            { pantryItemId: "wrong-unit-lot", quantity: 1, unit: "count" }
+          ],
+          appliedQuantity: 1,
+          appliedUnit: "count"
+        },
+        supabase: fake.client
+      })
+    ).rejects.toThrow("Pantry lot allocation units must match the applied unit.");
+    expect(fake.state.pantryConsumptionStockApplications).toEqual([]);
+    expect(fake.operations).not.toContain("rpc:apply_pantry_consumption_stock");
+  });
+
+  it("rejects overdraw and stale lot races without partial stock writes", async () => {
+    const overdraw = createFakeSupabase({
+      cookingSessionIngredients: [
+        cookingSessionIngredientRow({
+          id: "eligible-ingredient"
+        })
+      ],
+      cookingSessions: [
+        cookingSessionRow({
+          completed_at: "2026-06-28T12:00:00Z",
+          id: "completed-session",
+          status: "completed"
+        })
+      ],
+      groceryLists: [],
+      groceryListItems: [],
+      pantryConsumptionDecisions: [
+        {
+          cooking_session_ingredient_id: "eligible-ingredient",
+          household_id: "household-1",
+          id: "consumption-decision-1",
+          status: "confirmed"
+        }
+      ],
+      pantryItems: [
+        pantryItemRow({
+          food_id: "food-tortillas",
+          id: "target-lot",
+          quantity: 1,
+          stock_status: "in_stock",
+          unit: "count"
+        })
+      ]
+    });
+    const stale = createFakeSupabase({
+      beforeRpc(state) {
+        const targetLot = state.pantryItems.find((item) => item.id === "target-lot");
+        if (targetLot) {
+          targetLot.quantity = 1;
+        }
+      },
+      cookingSessionIngredients: [
+        cookingSessionIngredientRow({
+          id: "eligible-ingredient"
+        })
+      ],
+      cookingSessions: [
+        cookingSessionRow({
+          completed_at: "2026-06-28T12:00:00Z",
+          id: "completed-session",
+          status: "completed"
+        })
+      ],
+      groceryLists: [],
+      groceryListItems: [],
+      pantryConsumptionDecisions: [
+        {
+          cooking_session_ingredient_id: "eligible-ingredient",
+          household_id: "household-1",
+          id: "consumption-decision-1",
+          status: "confirmed"
+        }
+      ],
+      pantryItems: [
+        pantryItemRow({
+          food_id: "food-tortillas",
+          id: "target-lot",
+          quantity: 2,
+          stock_status: "in_stock",
+          unit: "count"
+        })
+      ]
+    });
+
+    await expect(
+      applyPantryConsumptionStockWithClient({
+        cookingSessionIngredientId: "eligible-ingredient",
+        householdId: "household-1",
+        input: {
+          allocations: [
+            { pantryItemId: "target-lot", quantity: 2, unit: "count" }
+          ],
+          appliedQuantity: 2,
+          appliedUnit: "count"
+        },
+        supabase: overdraw.client
+      })
+    ).rejects.toThrow("One selected pantry lot does not have enough quantity.");
+    await expect(
+      applyPantryConsumptionStockWithClient({
+        cookingSessionIngredientId: "eligible-ingredient",
+        householdId: "household-1",
+        input: {
+          allocations: [
+            { pantryItemId: "target-lot", quantity: 2, unit: "count" }
+          ],
+          appliedQuantity: 2,
+          appliedUnit: "count"
+        },
+        supabase: stale.client
+      })
+    ).rejects.toThrow("Pantry stock application selected a stale pantry lot.");
+
+    expect(overdraw.state.pantryItems[0]).toEqual(expect.objectContaining({ quantity: 1 }));
+    expect(overdraw.state.pantryConsumptionStockApplications).toEqual([]);
+    expect(stale.state.pantryItems[0]).toEqual(expect.objectContaining({ quantity: 1 }));
+    expect(stale.state.pantryConsumptionStockApplications).toEqual([]);
+  });
 });
 
 function createFakeSupabase({
+  beforeRpc,
   cookingSessionIngredients = [],
   cookingSessions = [],
   failNextPantryIntakeDecisionInsert = false,
@@ -684,10 +1529,14 @@ function createFakeSupabase({
   groceryLists,
   groceryListItems,
   pantryConsumptionDecisions = [],
+  pantryConsumptionStockApplicationAllocations = [],
+  pantryConsumptionStockApplications = [],
+  pantryConsumptionStockApplicationReversals = [],
   pantryIntakeDecisions = [],
   pantryItems,
   statusAfterCandidateRead
 }: {
+  beforeRpc?: (state: FakeSupabaseState) => void;
   cookingSessionIngredients?: CookingSessionIngredientRow[];
   cookingSessions?: CookingSessionRow[];
   failNextPantryIntakeDecisionInsert?: boolean;
@@ -696,12 +1545,16 @@ function createFakeSupabase({
   groceryLists: GroceryListRow[];
   groceryListItems: GroceryListItemRow[];
   pantryConsumptionDecisions?: PantryConsumptionDecisionRow[];
+  pantryConsumptionStockApplicationAllocations?: PantryConsumptionStockApplicationAllocationRow[];
+  pantryConsumptionStockApplications?: PantryConsumptionStockApplicationRow[];
+  pantryConsumptionStockApplicationReversals?: PantryConsumptionStockApplicationReversalRow[];
   pantryIntakeDecisions?: PantryIntakeDecisionRow[];
   pantryItems: PantryItemRow[];
   statusAfterCandidateRead?: GroceryListRow["status"];
 }) {
   const operations: string[] = [];
-  const state = {
+  const state: FakeSupabaseState = {
+    beforeRpc,
     cookingSessionIngredients: cookingSessionIngredients.map((ingredient) => ({
       ...ingredient
     })),
@@ -715,6 +1568,19 @@ function createFakeSupabase({
     pantryConsumptionDecisions: pantryConsumptionDecisions.map((decision) => ({
       ...decision
     })),
+    pantryConsumptionStockApplicationAllocations:
+      pantryConsumptionStockApplicationAllocations.map((allocation) => ({
+        ...allocation
+      })),
+    pantryConsumptionStockApplications: pantryConsumptionStockApplications.map(
+      (application) => ({
+        ...application
+      })
+    ),
+    pantryConsumptionStockApplicationReversals:
+      pantryConsumptionStockApplicationReversals.map((reversal) => ({
+        ...reversal
+      })),
     pantryIntakeDecisions: pantryIntakeDecisions.map((decision) => ({
       ...decision
     })),
@@ -728,27 +1594,57 @@ function createFakeSupabase({
         statusAfterCandidateRead,
         table
       });
+    },
+    rpc(name: string, params: Record<string, unknown>) {
+      operations.push(`rpc:${name}`);
+      if (name !== "apply_pantry_consumption_stock") {
+        return new FakeRpcResult({
+          data: null,
+          error: { message: `Unsupported RPC ${name}` }
+        });
+      }
+
+      return new FakeRpcResult(
+        executeApplyPantryConsumptionStockRpc({
+          params,
+          state
+        })
+      );
     }
   } as unknown as SupabaseClient;
 
   return { client, operations, state };
 }
 
+type FakeSupabaseState = {
+  beforeRpc?: (state: FakeSupabaseState) => void;
+  cookingSessionIngredients: CookingSessionIngredientRow[];
+  cookingSessions: CookingSessionRow[];
+  failNextPantryIntakeDecisionInsert: boolean;
+  finalPantryIntakeDecision?: PantryIntakeDecisionRow;
+  groceryItemSources: GroceryItemSourceRow[];
+  groceryListItems: GroceryListItemRow[];
+  groceryLists: GroceryListRow[];
+  pantryEvents: Array<Record<string, unknown>>;
+  pantryConsumptionDecisions: PantryConsumptionDecisionRow[];
+  pantryConsumptionStockApplicationAllocations: PantryConsumptionStockApplicationAllocationRow[];
+  pantryConsumptionStockApplications: PantryConsumptionStockApplicationRow[];
+  pantryConsumptionStockApplicationReversals: PantryConsumptionStockApplicationReversalRow[];
+  pantryIntakeDecisions: PantryIntakeDecisionRow[];
+  pantryItems: PantryItemRow[];
+};
+
+class FakeRpcResult {
+  constructor(private readonly result: QueryResult) {}
+
+  single() {
+    return Promise.resolve(this.result);
+  }
+}
+
 class FakeQuery {
   private readonly operations: string[];
-  private readonly state: {
-    cookingSessionIngredients: CookingSessionIngredientRow[];
-    cookingSessions: CookingSessionRow[];
-    failNextPantryIntakeDecisionInsert: boolean;
-    finalPantryIntakeDecision?: PantryIntakeDecisionRow;
-    groceryItemSources: GroceryItemSourceRow[];
-    groceryListItems: GroceryListItemRow[];
-    groceryLists: GroceryListRow[];
-    pantryEvents: Array<Record<string, unknown>>;
-    pantryConsumptionDecisions: PantryConsumptionDecisionRow[];
-    pantryIntakeDecisions: PantryIntakeDecisionRow[];
-    pantryItems: PantryItemRow[];
-  };
+  private readonly state: FakeSupabaseState;
   private readonly statusAfterCandidateRead: GroceryListRow["status"] | undefined;
   private readonly table: string;
   private filters: Array<[string, unknown]> = [];
@@ -863,6 +1759,24 @@ class FakeQuery {
     if (this.table === "pantry_consumption_decisions") {
       return {
         data: this.getPantryConsumptionDecisionRows(),
+        error: null
+      };
+    }
+
+    if (this.table === "pantry_consumption_stock_applications") {
+      return {
+        data: this.state.pantryConsumptionStockApplications.filter((application) =>
+          this.matchesFilters(application)
+        ),
+        error: null
+      };
+    }
+
+    if (this.table === "pantry_consumption_stock_application_reversals") {
+      return {
+        data: this.state.pantryConsumptionStockApplicationReversals.filter(
+          (reversal) => this.matchesFilters(reversal)
+        ),
         error: null
       };
     }
@@ -1064,6 +1978,26 @@ class FakeQuery {
       };
     }
 
+    if (this.table === "pantry_consumption_stock_applications") {
+      return {
+        data:
+          this.state.pantryConsumptionStockApplications.find((application) =>
+            this.matchesFilters(application)
+          ) ?? null,
+        error: null
+      };
+    }
+
+    if (this.table === "pantry_consumption_stock_application_reversals") {
+      return {
+        data:
+          this.state.pantryConsumptionStockApplicationReversals.find((reversal) =>
+            this.matchesFilters(reversal)
+          ) ?? null,
+        error: null
+      };
+    }
+
     return { data: null, error: null };
   }
 
@@ -1113,6 +2047,195 @@ type QueryResult = {
   data: unknown;
   error: { message: string } | null;
 };
+
+function executeApplyPantryConsumptionStockRpc({
+  params,
+  state
+}: {
+  params: Record<string, unknown>;
+  state: FakeSupabaseState;
+}): QueryResult {
+  state.beforeRpc?.(state);
+
+  const householdId = params.p_household_id as string;
+  const decisionId = params.p_pantry_consumption_decision_id as string;
+  const appliedQuantity = params.p_applied_quantity as number;
+  const appliedUnit = params.p_applied_unit as string;
+  const note = params.p_note as string | null;
+  const allocations = params.p_allocations as Array<{
+    expectedQuantityBefore: number;
+    expectedUpdatedAt: string;
+    pantryItemId: string;
+    quantity: number;
+    unit: string;
+  }>;
+  const decision = state.pantryConsumptionDecisions.find(
+    (candidateDecision) =>
+      candidateDecision.id === decisionId &&
+      candidateDecision.household_id === householdId
+  );
+
+  if (!decision) {
+    return {
+      data: null,
+      error: {
+        message:
+          "Pantry stock application requires an existing consumption decision in this household."
+      }
+    };
+  }
+
+  const existingApplication = state.pantryConsumptionStockApplications.find(
+    (application) =>
+      application.pantry_consumption_decision_id === decisionId &&
+      application.household_id === householdId
+  );
+
+  if (existingApplication) {
+    const existingReversal =
+      state.pantryConsumptionStockApplicationReversals.find(
+        (reversal) =>
+          reversal.stock_application_id === existingApplication.id &&
+          reversal.household_id === householdId
+      ) ?? null;
+    const existingAllocations =
+      state.pantryConsumptionStockApplicationAllocations.filter(
+        (allocation) => allocation.stock_application_id === existingApplication.id
+      );
+    const payloadMatches =
+      Number(existingApplication.applied_quantity) === appliedQuantity &&
+      existingApplication.applied_unit === appliedUnit &&
+      existingAllocations.length === allocations.length &&
+      allocations.every((allocation) =>
+        existingAllocations.some(
+          (existingAllocation) =>
+            existingAllocation.pantry_item_id === allocation.pantryItemId &&
+            Number(existingAllocation.applied_quantity) === allocation.quantity &&
+            existingAllocation.unit === allocation.unit
+        )
+      );
+
+    if (!existingReversal && !payloadMatches) {
+      return {
+        data: null,
+        error: {
+          message: "Pantry stock application already exists with different allocations."
+        }
+      };
+    }
+
+    return {
+      data: {
+        status: existingReversal ? "already_reversed" : "already_applied",
+        stock_application_id: existingApplication.id
+      },
+      error: null
+    };
+  }
+
+  const ingredient = state.cookingSessionIngredients.find(
+    (candidateIngredient) =>
+      candidateIngredient.id === decision.cooking_session_ingredient_id &&
+      candidateIngredient.household_id === householdId
+  );
+  const ingredientFoodId = ingredient?.food_id;
+  const touchedLots = allocations.map((allocation) => ({
+    allocation,
+    item: state.pantryItems.find(
+      (candidateItem) =>
+        candidateItem.id === allocation.pantryItemId &&
+        candidateItem.household_id === householdId
+    )
+  }));
+
+  if (
+    touchedLots.some(
+      ({ allocation, item }) =>
+        !item ||
+        item.food_id !== ingredientFoodId ||
+        item.discarded_at !== null ||
+        item.stock_status === "out" ||
+        item.stock_status === "unknown" ||
+        item.quantity === null ||
+        Number(item.quantity) <= 0 ||
+        item.unit !== allocation.unit ||
+        allocation.unit !== appliedUnit ||
+        allocation.expectedQuantityBefore === null ||
+        !allocation.expectedUpdatedAt
+    )
+  ) {
+    return {
+      data: null,
+      error: { message: "Pantry stock application selected an incompatible pantry lot." }
+    };
+  }
+
+  if (
+    touchedLots.some(
+      ({ allocation, item }) =>
+        Number(item?.quantity ?? 0) !== allocation.expectedQuantityBefore ||
+        item?.updated_at !== allocation.expectedUpdatedAt
+    )
+  ) {
+    return {
+      data: null,
+      error: { message: "Pantry stock application selected a stale pantry lot." }
+    };
+  }
+
+  if (
+    touchedLots.some(
+      ({ allocation, item }) => Number(item?.quantity ?? 0) < allocation.quantity
+    )
+  ) {
+    return {
+      data: null,
+      error: { message: "Pantry stock application would overdraw a pantry lot." }
+    };
+  }
+
+  const stockApplicationId = `stock-application-${
+    state.pantryConsumptionStockApplications.length + 1
+  }`;
+  state.pantryConsumptionStockApplications.push({
+    applied_quantity: appliedQuantity,
+    applied_unit: appliedUnit,
+    household_id: householdId,
+    id: stockApplicationId,
+    note,
+    pantry_consumption_decision_id: decisionId
+  });
+
+  for (const { allocation, item } of touchedLots) {
+    if (!item) {
+      continue;
+    }
+
+    const before = Number(item.quantity);
+    const after = before - allocation.quantity;
+    item.quantity = after;
+    state.pantryConsumptionStockApplicationAllocations.push({
+      applied_quantity: allocation.quantity,
+      household_id: householdId,
+      id: `stock-application-allocation-${
+        state.pantryConsumptionStockApplicationAllocations.length + 1
+      }`,
+      pantry_item_id: item.id,
+      pantry_quantity_after: after,
+      pantry_quantity_before: before,
+      stock_application_id: stockApplicationId,
+      unit: allocation.unit
+    });
+  }
+
+  return {
+    data: {
+      status: "applied",
+      stock_application_id: stockApplicationId
+    },
+    error: null
+  };
+}
 
 function groceryListRow(overrides: Partial<GroceryListRow> = {}): GroceryListRow {
   return {

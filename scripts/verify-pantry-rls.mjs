@@ -615,6 +615,56 @@ set constraints all deferred;
 
 do $$
 begin
+  insert into public.pantry_consumption_stock_applications (
+    id,
+    household_id,
+    pantry_consumption_decision_id,
+    applied_quantity,
+    applied_unit,
+    note
+  )
+  values (
+    '89000000-0000-4000-8000-000000000026',
+    '20000000-0000-4000-8000-000000000001',
+    '88000000-0000-4000-8000-000000000022',
+    1,
+    'count',
+    'This should fail because allocation units must match the application unit.'
+  );
+
+  insert into public.pantry_consumption_stock_application_allocations (
+    id,
+    household_id,
+    stock_application_id,
+    pantry_item_id,
+    applied_quantity,
+    unit,
+    pantry_quantity_before,
+    pantry_quantity_after
+  )
+  values (
+    '89100000-0000-4000-8000-000000000026',
+    '20000000-0000-4000-8000-000000000001',
+    '89000000-0000-4000-8000-000000000026',
+    '40000000-0000-4000-8000-000000000001',
+    1,
+    'bag',
+    5,
+    4
+  );
+
+  set constraints pantry_stock_application_allocations_complete immediate;
+
+  raise exception 'stock application with mismatched allocation unit unexpectedly succeeded';
+exception
+  when check_violation then
+    null;
+end $$;
+
+set constraints all deferred;
+
+do $$
+begin
   insert into public.pantry_consumption_stock_application_reversals (
     id,
     household_id,
@@ -1831,6 +1881,463 @@ select case when (
 select case when (
   select count(*) from public.pantry_consumption_stock_application_reversal_allocations where id = '89300000-0000-4000-8000-000000000001'
 ) = 0 then 'ok' else ('user two stock reversal allocation isolation failed ' || (select count(*) from public.pantry_consumption_stock_application_reversal_allocations))::integer::text end as user_two_cannot_read_stock_reversal_allocation;
+
+reset role;
+
+insert into public.recipes (id, household_id, name)
+values
+  ('90000000-0000-4000-8000-000000000099', '20000000-0000-4000-8000-000000000001', 'RLS stock apply recipe'),
+  ('90000000-0000-4000-8000-000000000098', '20000000-0000-4000-8000-000000000001', 'RLS stock apply stale recipe')
+on conflict (id) do nothing;
+
+insert into public.cooking_sessions (
+  id,
+  household_id,
+  recipe_id,
+  recipe_name_snapshot,
+  status,
+  completed_at
+)
+values
+  (
+    '91000000-0000-4000-8000-000000000099',
+    '20000000-0000-4000-8000-000000000001',
+    '90000000-0000-4000-8000-000000000099',
+    'RLS stock apply completed session',
+    'active',
+    null
+  ),
+  (
+    '91000000-0000-4000-8000-000000000098',
+    '20000000-0000-4000-8000-000000000001',
+    '90000000-0000-4000-8000-000000000098',
+    'RLS stock apply stale session',
+    'active',
+    null
+  )
+on conflict (id) do nothing;
+
+insert into public.cooking_session_ingredients (
+  id,
+  household_id,
+  cooking_session_id,
+  food_id,
+  display_name,
+  sort_order
+)
+values
+  (
+    '92000000-0000-4000-8000-000000000101',
+    '20000000-0000-4000-8000-000000000001',
+    '91000000-0000-4000-8000-000000000099',
+    '30000000-0000-4000-8000-000000000001',
+    'RLS apply apples success',
+    101
+  ),
+  (
+    '92000000-0000-4000-8000-000000000102',
+    '20000000-0000-4000-8000-000000000001',
+    '91000000-0000-4000-8000-000000000099',
+    '30000000-0000-4000-8000-000000000001',
+    'RLS apply apples skipped',
+    102
+  ),
+  (
+    '92000000-0000-4000-8000-000000000103',
+    '20000000-0000-4000-8000-000000000001',
+    '91000000-0000-4000-8000-000000000098',
+    '30000000-0000-4000-8000-000000000001',
+    'RLS apply apples active stale',
+    103
+  ),
+  (
+    '92000000-0000-4000-8000-000000000104',
+    '20000000-0000-4000-8000-000000000001',
+    '91000000-0000-4000-8000-000000000099',
+    '30000000-0000-4000-8000-000000000001',
+    'RLS apply apples overdraw',
+    104
+  ),
+  (
+    '92000000-0000-4000-8000-000000000105',
+    '20000000-0000-4000-8000-000000000001',
+    '91000000-0000-4000-8000-000000000099',
+    '30000000-0000-4000-8000-000000000001',
+    'RLS apply apples cross lot',
+    105
+  )
+on conflict (id) do nothing;
+
+update public.cooking_sessions
+set status = 'completed',
+    completed_at = now()
+where id in (
+  '91000000-0000-4000-8000-000000000099',
+  '91000000-0000-4000-8000-000000000098'
+);
+
+insert into public.pantry_items (id, household_id, food_id, display_name, quantity, unit, stock_status)
+values
+  (
+    '40000000-0000-4000-8000-000000000101',
+    '20000000-0000-4000-8000-000000000001',
+    '30000000-0000-4000-8000-000000000001',
+    'RLS apply apples lot one',
+    4,
+    'count',
+    'in_stock'
+  ),
+  (
+    '40000000-0000-4000-8000-000000000102',
+    '20000000-0000-4000-8000-000000000001',
+    '30000000-0000-4000-8000-000000000001',
+    'RLS apply apples lot two',
+    3,
+    'count',
+    'in_stock'
+  ),
+  (
+    '40000000-0000-4000-8000-000000000104',
+    '20000000-0000-4000-8000-000000000001',
+    '30000000-0000-4000-8000-000000000001',
+    'RLS apply apples overdraw lot',
+    1,
+    'count',
+    'in_stock'
+  )
+on conflict (id) do nothing;
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000001', true);
+
+insert into public.pantry_consumption_decisions (
+  id,
+  household_id,
+  cooking_session_ingredient_id,
+  status,
+  note
+)
+values
+  (
+    '88000000-0000-4000-8000-000000000101',
+    '20000000-0000-4000-8000-000000000001',
+    '92000000-0000-4000-8000-000000000101',
+    'confirmed',
+    'Confirmed for RPC stock apply success.'
+  ),
+  (
+    '88000000-0000-4000-8000-000000000102',
+    '20000000-0000-4000-8000-000000000001',
+    '92000000-0000-4000-8000-000000000102',
+    'skipped',
+    'Skipped for RPC stock apply rejection.'
+  ),
+  (
+    '88000000-0000-4000-8000-000000000103',
+    '20000000-0000-4000-8000-000000000001',
+    '92000000-0000-4000-8000-000000000103',
+    'confirmed',
+    'Confirmed before parent session becomes active.'
+  ),
+  (
+    '88000000-0000-4000-8000-000000000104',
+    '20000000-0000-4000-8000-000000000001',
+    '92000000-0000-4000-8000-000000000104',
+    'confirmed',
+    'Confirmed for RPC stock apply overdraw.'
+  ),
+  (
+    '88000000-0000-4000-8000-000000000105',
+    '20000000-0000-4000-8000-000000000001',
+    '92000000-0000-4000-8000-000000000105',
+    'confirmed',
+    'Confirmed for RPC stock apply cross-household lot.'
+  );
+
+create temp table pantry_apply_result as
+select *
+from public.apply_pantry_consumption_stock(
+  '20000000-0000-4000-8000-000000000001',
+  '88000000-0000-4000-8000-000000000101',
+  3,
+  'COUNT',
+  jsonb_build_array(
+    jsonb_build_object(
+      'pantryItemId',
+      '40000000-0000-4000-8000-000000000101',
+      'quantity',
+      1,
+      'unit',
+      'count',
+      'expectedQuantityBefore',
+      (select quantity from public.pantry_items where id = '40000000-0000-4000-8000-000000000101'),
+      'expectedUpdatedAt',
+      (select updated_at from public.pantry_items where id = '40000000-0000-4000-8000-000000000101')
+    ),
+    jsonb_build_object(
+      'pantryItemId',
+      '40000000-0000-4000-8000-000000000102',
+      'quantity',
+      2,
+      'unit',
+      'count',
+      'expectedQuantityBefore',
+      (select quantity from public.pantry_items where id = '40000000-0000-4000-8000-000000000102'),
+      'expectedUpdatedAt',
+      (select updated_at from public.pantry_items where id = '40000000-0000-4000-8000-000000000102')
+    )
+  ),
+  'Applied from RLS verifier.'
+);
+
+select case when (
+  select status from pantry_apply_result
+) = 'applied' then 'ok' else 'RPC stock application did not report applied' end as rpc_stock_application_reports_applied;
+
+select case when (
+  select quantity from public.pantry_items where id = '40000000-0000-4000-8000-000000000101'
+) = 3 and (
+  select quantity from public.pantry_items where id = '40000000-0000-4000-8000-000000000102'
+) = 1 then 'ok' else 'RPC stock application did not deduct selected lots' end as rpc_stock_application_deducts_selected_lots;
+
+select case when (
+  select count(*)
+  from public.pantry_consumption_stock_application_allocations allocations
+  join pantry_apply_result result
+    on result.stock_application_id = allocations.stock_application_id
+) = 2 then 'ok' else 'RPC stock application did not write allocation audit rows' end as rpc_stock_application_writes_allocations;
+
+select case when (
+  select applied_by_user_id
+  from public.pantry_consumption_stock_applications applications
+  join pantry_apply_result result
+    on result.stock_application_id = applications.id
+) = '10000000-0000-4000-8000-000000000001'
+then 'ok' else 'RPC stock application actor was not captured' end as rpc_stock_application_records_actor;
+
+create temp table pantry_apply_retry_result as
+select *
+from public.apply_pantry_consumption_stock(
+  '20000000-0000-4000-8000-000000000001',
+  '88000000-0000-4000-8000-000000000101',
+  3,
+  'count',
+  jsonb_build_array(
+    jsonb_build_object(
+      'pantryItemId',
+      '40000000-0000-4000-8000-000000000101',
+      'quantity',
+      1,
+      'unit',
+      'count',
+      'expectedQuantityBefore',
+      4,
+      'expectedUpdatedAt',
+      (select updated_at from public.pantry_items where id = '40000000-0000-4000-8000-000000000101')
+    ),
+    jsonb_build_object(
+      'pantryItemId',
+      '40000000-0000-4000-8000-000000000102',
+      'quantity',
+      2,
+      'unit',
+      'count',
+      'expectedQuantityBefore',
+      3,
+      'expectedUpdatedAt',
+      (select updated_at from public.pantry_items where id = '40000000-0000-4000-8000-000000000102')
+    )
+  ),
+  'Retried from RLS verifier.'
+);
+
+select case when (
+  select status from pantry_apply_retry_result
+) = 'already_applied' then 'ok' else 'RPC stock application retry did not report already_applied' end as rpc_stock_application_retry_is_idempotent;
+
+select case when (
+  select quantity from public.pantry_items where id = '40000000-0000-4000-8000-000000000101'
+) = 3 and (
+  select quantity from public.pantry_items where id = '40000000-0000-4000-8000-000000000102'
+) = 1 then 'ok' else 'RPC stock application retry deducted stock twice' end as rpc_stock_application_retry_does_not_deduct_twice;
+
+do $$
+begin
+  perform 1
+  from public.apply_pantry_consumption_stock(
+    '20000000-0000-4000-8000-000000000001',
+    '88000000-0000-4000-8000-000000000101',
+    1,
+    'count',
+    jsonb_build_array(
+      jsonb_build_object(
+        'pantryItemId',
+        '40000000-0000-4000-8000-000000000101',
+        'quantity',
+        1,
+        'unit',
+        'count',
+        'expectedQuantityBefore',
+        4,
+        'expectedUpdatedAt',
+        (select updated_at from public.pantry_items where id = '40000000-0000-4000-8000-000000000101')
+      )
+    ),
+    'This should fail because the existing application has a different payload.'
+  );
+
+  raise exception 'RPC stock application retry with different payload unexpectedly succeeded';
+exception
+  when unique_violation then
+    null;
+end $$;
+
+drop table pantry_apply_result;
+drop table pantry_apply_retry_result;
+
+do $$
+begin
+  perform 1
+  from public.apply_pantry_consumption_stock(
+    '20000000-0000-4000-8000-000000000001',
+    '88000000-0000-4000-8000-000000000102',
+    1,
+    'count',
+    jsonb_build_array(
+      jsonb_build_object(
+        'pantryItemId',
+        '40000000-0000-4000-8000-000000000101',
+        'quantity',
+        1,
+        'unit',
+        'count',
+        'expectedQuantityBefore',
+        (select quantity from public.pantry_items where id = '40000000-0000-4000-8000-000000000101'),
+        'expectedUpdatedAt',
+        (select updated_at from public.pantry_items where id = '40000000-0000-4000-8000-000000000101')
+      )
+    ),
+    'This should fail because skipped decisions cannot apply stock.'
+  );
+
+  raise exception 'RPC stock application for skipped decision unexpectedly succeeded';
+exception
+  when check_violation then
+    null;
+end $$;
+
+reset role;
+
+set session_replication_role = replica;
+update public.cooking_sessions
+set status = 'active',
+    completed_at = null
+where id = '91000000-0000-4000-8000-000000000098';
+set session_replication_role = origin;
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000001', true);
+
+do $$
+begin
+  perform 1
+  from public.apply_pantry_consumption_stock(
+    '20000000-0000-4000-8000-000000000001',
+    '88000000-0000-4000-8000-000000000103',
+    1,
+    'count',
+    jsonb_build_array(
+      jsonb_build_object(
+        'pantryItemId',
+        '40000000-0000-4000-8000-000000000101',
+        'quantity',
+        1,
+        'unit',
+        'count',
+        'expectedQuantityBefore',
+        (select quantity from public.pantry_items where id = '40000000-0000-4000-8000-000000000101'),
+        'expectedUpdatedAt',
+        (select updated_at from public.pantry_items where id = '40000000-0000-4000-8000-000000000101')
+      )
+    ),
+    'This should fail because the cooking session is no longer completed.'
+  );
+
+  raise exception 'RPC stock application for active session unexpectedly succeeded';
+exception
+  when check_violation then
+    null;
+end $$;
+
+do $$
+begin
+  perform 1
+  from public.apply_pantry_consumption_stock(
+    '20000000-0000-4000-8000-000000000001',
+    '88000000-0000-4000-8000-000000000104',
+    2,
+    'count',
+    jsonb_build_array(
+      jsonb_build_object(
+        'pantryItemId',
+        '40000000-0000-4000-8000-000000000104',
+        'quantity',
+        2,
+        'unit',
+        'count',
+        'expectedQuantityBefore',
+        (select quantity from public.pantry_items where id = '40000000-0000-4000-8000-000000000104'),
+        'expectedUpdatedAt',
+        (select updated_at from public.pantry_items where id = '40000000-0000-4000-8000-000000000104')
+      )
+    ),
+    'This should fail because the selected lot cannot cover the quantity.'
+  );
+
+  raise exception 'RPC stock application overdraw unexpectedly succeeded';
+exception
+  when check_violation then
+    null;
+end $$;
+
+select case when (
+  select quantity from public.pantry_items where id = '40000000-0000-4000-8000-000000000104'
+) = 1 and not exists (
+  select 1
+  from public.pantry_consumption_stock_applications
+  where pantry_consumption_decision_id = '88000000-0000-4000-8000-000000000104'
+) then 'ok' else 'RPC stock application overdraw left partial writes' end as rpc_stock_application_overdraw_has_no_partial_writes;
+
+do $$
+begin
+  perform 1
+  from public.apply_pantry_consumption_stock(
+    '20000000-0000-4000-8000-000000000001',
+    '88000000-0000-4000-8000-000000000105',
+    1,
+    'count',
+    jsonb_build_array(
+      jsonb_build_object(
+        'pantryItemId',
+        '40000000-0000-4000-8000-000000000002',
+        'quantity',
+        1,
+        'unit',
+        'count',
+        'expectedQuantityBefore',
+        (select quantity from public.pantry_items where id = '40000000-0000-4000-8000-000000000002'),
+        'expectedUpdatedAt',
+        (select updated_at from public.pantry_items where id = '40000000-0000-4000-8000-000000000002')
+      )
+    ),
+    'This should fail because the selected lot is in another household.'
+  );
+
+  raise exception 'RPC stock application with cross-household lot unexpectedly succeeded';
+exception
+  when check_violation then
+    null;
+end $$;
 
 rollback;
 `;

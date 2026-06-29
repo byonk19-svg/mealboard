@@ -25,6 +25,13 @@ import {
   type PantryConsumptionDecision
 } from "./consumption-candidates";
 import {
+  validatePantryConsumptionStockAllocations,
+  validatePantryConsumptionStockApplicationInput,
+  type PantryConsumptionStockAllocationDraft,
+  type PantryConsumptionStockAllocationValidationReason,
+  type PantryConsumptionStockApplicationValidationReason
+} from "./consumption-stock-application";
+import {
   derivePantryUseSoonSignals,
   type PantryUseSoonSignal
 } from "./use-soon-signals";
@@ -141,8 +148,14 @@ type PantryIntakeDecisionRow = {
 };
 
 type PantryConsumptionDecisionRow = {
+  id?: string;
   cooking_session_ingredient_id: string;
   status: PantryConsumptionDecision["status"];
+};
+
+type PantryConsumptionStockApplicationRow = {
+  id: string;
+  pantry_consumption_decision_id: string;
 };
 
 type PantryConsumptionCookingSessionRow = {
@@ -192,6 +205,18 @@ export type AddPantryRestockCandidateResult =
       groceryListItemId: string;
       status: "already_on_grocery_list";
     };
+
+export type ApplyPantryConsumptionStockInput = {
+  allocations: PantryConsumptionStockAllocationDraft[];
+  appliedQuantity: number | null;
+  appliedUnit: string | null;
+};
+
+export type ApplyPantryConsumptionStockResult = {
+  cookingSessionIngredientId: string;
+  status: "already_applied" | "already_reversed" | "applied";
+  stockApplicationId: string;
+};
 
 export async function getPantryItems(
   householdId: string,
@@ -705,6 +730,188 @@ export async function skipPantryConsumptionCandidateWithClient({
   return { cookingSessionIngredientId, status: "skipped" };
 }
 
+export async function applyPantryConsumptionStock({
+  cookingSessionIngredientId,
+  householdId,
+  input,
+  note
+}: {
+  cookingSessionIngredientId: string;
+  householdId: string;
+  input: ApplyPantryConsumptionStockInput;
+  note?: string | null;
+}): Promise<ApplyPantryConsumptionStockResult> {
+  const supabase = await createClient();
+  return applyPantryConsumptionStockWithClient({
+    cookingSessionIngredientId,
+    householdId,
+    input,
+    note,
+    supabase
+  });
+}
+
+export async function applyPantryConsumptionStockWithClient({
+  cookingSessionIngredientId,
+  householdId,
+  input,
+  note,
+  supabase
+}: {
+  cookingSessionIngredientId: string;
+  householdId: string;
+  input: ApplyPantryConsumptionStockInput;
+  note?: string | null;
+  supabase: SupabaseClient;
+}): Promise<ApplyPantryConsumptionStockResult> {
+  const existingDecision = await getPantryConsumptionDecisionByIngredientId({
+    cookingSessionIngredientId,
+    householdId,
+    supabase
+  });
+
+  if (!existingDecision?.id) {
+    throw new Error("Confirm this cooking ingredient before applying pantry stock.");
+  }
+
+  if (existingDecision.status === "skipped") {
+    throw new Error("Skipped cooking ingredients cannot apply pantry stock.");
+  }
+
+  const applicationValidation = validatePantryConsumptionStockApplicationInput({
+    appliedQuantity: input.appliedQuantity,
+    appliedUnit: input.appliedUnit
+  });
+
+  if (!applicationValidation.valid) {
+    throw new Error(
+      getPantryConsumptionStockApplicationValidationMessage(
+        applicationValidation.reasons
+      )
+    );
+  }
+
+  if (
+    await hasPantryConsumptionStockApplication({
+      householdId,
+      pantryConsumptionDecisionId: existingDecision.id,
+      supabase
+    })
+  ) {
+    return applyPantryConsumptionStockViaRpc({
+      allocations: input.allocations.map((allocation) => ({
+        pantryItemId: allocation.pantryItemId,
+        quantity: allocation.quantity,
+        unit: allocation.unit
+      })),
+      appliedQuantity: applicationValidation.quantity,
+      appliedUnit: applicationValidation.unit,
+      cookingSessionIngredientId,
+      householdId,
+      note,
+      pantryConsumptionDecisionId: existingDecision.id,
+      supabase
+    });
+  }
+
+  const [candidate, pantryItems] = await Promise.all([
+    getSinglePantryConsumptionStockCandidate({
+      cookingSessionIngredientId,
+      householdId,
+      supabase
+    }),
+    getPantryItemsWithClient({ householdId, supabase })
+  ]);
+  const allocationValidation = validatePantryConsumptionStockAllocations({
+    allocations: input.allocations,
+    appliedQuantity: applicationValidation.quantity,
+    appliedUnit: applicationValidation.unit,
+    foodId: candidate.foodId,
+    householdId,
+    pantryItems
+  });
+
+  if (!allocationValidation.valid) {
+    throw new Error(
+      getPantryConsumptionStockAllocationValidationMessage(
+        allocationValidation.reasons
+      )
+    );
+  }
+
+  return applyPantryConsumptionStockViaRpc({
+    allocations: allocationValidation.allocations.map((allocation) => ({
+      expectedQuantityBefore: allocation.pantryQuantityBefore,
+      expectedUpdatedAt: allocation.pantryUpdatedAt,
+      pantryItemId: allocation.pantryItemId,
+      quantity: allocation.quantity,
+      unit: allocation.unit
+    })),
+    appliedQuantity: applicationValidation.quantity,
+    appliedUnit: applicationValidation.unit,
+    cookingSessionIngredientId,
+    householdId,
+    note,
+    pantryConsumptionDecisionId: existingDecision.id,
+    supabase
+  });
+}
+
+async function applyPantryConsumptionStockViaRpc({
+  allocations,
+  appliedQuantity,
+  appliedUnit,
+  cookingSessionIngredientId,
+  householdId,
+  note,
+  pantryConsumptionDecisionId,
+  supabase
+}: {
+  allocations: Array<{
+    expectedQuantityBefore?: number;
+    expectedUpdatedAt?: string;
+    pantryItemId: string;
+    quantity: number | null;
+    unit: string | null;
+  }>;
+  appliedQuantity: number;
+  appliedUnit: string;
+  cookingSessionIngredientId: string;
+  householdId: string;
+  note?: string | null;
+  pantryConsumptionDecisionId: string;
+  supabase: SupabaseClient;
+}): Promise<ApplyPantryConsumptionStockResult> {
+  const { data, error } = await supabase
+    .rpc("apply_pantry_consumption_stock", {
+      p_allocations: allocations,
+      p_applied_quantity: appliedQuantity,
+      p_applied_unit: appliedUnit,
+      p_household_id: householdId,
+      p_note: normalizeEventNote(note),
+      p_pantry_consumption_decision_id: pantryConsumptionDecisionId
+    })
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const result = data as
+    | { status: ApplyPantryConsumptionStockResult["status"]; stock_application_id: string }
+    | null;
+
+  if (!result?.stock_application_id) {
+    throw new Error("Pantry stock application did not return an audit row.");
+  }
+
+  return {
+    cookingSessionIngredientId,
+    status: result.status,
+    stockApplicationId: result.stock_application_id
+  };
+}
+
 export async function addPantryRestockCandidateToGroceryList({
   householdId,
   pantryItemId
@@ -1186,6 +1393,53 @@ async function getSinglePantryConsumptionCandidate({
   return candidate;
 }
 
+async function getSinglePantryConsumptionStockCandidate({
+  cookingSessionIngredientId,
+  householdId,
+  supabase
+}: {
+  cookingSessionIngredientId: string;
+  householdId: string;
+  supabase: SupabaseClient;
+}) {
+  const { data, error } = await supabase
+    .from("cooking_session_ingredients")
+    .select("cooking_session_id")
+    .eq("household_id", householdId)
+    .eq("id", cookingSessionIngredientId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const cookingSessionId = data?.cooking_session_id as string | undefined;
+
+  if (!cookingSessionId) {
+    throw new Error("That cooking ingredient is no longer available.");
+  }
+
+  const cookingSessions = await getCompletedCookingSessionsForPantryConsumption({
+    cookingSessionId,
+    householdId,
+    supabase
+  });
+  const candidate = cookingSessions
+    .flatMap((session) => session.ingredients)
+    .find((ingredient) => ingredient.id === cookingSessionIngredientId);
+
+  if (!candidate?.foodId) {
+    throw new Error("That cooking ingredient is not available for pantry stock application.");
+  }
+
+  return {
+    cookingSessionIngredientId: candidate.id,
+    foodId: candidate.foodId,
+    quantity: candidate.quantity,
+    unit: candidate.unit
+  };
+}
+
 async function getCompletedGroceryListsForPantryIntake({
   groceryListId,
   householdId,
@@ -1438,7 +1692,7 @@ async function getPantryConsumptionDecisionByIngredientId({
 }) {
   const { data, error } = await supabase
     .from("pantry_consumption_decisions")
-    .select("cooking_session_ingredient_id, status")
+    .select("id, cooking_session_ingredient_id, status")
     .eq("household_id", householdId)
     .eq("cooking_session_ingredient_id", cookingSessionIngredientId)
     .maybeSingle();
@@ -1448,6 +1702,29 @@ async function getPantryConsumptionDecisionByIngredientId({
   }
 
   return data as PantryConsumptionDecisionRow | null;
+}
+
+async function hasPantryConsumptionStockApplication({
+  householdId,
+  pantryConsumptionDecisionId,
+  supabase
+}: {
+  householdId: string;
+  pantryConsumptionDecisionId: string;
+  supabase: SupabaseClient;
+}) {
+  const { data, error } = await supabase
+    .from("pantry_consumption_stock_applications")
+    .select("id, pantry_consumption_decision_id")
+    .eq("household_id", householdId)
+    .eq("pantry_consumption_decision_id", pantryConsumptionDecisionId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return Boolean(data as PantryConsumptionStockApplicationRow | null);
 }
 
 async function getEditableGroceryListsWithClient({
@@ -1744,6 +2021,62 @@ function toNullableNumber(value: number | string | null) {
 function normalizeEventNote(value: string | null | undefined) {
   const note = String(value ?? "").trim().replace(/\s+/g, " ");
   return note.length > 0 ? note : null;
+}
+
+function getPantryConsumptionStockApplicationValidationMessage(
+  reasons: PantryConsumptionStockApplicationValidationReason[]
+) {
+  if (reasons.includes("missing_quantity")) {
+    return "Enter a pantry stock quantity to apply.";
+  }
+
+  if (reasons.includes("invalid_quantity")) {
+    return "Pantry stock application quantity must be greater than zero.";
+  }
+
+  return "Enter a pantry stock unit to apply.";
+}
+
+function getPantryConsumptionStockAllocationValidationMessage(
+  reasons: PantryConsumptionStockAllocationValidationReason[]
+) {
+  if (reasons.includes("missing_allocation")) {
+    return "Select at least one pantry lot to apply stock.";
+  }
+
+  if (reasons.includes("duplicate_lot")) {
+    return "Each pantry lot can be selected only once.";
+  }
+
+  if (reasons.includes("unknown_lot")) {
+    return "One selected pantry lot is no longer available.";
+  }
+
+  if (reasons.includes("inactive_lot")) {
+    return "One selected pantry lot is no longer active.";
+  }
+
+  if (reasons.includes("wrong_food")) {
+    return "One selected pantry lot does not match the cooking ingredient.";
+  }
+
+  if (reasons.includes("missing_quantity")) {
+    return "Enter a quantity for each selected pantry lot.";
+  }
+
+  if (reasons.includes("invalid_quantity")) {
+    return "Pantry lot allocation quantities must be greater than zero.";
+  }
+
+  if (reasons.includes("missing_unit") || reasons.includes("incompatible_unit")) {
+    return "Pantry lot allocation units must match the applied unit.";
+  }
+
+  if (reasons.includes("overdraw")) {
+    return "One selected pantry lot does not have enough quantity.";
+  }
+
+  return "Pantry lot allocation quantities must sum to the applied quantity.";
 }
 
 function getSupabaseErrorMessage(error: unknown) {
