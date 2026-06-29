@@ -58,9 +58,11 @@ test.describe("Pantry intake review", () => {
     ).toBeVisible();
 
     expect(readIntakeFixtureResult()).toEqual({
+      beansDecisionActorMatches: "true",
       beansDecisionCount: "1",
       beansPantryCount: "1",
       grocerySourceCount: "2",
+      riceDecisionActorMatches: "true",
       riceDecisionCount: "1",
       unchangedGroceryItemCount: "2"
     });
@@ -252,6 +254,13 @@ select
       and created_pantry_item_id is not null
   ) as beans_decision_count,
   (
+    select (decisions.decided_by_user_id = users.id)::text
+    from public.pantry_intake_decisions decisions
+    join auth.users users
+      on lower(users.email) = lower(${sqlString(fixture.email)})
+    where decisions.grocery_list_item_id = ${sqlString(fixture.groceryListItemBeansId)}
+  ) as beans_decision_actor_matches,
+  (
     select count(*)
     from public.pantry_items
     where household_id = ${sqlString(fixture.householdId)}
@@ -265,6 +274,13 @@ select
       and status = 'skipped'
       and created_pantry_item_id is null
   ) as rice_decision_count,
+  (
+    select (decisions.decided_by_user_id = users.id)::text
+    from public.pantry_intake_decisions decisions
+    join auth.users users
+      on lower(users.email) = lower(${sqlString(fixture.email)})
+    where decisions.grocery_list_item_id = ${sqlString(fixture.groceryListItemRiceId)}
+  ) as rice_decision_actor_matches,
   (
     select count(*)
     from public.grocery_list_items
@@ -285,16 +301,20 @@ select
     .trim();
   const [
     beansDecisionCount,
+    beansDecisionActorMatches,
     beansPantryCount,
     riceDecisionCount,
+    riceDecisionActorMatches,
     unchangedGroceryItemCount,
     grocerySourceCount
   ] = output.split(",");
 
   return {
+    beansDecisionActorMatches,
     beansDecisionCount,
     beansPantryCount,
     grocerySourceCount,
+    riceDecisionActorMatches,
     riceDecisionCount,
     unchangedGroceryItemCount
   };
