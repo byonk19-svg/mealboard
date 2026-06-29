@@ -30,6 +30,104 @@ values
   ('30000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000002', 'RLS Bananas')
 on conflict (id) do nothing;
 
+insert into public.recipes (id, household_id, name)
+values
+  ('90000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001', 'RLS Pantry Consumption Recipe One'),
+  ('90000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000002', 'RLS Pantry Consumption Recipe Two'),
+  ('90000000-0000-4000-8000-000000000003', '20000000-0000-4000-8000-000000000001', 'RLS Active Consumption Recipe'),
+  ('90000000-0000-4000-8000-000000000004', '20000000-0000-4000-8000-000000000001', 'RLS Unlinked Consumption Recipe')
+on conflict (id) do nothing;
+
+insert into public.cooking_sessions (
+  id,
+  household_id,
+  recipe_id,
+  recipe_name_snapshot,
+  status
+)
+values
+  (
+    '91000000-0000-4000-8000-000000000001',
+    '20000000-0000-4000-8000-000000000001',
+    '90000000-0000-4000-8000-000000000001',
+    'RLS completed cooking session one',
+    'active'
+  ),
+  (
+    '91000000-0000-4000-8000-000000000002',
+    '20000000-0000-4000-8000-000000000002',
+    '90000000-0000-4000-8000-000000000002',
+    'RLS completed cooking session two',
+    'active'
+  ),
+  (
+    '91000000-0000-4000-8000-000000000003',
+    '20000000-0000-4000-8000-000000000001',
+    '90000000-0000-4000-8000-000000000003',
+    'RLS active cooking session',
+    'active'
+  ),
+  (
+    '91000000-0000-4000-8000-000000000004',
+    '20000000-0000-4000-8000-000000000001',
+    '90000000-0000-4000-8000-000000000004',
+    'RLS completed cooking session with unlinked ingredient',
+    'active'
+  )
+on conflict (id) do nothing;
+
+insert into public.cooking_session_ingredients (
+  id,
+  household_id,
+  cooking_session_id,
+  food_id,
+  display_name,
+  sort_order
+)
+values
+  (
+    '92000000-0000-4000-8000-000000000001',
+    '20000000-0000-4000-8000-000000000001',
+    '91000000-0000-4000-8000-000000000001',
+    '30000000-0000-4000-8000-000000000001',
+    'RLS consumed apples',
+    0
+  ),
+  (
+    '92000000-0000-4000-8000-000000000002',
+    '20000000-0000-4000-8000-000000000002',
+    '91000000-0000-4000-8000-000000000002',
+    '30000000-0000-4000-8000-000000000002',
+    'RLS consumed bananas',
+    0
+  ),
+  (
+    '92000000-0000-4000-8000-000000000003',
+    '20000000-0000-4000-8000-000000000001',
+    '91000000-0000-4000-8000-000000000003',
+    '30000000-0000-4000-8000-000000000001',
+    'RLS active-session apples',
+    0
+  ),
+  (
+    '92000000-0000-4000-8000-000000000004',
+    '20000000-0000-4000-8000-000000000001',
+    '91000000-0000-4000-8000-000000000004',
+    null,
+    'RLS unlinked ingredient',
+    0
+  )
+on conflict (id) do nothing;
+
+update public.cooking_sessions
+set status = 'completed',
+    completed_at = now()
+where id in (
+  '91000000-0000-4000-8000-000000000001',
+  '91000000-0000-4000-8000-000000000002',
+  '91000000-0000-4000-8000-000000000004'
+);
+
 insert into public.grocery_lists (id, household_id, name, status)
 values
   ('60000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001', 'Pantry RLS List One', 'completed'),
@@ -140,6 +238,142 @@ values (
   '40000000-0000-4000-8000-000000000001',
   'Confirmed during RLS smoke.'
 );
+
+insert into public.pantry_consumption_decisions (
+  id,
+  household_id,
+  cooking_session_ingredient_id,
+  status,
+  note
+)
+values (
+  '88000000-0000-4000-8000-000000000001',
+  '20000000-0000-4000-8000-000000000001',
+  '92000000-0000-4000-8000-000000000001',
+  'confirmed',
+  'Confirmed consumption during RLS smoke.'
+);
+
+do $$
+begin
+  insert into public.pantry_consumption_decisions (
+    id,
+    household_id,
+    cooking_session_ingredient_id,
+    status,
+    note
+  )
+  values (
+    '88000000-0000-4000-8000-000000000010',
+    '20000000-0000-4000-8000-000000000001',
+    '92000000-0000-4000-8000-000000000003',
+    'skipped',
+    'This should fail because the cooking session is not completed.'
+  );
+
+  raise exception 'active cooking session ingredient consumption decision unexpectedly succeeded';
+exception
+  when check_violation then
+    null;
+end $$;
+
+do $$
+begin
+  insert into public.pantry_consumption_decisions (
+    id,
+    household_id,
+    cooking_session_ingredient_id,
+    status,
+    note
+  )
+  values (
+    '88000000-0000-4000-8000-000000000011',
+    '20000000-0000-4000-8000-000000000001',
+    '92000000-0000-4000-8000-000000000004',
+    'skipped',
+    'This should fail because the cooking session ingredient has no food identity.'
+  );
+
+  raise exception 'unlinked cooking session ingredient consumption decision unexpectedly succeeded';
+exception
+  when check_violation then
+    null;
+end $$;
+
+do $$
+begin
+  insert into public.pantry_consumption_decisions (
+    id,
+    household_id,
+    cooking_session_ingredient_id,
+    status,
+    note
+  )
+  values (
+    '88000000-0000-4000-8000-000000000012',
+    '20000000-0000-4000-8000-000000000001',
+    '92000000-0000-4000-8000-000000000001',
+    'skipped',
+    'This should fail because the cooking session ingredient already has a decision.'
+  );
+
+  raise exception 'duplicate pantry consumption decision unexpectedly succeeded';
+exception
+  when unique_violation then
+    null;
+end $$;
+
+do $$
+begin
+  insert into public.pantry_consumption_decisions (
+    id,
+    household_id,
+    cooking_session_ingredient_id,
+    status,
+    note
+  )
+  values (
+    '88000000-0000-4000-8000-000000000013',
+    '20000000-0000-4000-8000-000000000001',
+    '92000000-0000-4000-8000-000000000002',
+    'skipped',
+    'This should fail because the cooking session ingredient is in another household.'
+  );
+
+  raise exception 'cross-household cooking session ingredient consumption decision unexpectedly succeeded';
+exception
+  when check_violation then
+    null;
+  when foreign_key_violation then
+    null;
+end $$;
+
+do $$
+begin
+  update public.pantry_consumption_decisions
+  set note = 'This should fail because authenticated clients cannot update decisions.'
+  where id = '88000000-0000-4000-8000-000000000001';
+
+  if found then
+    raise exception 'authenticated pantry consumption decision update unexpectedly succeeded';
+  end if;
+exception
+  when insufficient_privilege then
+    null;
+end $$;
+
+do $$
+begin
+  delete from public.pantry_consumption_decisions
+  where id = '88000000-0000-4000-8000-000000000001';
+
+  if found then
+    raise exception 'authenticated pantry consumption decision delete unexpectedly succeeded';
+  end if;
+exception
+  when insufficient_privilege then
+    null;
+end $$;
 
 do $$
 begin
@@ -321,6 +555,10 @@ select case when (
   select count(*) from public.pantry_intake_decisions where id = '80000000-0000-4000-8000-000000000001'
 ) = 1 then 'ok' else ('user one intake decision read failed ' || (select count(*) from public.pantry_intake_decisions))::integer::text end as user_one_can_read_intake_decision;
 
+select case when (
+  select count(*) from public.pantry_consumption_decisions where id = '88000000-0000-4000-8000-000000000001'
+) = 1 then 'ok' else ('user one consumption decision read failed ' || (select count(*) from public.pantry_consumption_decisions))::integer::text end as user_one_can_read_consumption_decision;
+
 do $$
 begin
   insert into public.pantry_intake_decisions (
@@ -359,6 +597,10 @@ select case when (
 select case when (
   select count(*) from public.pantry_intake_decisions where id = '80000000-0000-4000-8000-000000000001'
 ) = 0 then 'ok' else ('user two intake decision isolation failed ' || (select count(*) from public.pantry_intake_decisions))::integer::text end as user_two_cannot_read_intake_decision;
+
+select case when (
+  select count(*) from public.pantry_consumption_decisions where id = '88000000-0000-4000-8000-000000000001'
+) = 0 then 'ok' else ('user two consumption decision isolation failed ' || (select count(*) from public.pantry_consumption_decisions))::integer::text end as user_two_cannot_read_consumption_decision;
 
 rollback;
 `;
