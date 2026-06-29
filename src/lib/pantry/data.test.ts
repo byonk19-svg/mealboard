@@ -2,8 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   addPantryRestockCandidateToGroceryListWithClient,
+  confirmPantryConsumptionCandidateWithClient,
   confirmPantryIntakeCandidateWithClient,
+  getPantryConsumptionCandidatesWithClient,
   getPantryIntakeCandidatesWithClient,
+  skipPantryConsumptionCandidateWithClient,
   skipPantryIntakeCandidateWithClient
 } from "./data";
 
@@ -57,6 +60,43 @@ type PantryItemRow = ReturnType<typeof pantryItemRow>;
 type PantryIntakeDecisionRow = {
   created_pantry_item_id: string | null;
   grocery_list_item_id: string;
+  household_id: string;
+  note?: string | null;
+  status: "confirmed" | "skipped";
+};
+
+type CookingSessionRow = {
+  completed_at: string | null;
+  created_at: string;
+  household_id: string;
+  id: string;
+  recipe_id: string;
+  recipe_name_snapshot: string;
+  scale_factor_snapshot: number;
+  servings_snapshot: number | null;
+  started_at: string;
+  status: "active" | "paused" | "completed" | "abandoned";
+};
+
+type CookingSessionIngredientRow = {
+  cooking_session_id: string;
+  display_name: string;
+  food_id: string | null;
+  foods?: { name: string } | null;
+  household_id: string;
+  id: string;
+  is_ready: boolean;
+  notes: string | null;
+  optional: boolean;
+  preparation: string | null;
+  quantity: number | string | null;
+  ready_at: string | null;
+  sort_order: number;
+  unit: string | null;
+};
+
+type PantryConsumptionDecisionRow = {
+  cooking_session_ingredient_id: string;
   household_id: string;
   note?: string | null;
   status: "confirmed" | "skipped";
@@ -428,33 +468,200 @@ describe("pantry intake data functions", () => {
   });
 });
 
+describe("pantry consumption data functions", () => {
+  it("reads candidates from completed food-backed cooking ingredients and suppresses decisions", async () => {
+    const fake = createFakeSupabase({
+      cookingSessionIngredients: [
+        cookingSessionIngredientRow({
+          id: "eligible-ingredient",
+          sort_order: 1
+        }),
+        cookingSessionIngredientRow({
+          id: "decided-ingredient",
+          sort_order: 2
+        }),
+        cookingSessionIngredientRow({
+          food_id: null,
+          id: "unlinked-ingredient",
+          sort_order: 3
+        })
+      ],
+      cookingSessions: [
+        cookingSessionRow({
+          completed_at: "2026-06-28T12:00:00Z",
+          id: "completed-session",
+          status: "completed"
+        }),
+        cookingSessionRow({
+          id: "active-session",
+          status: "active"
+        })
+      ],
+      groceryLists: [],
+      groceryListItems: [],
+      pantryConsumptionDecisions: [
+        {
+          cooking_session_ingredient_id: "decided-ingredient",
+          household_id: "household-1",
+          status: "skipped"
+        }
+      ],
+      pantryItems: []
+    });
+
+    await expect(
+      getPantryConsumptionCandidatesWithClient({
+        householdId: "household-1",
+        supabase: fake.client
+      })
+    ).resolves.toEqual([
+      expect.objectContaining({
+        cookingSessionId: "completed-session",
+        cookingSessionIngredientId: "eligible-ingredient",
+        displayName: "Tortillas",
+        foodId: "food-tortillas",
+        foodName: "Tortillas",
+        recipeNameSnapshot: "Wraps"
+      })
+    ]);
+  });
+
+  it("confirms one consumption candidate without mutating pantry stock or events", async () => {
+    const fake = createFakeSupabase({
+      cookingSessionIngredients: [
+        cookingSessionIngredientRow({
+          id: "eligible-ingredient"
+        })
+      ],
+      cookingSessions: [
+        cookingSessionRow({
+          completed_at: "2026-06-28T12:00:00Z",
+          id: "completed-session",
+          status: "completed"
+        })
+      ],
+      groceryLists: [],
+      groceryListItems: [],
+      pantryItems: []
+    });
+
+    await expect(
+      confirmPantryConsumptionCandidateWithClient({
+        cookingSessionIngredientId: "eligible-ingredient",
+        householdId: "household-1",
+        note: "Used for dinner",
+        supabase: fake.client
+      })
+    ).resolves.toEqual({
+      cookingSessionIngredientId: "eligible-ingredient",
+      status: "confirmed"
+    });
+
+    expect(fake.state.pantryConsumptionDecisions).toContainEqual(
+      expect.objectContaining({
+        cooking_session_ingredient_id: "eligible-ingredient",
+        note: "Used for dinner",
+        status: "confirmed"
+      })
+    );
+    expect(fake.state.pantryItems).toEqual([]);
+    expect(fake.state.pantryEvents).toEqual([]);
+  });
+
+  it("skips one consumption candidate idempotently without pantry stock changes", async () => {
+    const fake = createFakeSupabase({
+      cookingSessionIngredients: [
+        cookingSessionIngredientRow({
+          id: "eligible-ingredient"
+        })
+      ],
+      cookingSessions: [
+        cookingSessionRow({
+          completed_at: "2026-06-28T12:00:00Z",
+          id: "completed-session",
+          status: "completed"
+        })
+      ],
+      groceryLists: [],
+      groceryListItems: [],
+      pantryItems: []
+    });
+
+    await expect(
+      skipPantryConsumptionCandidateWithClient({
+        cookingSessionIngredientId: "eligible-ingredient",
+        householdId: "household-1",
+        note: "Not pantry stock",
+        supabase: fake.client
+      })
+    ).resolves.toEqual({
+      cookingSessionIngredientId: "eligible-ingredient",
+      status: "skipped"
+    });
+
+    expect(fake.state.pantryConsumptionDecisions).toContainEqual(
+      expect.objectContaining({
+        cooking_session_ingredient_id: "eligible-ingredient",
+        note: "Not pantry stock",
+        status: "skipped"
+      })
+    );
+    expect(fake.state.pantryItems).toEqual([]);
+    expect(fake.state.pantryEvents).toEqual([]);
+
+    await expect(
+      skipPantryConsumptionCandidateWithClient({
+        cookingSessionIngredientId: "eligible-ingredient",
+        householdId: "household-1",
+        supabase: fake.client
+      })
+    ).resolves.toEqual({
+      cookingSessionIngredientId: "eligible-ingredient",
+      status: "already_skipped"
+    });
+  });
+});
+
 function createFakeSupabase({
+  cookingSessionIngredients = [],
+  cookingSessions = [],
   failNextPantryIntakeDecisionInsert = false,
   finalPantryIntakeDecision,
   groceryItemSources = [],
   groceryLists,
   groceryListItems,
+  pantryConsumptionDecisions = [],
   pantryIntakeDecisions = [],
   pantryItems,
   statusAfterCandidateRead
 }: {
+  cookingSessionIngredients?: CookingSessionIngredientRow[];
+  cookingSessions?: CookingSessionRow[];
   failNextPantryIntakeDecisionInsert?: boolean;
   finalPantryIntakeDecision?: PantryIntakeDecisionRow;
   groceryItemSources?: GroceryItemSourceRow[];
   groceryLists: GroceryListRow[];
   groceryListItems: GroceryListItemRow[];
+  pantryConsumptionDecisions?: PantryConsumptionDecisionRow[];
   pantryIntakeDecisions?: PantryIntakeDecisionRow[];
   pantryItems: PantryItemRow[];
   statusAfterCandidateRead?: GroceryListRow["status"];
 }) {
   const operations: string[] = [];
   const state = {
+    cookingSessionIngredients: cookingSessionIngredients.map((ingredient) => ({
+      ...ingredient
+    })),
+    cookingSessions: cookingSessions.map((session) => ({ ...session })),
     failNextPantryIntakeDecisionInsert,
     finalPantryIntakeDecision,
     groceryItemSources: groceryItemSources.map((source) => ({ ...source })),
     groceryListItems: groceryListItems.map((item) => ({ ...item })),
     groceryLists: groceryLists.map((list) => ({ ...list })),
     pantryEvents: [] as Array<Record<string, unknown>>,
+    pantryConsumptionDecisions: pantryConsumptionDecisions.map((decision) => ({
+      ...decision
+    })),
     pantryIntakeDecisions: pantryIntakeDecisions.map((decision) => ({
       ...decision
     })),
@@ -477,12 +684,15 @@ function createFakeSupabase({
 class FakeQuery {
   private readonly operations: string[];
   private readonly state: {
+    cookingSessionIngredients: CookingSessionIngredientRow[];
+    cookingSessions: CookingSessionRow[];
     failNextPantryIntakeDecisionInsert: boolean;
     finalPantryIntakeDecision?: PantryIntakeDecisionRow;
     groceryItemSources: GroceryItemSourceRow[];
     groceryListItems: GroceryListItemRow[];
     groceryLists: GroceryListRow[];
     pantryEvents: Array<Record<string, unknown>>;
+    pantryConsumptionDecisions: PantryConsumptionDecisionRow[];
     pantryIntakeDecisions: PantryIntakeDecisionRow[];
     pantryItems: PantryItemRow[];
   };
@@ -597,6 +807,22 @@ class FakeQuery {
       };
     }
 
+    if (this.table === "pantry_consumption_decisions") {
+      return {
+        data: this.getPantryConsumptionDecisionRows(),
+        error: null
+      };
+    }
+
+    if (this.table === "cooking_session_ingredients") {
+      return {
+        data: this.state.cookingSessionIngredients.filter((ingredient) =>
+          this.matchesFilters(ingredient)
+        ),
+        error: null
+      };
+    }
+
     if (this.table === "grocery_item_sources") {
       return {
         data: this.state.groceryItemSources.filter((source) =>
@@ -616,6 +842,22 @@ class FakeQuery {
           ...list,
           grocery_list_items: this.state.groceryListItems.filter(
             (item) => item.grocery_list_id === list.id
+          )
+        })),
+        error: null
+      };
+    }
+
+    if (this.table === "cooking_sessions") {
+      const rows = this.state.cookingSessions.filter((session) =>
+        this.matchesFilters(session)
+      );
+
+      return {
+        data: rows.map((session) => ({
+          ...session,
+          cooking_session_ingredients: this.state.cookingSessionIngredients.filter(
+            (ingredient) => ingredient.cooking_session_id === session.id
           )
         })),
         error: null
@@ -670,6 +912,12 @@ class FakeQuery {
 
       this.state.pantryIntakeDecisions.push(
         this.insertPayload as PantryIntakeDecisionRow
+      );
+    }
+
+    if (this.table === "pantry_consumption_decisions") {
+      this.state.pantryConsumptionDecisions.push(
+        this.insertPayload as PantryConsumptionDecisionRow
       );
     }
 
@@ -740,6 +988,29 @@ class FakeQuery {
       };
     }
 
+    if (
+      this.table === "cooking_session_ingredients" &&
+      this.selectColumns === "cooking_session_id"
+    ) {
+      const ingredient = this.state.cookingSessionIngredients.find(
+        (candidateIngredient) => this.matchesFilters(candidateIngredient)
+      );
+
+      return {
+        data: ingredient
+          ? { cooking_session_id: ingredient.cooking_session_id }
+          : null,
+        error: null
+      };
+    }
+
+    if (this.table === "pantry_consumption_decisions") {
+      return {
+        data: this.getPantryConsumptionDecisionRows()[0] ?? null,
+        error: null
+      };
+    }
+
     return { data: null, error: null };
   }
 
@@ -762,6 +1033,12 @@ class FakeQuery {
     }
 
     return rows.filter((decision) => this.matchesFilters(decision));
+  }
+
+  private getPantryConsumptionDecisionRows() {
+    return this.state.pantryConsumptionDecisions.filter((decision) =>
+      this.matchesFilters(decision)
+    );
   }
 
   private matchesFilters(row: Record<string, unknown>) {
@@ -833,6 +1110,46 @@ function groceryItemSourceRow(
     source_label: null,
     source_type: "recipe",
     unit: null,
+    ...overrides
+  };
+}
+
+function cookingSessionRow(
+  overrides: Partial<CookingSessionRow> = {}
+): CookingSessionRow {
+  return {
+    completed_at: null,
+    created_at: "2026-06-28T12:00:00Z",
+    household_id: "household-1",
+    id: "completed-session",
+    recipe_id: "recipe-1",
+    recipe_name_snapshot: "Wraps",
+    scale_factor_snapshot: 1,
+    servings_snapshot: 2,
+    started_at: "2026-06-28T11:00:00Z",
+    status: "completed",
+    ...overrides
+  };
+}
+
+function cookingSessionIngredientRow(
+  overrides: Partial<CookingSessionIngredientRow> = {}
+): CookingSessionIngredientRow {
+  return {
+    cooking_session_id: "completed-session",
+    display_name: "Tortillas",
+    food_id: "food-tortillas",
+    foods: { name: "Tortillas" },
+    household_id: "household-1",
+    id: "cooking-ingredient-1",
+    is_ready: true,
+    notes: null,
+    optional: false,
+    preparation: null,
+    quantity: 2,
+    ready_at: "2026-06-28T11:05:00Z",
+    sort_order: 0,
+    unit: "count",
     ...overrides
   };
 }
