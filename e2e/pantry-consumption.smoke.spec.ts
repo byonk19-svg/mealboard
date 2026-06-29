@@ -60,6 +60,7 @@ test.describe("Pantry consumption review", () => {
     ).toBeVisible();
 
     expect(readConsumptionFixtureResult(seeded)).toEqual({
+      confirmedDecisionActorMatches: "true",
       confirmedDecisionCount: "1",
       groceryItemSourceCount: "0",
       groceryListCount: "0",
@@ -69,6 +70,7 @@ test.describe("Pantry consumption review", () => {
       pantryItemOpen: "false",
       pantryItemQuantity: "3",
       pantryItemStatus: "in_stock",
+      skippedDecisionActorMatches: "true",
       skippedDecisionCount: "1",
       unlinkedDecisionCount: "0"
     });
@@ -363,11 +365,25 @@ select
       and status = 'confirmed'
   ) as confirmed_decision_count,
   (
+    select (decisions.decided_by_user_id = users.id)::text
+    from public.pantry_consumption_decisions decisions
+    join auth.users users
+      on lower(users.email) = lower(${sqlString(fixture.email)})
+    where decisions.cooking_session_ingredient_id = ${sqlString(seeded.confirmedIngredientId)}
+  ) as confirmed_decision_actor_matches,
+  (
     select count(*)
     from public.pantry_consumption_decisions
     where cooking_session_ingredient_id = ${sqlString(seeded.skippedIngredientId)}
       and status = 'skipped'
   ) as skipped_decision_count,
+  (
+    select (decisions.decided_by_user_id = users.id)::text
+    from public.pantry_consumption_decisions decisions
+    join auth.users users
+      on lower(users.email) = lower(${sqlString(fixture.email)})
+    where decisions.cooking_session_ingredient_id = ${sqlString(seeded.skippedIngredientId)}
+  ) as skipped_decision_actor_matches,
   (
     select count(*)
     from public.pantry_consumption_decisions
@@ -422,7 +438,9 @@ select
     .trim();
   const [
     confirmedDecisionCount,
+    confirmedDecisionActorMatches,
     skippedDecisionCount,
+    skippedDecisionActorMatches,
     unlinkedDecisionCount,
     pantryItemQuantity,
     pantryItemStatus,
@@ -435,6 +453,7 @@ select
   ] = output.split(",");
 
   return {
+    confirmedDecisionActorMatches,
     confirmedDecisionCount,
     groceryItemSourceCount,
     groceryListCount,
@@ -444,6 +463,7 @@ select
     pantryItemOpen,
     pantryItemQuantity,
     pantryItemStatus,
+    skippedDecisionActorMatches,
     skippedDecisionCount,
     unlinkedDecisionCount
   };

@@ -9,7 +9,8 @@ begin;
 insert into auth.users (id, email, aud, role, created_at, updated_at)
 values
   ('10000000-0000-4000-8000-000000000001', 'pantry-one@example.test', 'authenticated', 'authenticated', now(), now()),
-  ('10000000-0000-4000-8000-000000000002', 'pantry-two@example.test', 'authenticated', 'authenticated', now(), now())
+  ('10000000-0000-4000-8000-000000000002', 'pantry-two@example.test', 'authenticated', 'authenticated', now(), now()),
+  ('10000000-0000-4000-8000-000000000003', 'pantry-one-peer@example.test', 'authenticated', 'authenticated', now(), now())
 on conflict (id) do nothing;
 
 insert into public.households (id, name)
@@ -21,6 +22,7 @@ on conflict (id) do nothing;
 insert into public.household_memberships (household_id, user_id)
 values
   ('20000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000001'),
+  ('20000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000003'),
   ('20000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000002')
 on conflict (household_id, user_id) do nothing;
 
@@ -116,6 +118,38 @@ values
     null,
     'RLS unlinked ingredient',
     0
+  ),
+  (
+    '92000000-0000-4000-8000-000000000005',
+    '20000000-0000-4000-8000-000000000001',
+    '91000000-0000-4000-8000-000000000001',
+    '30000000-0000-4000-8000-000000000001',
+    'RLS spoof actor consumed apples',
+    1
+  ),
+  (
+    '92000000-0000-4000-8000-000000000006',
+    '20000000-0000-4000-8000-000000000001',
+    '91000000-0000-4000-8000-000000000001',
+    '30000000-0000-4000-8000-000000000001',
+    'RLS peer consumed apples',
+    2
+  ),
+  (
+    '92000000-0000-4000-8000-000000000007',
+    '20000000-0000-4000-8000-000000000001',
+    '91000000-0000-4000-8000-000000000001',
+    '30000000-0000-4000-8000-000000000001',
+    'RLS service actor consumed apples',
+    3
+  ),
+  (
+    '92000000-0000-4000-8000-000000000008',
+    '20000000-0000-4000-8000-000000000001',
+    '91000000-0000-4000-8000-000000000001',
+    '30000000-0000-4000-8000-000000000001',
+    'RLS missing service actor consumed apples',
+    4
   )
 on conflict (id) do nothing;
 
@@ -191,6 +225,38 @@ values
     '30000000-0000-4000-8000-000000000001',
     'RLS cross-pantry apples grocery item',
     true
+  ),
+  (
+    '70000000-0000-4000-8000-000000000007',
+    '20000000-0000-4000-8000-000000000001',
+    '60000000-0000-4000-8000-000000000001',
+    '30000000-0000-4000-8000-000000000001',
+    'RLS spoof actor apples grocery item',
+    true
+  ),
+  (
+    '70000000-0000-4000-8000-000000000008',
+    '20000000-0000-4000-8000-000000000001',
+    '60000000-0000-4000-8000-000000000001',
+    '30000000-0000-4000-8000-000000000001',
+    'RLS peer actor apples grocery item',
+    true
+  ),
+  (
+    '70000000-0000-4000-8000-000000000009',
+    '20000000-0000-4000-8000-000000000001',
+    '60000000-0000-4000-8000-000000000001',
+    '30000000-0000-4000-8000-000000000001',
+    'RLS service actor apples grocery item',
+    true
+  ),
+  (
+    '70000000-0000-4000-8000-000000000010',
+    '20000000-0000-4000-8000-000000000001',
+    '60000000-0000-4000-8000-000000000001',
+    '30000000-0000-4000-8000-000000000001',
+    'RLS missing service actor apples grocery item',
+    true
   )
 on conflict (id) do nothing;
 
@@ -253,6 +319,216 @@ values (
   'confirmed',
   'Confirmed consumption during RLS smoke.'
 );
+
+select case when (
+  select decided_by_user_id
+  from public.pantry_intake_decisions
+  where id = '80000000-0000-4000-8000-000000000001'
+) = '10000000-0000-4000-8000-000000000001'
+then 'ok' else 'intake decision actor was not captured from auth context' end as intake_decision_records_actor;
+
+select case when (
+  select decided_by_user_id
+  from public.pantry_consumption_decisions
+  where id = '88000000-0000-4000-8000-000000000001'
+) = '10000000-0000-4000-8000-000000000001'
+then 'ok' else 'consumption decision actor was not captured from auth context' end as consumption_decision_records_actor;
+
+do $$
+begin
+  insert into public.pantry_intake_decisions (
+    id,
+    household_id,
+    grocery_list_item_id,
+    status,
+    decided_by_user_id,
+    note
+  )
+  values (
+    '80000000-0000-4000-8000-000000000014',
+    '20000000-0000-4000-8000-000000000001',
+    '70000000-0000-4000-8000-000000000007',
+    'skipped',
+    '10000000-0000-4000-8000-000000000003',
+    'This should fail because authenticated users cannot spoof another actor.'
+  );
+
+  raise exception 'spoofed intake decision actor unexpectedly succeeded';
+exception
+  when insufficient_privilege then
+    null;
+end $$;
+
+do $$
+begin
+  insert into public.pantry_consumption_decisions (
+    id,
+    household_id,
+    cooking_session_ingredient_id,
+    status,
+    decided_by_user_id,
+    note
+  )
+  values (
+    '88000000-0000-4000-8000-000000000014',
+    '20000000-0000-4000-8000-000000000001',
+    '92000000-0000-4000-8000-000000000005',
+    'skipped',
+    '10000000-0000-4000-8000-000000000003',
+    'This should fail because authenticated users cannot spoof another actor.'
+  );
+
+  raise exception 'spoofed consumption decision actor unexpectedly succeeded';
+exception
+  when insufficient_privilege then
+    null;
+end $$;
+
+reset role;
+select set_config('request.jwt.claim.sub', '', true);
+
+do $$
+begin
+  insert into public.pantry_intake_decisions (
+    id,
+    household_id,
+    grocery_list_item_id,
+    status,
+    note
+  )
+  values (
+    '80000000-0000-4000-8000-000000000016',
+    '20000000-0000-4000-8000-000000000001',
+    '70000000-0000-4000-8000-000000000010',
+    'skipped',
+    'This should fail because privileged inserts must identify an actor.'
+  );
+
+  raise exception 'service role intake decision without actor unexpectedly succeeded';
+exception
+  when not_null_violation then
+    null;
+end $$;
+
+do $$
+begin
+  insert into public.pantry_consumption_decisions (
+    id,
+    household_id,
+    cooking_session_ingredient_id,
+    status,
+    note
+  )
+  values (
+    '88000000-0000-4000-8000-000000000016',
+    '20000000-0000-4000-8000-000000000001',
+    '92000000-0000-4000-8000-000000000008',
+    'skipped',
+    'This should fail because privileged inserts must identify an actor.'
+  );
+
+  raise exception 'service role consumption decision without actor unexpectedly succeeded';
+exception
+  when not_null_violation then
+    null;
+end $$;
+
+insert into public.pantry_intake_decisions (
+  id,
+  household_id,
+  grocery_list_item_id,
+  status,
+  decided_by_user_id,
+  note
+)
+values (
+  '80000000-0000-4000-8000-000000000017',
+  '20000000-0000-4000-8000-000000000001',
+  '70000000-0000-4000-8000-000000000009',
+  'skipped',
+  '10000000-0000-4000-8000-000000000001',
+  'Skipped by service role with explicit actor during RLS smoke.'
+);
+
+insert into public.pantry_consumption_decisions (
+  id,
+  household_id,
+  cooking_session_ingredient_id,
+  status,
+  decided_by_user_id,
+  note
+)
+values (
+  '88000000-0000-4000-8000-000000000017',
+  '20000000-0000-4000-8000-000000000001',
+  '92000000-0000-4000-8000-000000000007',
+  'skipped',
+  '10000000-0000-4000-8000-000000000001',
+  'Skipped by service role with explicit actor during RLS smoke.'
+);
+
+select case when (
+  select decided_by_user_id
+  from public.pantry_intake_decisions
+  where id = '80000000-0000-4000-8000-000000000017'
+) = '10000000-0000-4000-8000-000000000001'
+then 'ok' else 'service role intake decision actor was not preserved' end as service_intake_decision_records_actor;
+
+select case when (
+  select decided_by_user_id
+  from public.pantry_consumption_decisions
+  where id = '88000000-0000-4000-8000-000000000017'
+) = '10000000-0000-4000-8000-000000000001'
+then 'ok' else 'service role consumption decision actor was not preserved' end as service_consumption_decision_records_actor;
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000003', true);
+
+insert into public.pantry_intake_decisions (
+  id,
+  household_id,
+  grocery_list_item_id,
+  status,
+  note
+)
+values (
+  '80000000-0000-4000-8000-000000000015',
+  '20000000-0000-4000-8000-000000000001',
+  '70000000-0000-4000-8000-000000000008',
+  'skipped',
+  'Skipped by same-household peer during RLS smoke.'
+);
+
+insert into public.pantry_consumption_decisions (
+  id,
+  household_id,
+  cooking_session_ingredient_id,
+  status,
+  note
+)
+values (
+  '88000000-0000-4000-8000-000000000015',
+  '20000000-0000-4000-8000-000000000001',
+  '92000000-0000-4000-8000-000000000006',
+  'skipped',
+  'Skipped by same-household peer during RLS smoke.'
+);
+
+select case when (
+  select decided_by_user_id
+  from public.pantry_intake_decisions
+  where id = '80000000-0000-4000-8000-000000000015'
+) = '10000000-0000-4000-8000-000000000003'
+then 'ok' else 'same-household peer intake actor was not captured' end as peer_intake_decision_records_actor;
+
+select case when (
+  select decided_by_user_id
+  from public.pantry_consumption_decisions
+  where id = '88000000-0000-4000-8000-000000000015'
+) = '10000000-0000-4000-8000-000000000003'
+then 'ok' else 'same-household peer consumption actor was not captured' end as peer_consumption_decision_records_actor;
+
+select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000001', true);
 
 do $$
 begin
