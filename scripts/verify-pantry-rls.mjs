@@ -150,6 +150,46 @@ values
     '30000000-0000-4000-8000-000000000001',
     'RLS missing service actor consumed apples',
     4
+  ),
+  (
+    '92000000-0000-4000-8000-000000000009',
+    '20000000-0000-4000-8000-000000000001',
+    '91000000-0000-4000-8000-000000000001',
+    '30000000-0000-4000-8000-000000000001',
+    'RLS stock application spoof actor apples',
+    5
+  ),
+  (
+    '92000000-0000-4000-8000-000000000010',
+    '20000000-0000-4000-8000-000000000001',
+    '91000000-0000-4000-8000-000000000001',
+    '30000000-0000-4000-8000-000000000001',
+    'RLS stock application service apples',
+    6
+  ),
+  (
+    '92000000-0000-4000-8000-000000000011',
+    '20000000-0000-4000-8000-000000000001',
+    '91000000-0000-4000-8000-000000000001',
+    '30000000-0000-4000-8000-000000000001',
+    'RLS skipped stock application apples',
+    7
+  ),
+  (
+    '92000000-0000-4000-8000-000000000012',
+    '20000000-0000-4000-8000-000000000001',
+    '91000000-0000-4000-8000-000000000001',
+    '30000000-0000-4000-8000-000000000001',
+    'RLS stock application missing actor apples',
+    8
+  ),
+  (
+    '92000000-0000-4000-8000-000000000013',
+    '20000000-0000-4000-8000-000000000001',
+    '91000000-0000-4000-8000-000000000001',
+    '30000000-0000-4000-8000-000000000001',
+    'RLS stock reversal missing actor apples',
+    9
   )
 on conflict (id) do nothing;
 
@@ -260,23 +300,27 @@ values
   )
 on conflict (id) do nothing;
 
-insert into public.pantry_items (id, household_id, food_id, display_name)
+insert into public.pantry_items (id, household_id, food_id, display_name, quantity, unit)
 values (
   '40000000-0000-4000-8000-000000000002',
   '20000000-0000-4000-8000-000000000002',
   '30000000-0000-4000-8000-000000000002',
-  'RLS bananas lot'
+  'RLS bananas lot',
+  5,
+  'count'
 );
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000001', true);
 
-insert into public.pantry_items (id, household_id, food_id, display_name)
+insert into public.pantry_items (id, household_id, food_id, display_name, quantity, unit)
 values (
   '40000000-0000-4000-8000-000000000001',
   '20000000-0000-4000-8000-000000000001',
   '30000000-0000-4000-8000-000000000001',
-  'RLS apples lot'
+  'RLS apples lot',
+  5,
+  'count'
 );
 
 insert into public.pantry_events (id, household_id, pantry_item_id, event_type, note)
@@ -333,6 +377,336 @@ select case when (
   where id = '88000000-0000-4000-8000-000000000001'
 ) = '10000000-0000-4000-8000-000000000001'
 then 'ok' else 'consumption decision actor was not captured from auth context' end as consumption_decision_records_actor;
+
+insert into public.pantry_consumption_decisions (
+  id,
+  household_id,
+  cooking_session_ingredient_id,
+  status,
+  note
+)
+values
+  (
+    '88000000-0000-4000-8000-000000000018',
+    '20000000-0000-4000-8000-000000000001',
+    '92000000-0000-4000-8000-000000000009',
+    'confirmed',
+    'Confirmed for stock application reversal spoof smoke.'
+  ),
+  (
+    '88000000-0000-4000-8000-000000000019',
+    '20000000-0000-4000-8000-000000000001',
+    '92000000-0000-4000-8000-000000000010',
+    'confirmed',
+    'Confirmed for service stock application smoke.'
+  ),
+  (
+    '88000000-0000-4000-8000-000000000020',
+    '20000000-0000-4000-8000-000000000001',
+    '92000000-0000-4000-8000-000000000011',
+    'skipped',
+    'Skipped decisions must not support stock application.'
+  ),
+  (
+    '88000000-0000-4000-8000-000000000021',
+    '20000000-0000-4000-8000-000000000001',
+    '92000000-0000-4000-8000-000000000012',
+    'confirmed',
+    'Confirmed for missing reversal actor smoke.'
+  ),
+  (
+    '88000000-0000-4000-8000-000000000022',
+    '20000000-0000-4000-8000-000000000001',
+    '92000000-0000-4000-8000-000000000013',
+    'confirmed',
+    'Confirmed for wrong actor service smoke.'
+  );
+
+insert into public.pantry_consumption_stock_applications (
+  id,
+  household_id,
+  pantry_consumption_decision_id,
+  applied_quantity,
+  applied_unit,
+  note
+)
+values (
+  '89000000-0000-4000-8000-000000000001',
+  '20000000-0000-4000-8000-000000000001',
+  '88000000-0000-4000-8000-000000000001',
+  1,
+  'count',
+  'Application audit row during RLS smoke.'
+);
+
+insert into public.pantry_consumption_stock_application_allocations (
+  id,
+  household_id,
+  stock_application_id,
+  pantry_item_id,
+  applied_quantity,
+  unit,
+  pantry_quantity_before,
+  pantry_quantity_after
+)
+values (
+  '89100000-0000-4000-8000-000000000001',
+  '20000000-0000-4000-8000-000000000001',
+  '89000000-0000-4000-8000-000000000001',
+  '40000000-0000-4000-8000-000000000001',
+  1,
+  'count',
+  5,
+  4
+);
+
+insert into public.pantry_consumption_stock_application_reversals (
+  id,
+  household_id,
+  stock_application_id,
+  note
+)
+values (
+  '89200000-0000-4000-8000-000000000001',
+  '20000000-0000-4000-8000-000000000001',
+  '89000000-0000-4000-8000-000000000001',
+  'Reversal audit row during RLS smoke.'
+);
+
+insert into public.pantry_consumption_stock_application_reversal_allocations (
+  id,
+  household_id,
+  stock_application_reversal_id,
+  stock_application_allocation_id,
+  pantry_item_id,
+  restored_quantity,
+  unit,
+  pantry_quantity_before,
+  pantry_quantity_after
+)
+values (
+  '89300000-0000-4000-8000-000000000001',
+  '20000000-0000-4000-8000-000000000001',
+  '89200000-0000-4000-8000-000000000001',
+  '89100000-0000-4000-8000-000000000001',
+  '40000000-0000-4000-8000-000000000001',
+  1,
+  'count',
+  4,
+  5
+);
+
+insert into public.pantry_consumption_stock_applications (
+  id,
+  household_id,
+  pantry_consumption_decision_id,
+  applied_quantity,
+  applied_unit,
+  note
+)
+values (
+  '89000000-0000-4000-8000-000000000002',
+  '20000000-0000-4000-8000-000000000001',
+  '88000000-0000-4000-8000-000000000018',
+  1,
+  'count',
+  'Application audit row for reversal spoof smoke.'
+);
+
+insert into public.pantry_consumption_stock_application_allocations (
+  id,
+  household_id,
+  stock_application_id,
+  pantry_item_id,
+  applied_quantity,
+  unit,
+  pantry_quantity_before,
+  pantry_quantity_after
+)
+values (
+  '89100000-0000-4000-8000-000000000002',
+  '20000000-0000-4000-8000-000000000001',
+  '89000000-0000-4000-8000-000000000002',
+  '40000000-0000-4000-8000-000000000001',
+  1,
+  'count',
+  5,
+  4
+);
+
+do $$
+begin
+  insert into public.pantry_consumption_stock_applications (
+    id,
+    household_id,
+    pantry_consumption_decision_id,
+    applied_quantity,
+    applied_unit,
+    note
+  )
+  values (
+    '89000000-0000-4000-8000-000000000023',
+    '20000000-0000-4000-8000-000000000001',
+    '88000000-0000-4000-8000-000000000022',
+    1,
+    'count',
+    'This should fail because stock applications require an allocation before commit.'
+  );
+
+  set constraints pantry_stock_application_allocations_complete immediate;
+
+  raise exception 'stock application without allocations unexpectedly succeeded';
+exception
+  when check_violation then
+    null;
+end $$;
+
+set constraints all deferred;
+
+do $$
+begin
+  insert into public.pantry_consumption_stock_applications (
+    id,
+    household_id,
+    pantry_consumption_decision_id,
+    applied_quantity,
+    applied_unit,
+    note
+  )
+  values (
+    '89000000-0000-4000-8000-000000000025',
+    '20000000-0000-4000-8000-000000000001',
+    '88000000-0000-4000-8000-000000000022',
+    1,
+    'count',
+    'This should fail because allocation quantities must sum to the application quantity.'
+  );
+
+  insert into public.pantry_consumption_stock_application_allocations (
+    id,
+    household_id,
+    stock_application_id,
+    pantry_item_id,
+    applied_quantity,
+    unit,
+    pantry_quantity_before,
+    pantry_quantity_after
+  )
+  values (
+    '89100000-0000-4000-8000-000000000025',
+    '20000000-0000-4000-8000-000000000001',
+    '89000000-0000-4000-8000-000000000025',
+    '40000000-0000-4000-8000-000000000001',
+    0.5,
+    'count',
+    5,
+    4.5
+  );
+
+  set constraints pantry_stock_application_allocations_complete immediate;
+
+  raise exception 'stock application with mismatched allocation sum unexpectedly succeeded';
+exception
+  when check_violation then
+    null;
+end $$;
+
+set constraints all deferred;
+
+do $$
+begin
+  insert into public.pantry_consumption_stock_application_reversals (
+    id,
+    household_id,
+    stock_application_id,
+    note
+  )
+  values (
+    '89200000-0000-4000-8000-000000000023',
+    '20000000-0000-4000-8000-000000000001',
+    '89000000-0000-4000-8000-000000000002',
+    'This should fail because stock reversals require reversal allocations before commit.'
+  );
+
+  set constraints pantry_stock_reversal_allocations_complete immediate;
+
+  raise exception 'stock reversal without reversal allocations unexpectedly succeeded';
+exception
+  when check_violation then
+    null;
+end $$;
+
+set constraints all deferred;
+
+select case when (
+  select applied_by_user_id
+  from public.pantry_consumption_stock_applications
+  where id = '89000000-0000-4000-8000-000000000001'
+) = '10000000-0000-4000-8000-000000000001'
+then 'ok' else 'stock application actor was not captured from auth context' end as stock_application_records_actor;
+
+select case when (
+  select reversed_by_user_id
+  from public.pantry_consumption_stock_application_reversals
+  where id = '89200000-0000-4000-8000-000000000001'
+) = '10000000-0000-4000-8000-000000000001'
+then 'ok' else 'stock reversal actor was not captured from auth context' end as stock_reversal_records_actor;
+
+select case when (
+  select quantity
+  from public.pantry_items
+  where id = '40000000-0000-4000-8000-000000000001'
+) = 5 then 'ok' else 'stock application schema smoke mutated pantry quantity' end as stock_application_schema_is_audit_only;
+
+do $$
+begin
+  insert into public.pantry_consumption_stock_applications (
+    id,
+    household_id,
+    pantry_consumption_decision_id,
+    applied_quantity,
+    applied_unit,
+    applied_by_user_id,
+    note
+  )
+  values (
+    '89000000-0000-4000-8000-000000000014',
+    '20000000-0000-4000-8000-000000000001',
+    '88000000-0000-4000-8000-000000000019',
+    1,
+    'count',
+    '10000000-0000-4000-8000-000000000003',
+    'This should fail because authenticated users cannot spoof another application actor.'
+  );
+
+  raise exception 'spoofed stock application actor unexpectedly succeeded';
+exception
+  when insufficient_privilege then
+    null;
+end $$;
+
+do $$
+begin
+  insert into public.pantry_consumption_stock_application_reversals (
+    id,
+    household_id,
+    stock_application_id,
+    reversed_by_user_id,
+    note
+  )
+  values (
+    '89200000-0000-4000-8000-000000000014',
+    '20000000-0000-4000-8000-000000000001',
+    '89000000-0000-4000-8000-000000000002',
+    '10000000-0000-4000-8000-000000000003',
+    'This should fail because authenticated users cannot spoof another reversal actor.'
+  );
+
+  raise exception 'spoofed stock reversal actor unexpectedly succeeded';
+exception
+  when insufficient_privilege then
+    null;
+end $$;
 
 do $$
 begin
@@ -481,6 +855,230 @@ select case when (
 ) = '10000000-0000-4000-8000-000000000001'
 then 'ok' else 'service role consumption decision actor was not preserved' end as service_consumption_decision_records_actor;
 
+insert into public.pantry_consumption_decisions (
+  id,
+  household_id,
+  cooking_session_ingredient_id,
+  status,
+  decided_by_user_id,
+  note
+)
+values (
+  '88000000-0000-4000-8000-000000000024',
+  '20000000-0000-4000-8000-000000000002',
+  '92000000-0000-4000-8000-000000000002',
+  'confirmed',
+  '10000000-0000-4000-8000-000000000002',
+  'Confirmed by service role for cross-household stock application smoke.'
+);
+
+insert into public.pantry_consumption_stock_applications (
+  id,
+  household_id,
+  pantry_consumption_decision_id,
+  applied_quantity,
+  applied_unit,
+  note
+)
+values (
+  '89000000-0000-4000-8000-000000000016',
+  '20000000-0000-4000-8000-000000000001',
+  '88000000-0000-4000-8000-000000000021',
+  1,
+  'count',
+  'Service stock application without auth context keeps a null actor.'
+);
+
+insert into public.pantry_consumption_stock_application_allocations (
+  id,
+  household_id,
+  stock_application_id,
+  pantry_item_id,
+  applied_quantity,
+  unit,
+  pantry_quantity_before,
+  pantry_quantity_after
+)
+values (
+  '89100000-0000-4000-8000-000000000018',
+  '20000000-0000-4000-8000-000000000001',
+  '89000000-0000-4000-8000-000000000016',
+  '40000000-0000-4000-8000-000000000001',
+  1,
+  'count',
+  5,
+  4
+);
+
+do $$
+begin
+  insert into public.pantry_consumption_stock_applications (
+    id,
+    household_id,
+    pantry_consumption_decision_id,
+    applied_quantity,
+    applied_unit,
+    applied_by_user_id,
+    note
+  )
+  values (
+    '89000000-0000-4000-8000-000000000022',
+    '20000000-0000-4000-8000-000000000001',
+    '88000000-0000-4000-8000-000000000022',
+    1,
+    'count',
+    '10000000-0000-4000-8000-000000000002',
+    'This should fail because the actor is not a member of the stock application household.'
+  );
+
+  raise exception 'service role stock application with cross-household actor unexpectedly succeeded';
+exception
+  when check_violation then
+    null;
+end $$;
+
+insert into public.pantry_consumption_stock_applications (
+  id,
+  household_id,
+  pantry_consumption_decision_id,
+  applied_quantity,
+  applied_unit,
+  applied_by_user_id,
+  note
+)
+values (
+  '89000000-0000-4000-8000-000000000017',
+  '20000000-0000-4000-8000-000000000001',
+  '88000000-0000-4000-8000-000000000019',
+  1,
+  'count',
+  '10000000-0000-4000-8000-000000000001',
+  'Application by service role with explicit actor during RLS smoke.'
+);
+
+insert into public.pantry_consumption_stock_application_allocations (
+  id,
+  household_id,
+  stock_application_id,
+  pantry_item_id,
+  applied_quantity,
+  unit,
+  pantry_quantity_before,
+  pantry_quantity_after
+)
+values (
+  '89100000-0000-4000-8000-000000000017',
+  '20000000-0000-4000-8000-000000000001',
+  '89000000-0000-4000-8000-000000000017',
+  '40000000-0000-4000-8000-000000000001',
+  1,
+  'count',
+  5,
+  4
+);
+
+insert into public.pantry_consumption_stock_application_reversals (
+  id,
+  household_id,
+  stock_application_id,
+  reversed_by_user_id,
+  note
+)
+values (
+  '89200000-0000-4000-8000-000000000017',
+  '20000000-0000-4000-8000-000000000001',
+  '89000000-0000-4000-8000-000000000017',
+  '10000000-0000-4000-8000-000000000001',
+  'Reversal by service role with explicit actor during RLS smoke.'
+);
+
+insert into public.pantry_consumption_stock_application_reversal_allocations (
+  id,
+  household_id,
+  stock_application_reversal_id,
+  stock_application_allocation_id,
+  pantry_item_id,
+  restored_quantity,
+  unit,
+  pantry_quantity_before,
+  pantry_quantity_after
+)
+values (
+  '89300000-0000-4000-8000-000000000017',
+  '20000000-0000-4000-8000-000000000001',
+  '89200000-0000-4000-8000-000000000017',
+  '89100000-0000-4000-8000-000000000017',
+  '40000000-0000-4000-8000-000000000001',
+  1,
+  'count',
+  4,
+  5
+);
+
+insert into public.pantry_consumption_stock_application_reversals (
+  id,
+  household_id,
+  stock_application_id,
+  note
+)
+values (
+  '89200000-0000-4000-8000-000000000018',
+  '20000000-0000-4000-8000-000000000001',
+  '89000000-0000-4000-8000-000000000016',
+  'Service stock reversal without auth context keeps a null actor.'
+);
+
+insert into public.pantry_consumption_stock_application_reversal_allocations (
+  id,
+  household_id,
+  stock_application_reversal_id,
+  stock_application_allocation_id,
+  pantry_item_id,
+  restored_quantity,
+  unit,
+  pantry_quantity_before,
+  pantry_quantity_after
+)
+values (
+  '89300000-0000-4000-8000-000000000018',
+  '20000000-0000-4000-8000-000000000001',
+  '89200000-0000-4000-8000-000000000018',
+  '89100000-0000-4000-8000-000000000018',
+  '40000000-0000-4000-8000-000000000001',
+  1,
+  'count',
+  4,
+  5
+);
+
+select case when (
+  select applied_by_user_id
+  from public.pantry_consumption_stock_applications
+  where id = '89000000-0000-4000-8000-000000000017'
+) = '10000000-0000-4000-8000-000000000001'
+then 'ok' else 'service role stock application actor was not preserved' end as service_stock_application_records_actor;
+
+select case when (
+  select applied_by_user_id
+  from public.pantry_consumption_stock_applications
+  where id = '89000000-0000-4000-8000-000000000016'
+) is null
+then 'ok' else 'service role stock application without auth context should keep a null actor' end as service_stock_application_allows_null_actor;
+
+select case when (
+  select reversed_by_user_id
+  from public.pantry_consumption_stock_application_reversals
+  where id = '89200000-0000-4000-8000-000000000017'
+) = '10000000-0000-4000-8000-000000000001'
+then 'ok' else 'service role stock reversal actor was not preserved' end as service_stock_reversal_records_actor;
+
+select case when (
+  select reversed_by_user_id
+  from public.pantry_consumption_stock_application_reversals
+  where id = '89200000-0000-4000-8000-000000000018'
+) is null
+then 'ok' else 'service role stock reversal without auth context should keep a null actor' end as service_stock_reversal_allows_null_actor;
+
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000003', true);
 
@@ -626,6 +1224,253 @@ end $$;
 
 do $$
 begin
+  insert into public.pantry_consumption_stock_applications (
+    id,
+    household_id,
+    pantry_consumption_decision_id,
+    applied_quantity,
+    applied_unit,
+    note
+  )
+  values (
+    '89000000-0000-4000-8000-000000000020',
+    '20000000-0000-4000-8000-000000000001',
+    '88000000-0000-4000-8000-000000000020',
+    1,
+    'count',
+    'This should fail because skipped consumption decisions cannot be stock-applied.'
+  );
+
+  raise exception 'stock application for skipped consumption decision unexpectedly succeeded';
+exception
+  when check_violation then
+    null;
+end $$;
+
+do $$
+begin
+  insert into public.pantry_consumption_stock_applications (
+    id,
+    household_id,
+    pantry_consumption_decision_id,
+    applied_quantity,
+    applied_unit,
+    note
+  )
+  values (
+    '89000000-0000-4000-8000-000000000012',
+    '20000000-0000-4000-8000-000000000001',
+    '88000000-0000-4000-8000-000000000001',
+    1,
+    'count',
+    'This should fail because the confirmed decision already has a stock application.'
+  );
+
+  raise exception 'duplicate stock application unexpectedly succeeded';
+exception
+  when unique_violation then
+    null;
+end $$;
+
+do $$
+begin
+  insert into public.pantry_consumption_stock_applications (
+    id,
+    household_id,
+    pantry_consumption_decision_id,
+    applied_quantity,
+    applied_unit,
+    note
+  )
+  values (
+    '89000000-0000-4000-8000-000000000013',
+    '20000000-0000-4000-8000-000000000001',
+    '88000000-0000-4000-8000-000000000024',
+    1,
+    'count',
+    'This should fail because the consumption decision is in another household.'
+  );
+
+  raise exception 'cross-household stock application decision reference unexpectedly succeeded';
+exception
+  when check_violation then
+    null;
+  when foreign_key_violation then
+    null;
+end $$;
+
+do $$
+begin
+  insert into public.pantry_consumption_stock_application_allocations (
+    id,
+    household_id,
+    stock_application_id,
+    pantry_item_id,
+    applied_quantity,
+    unit,
+    pantry_quantity_before,
+    pantry_quantity_after
+  )
+  values (
+    '89100000-0000-4000-8000-000000000013',
+    '20000000-0000-4000-8000-000000000001',
+    '89000000-0000-4000-8000-000000000002',
+    '40000000-0000-4000-8000-000000000002',
+    1,
+    'count',
+    5,
+    4
+  );
+
+  raise exception 'cross-household stock allocation pantry item reference unexpectedly succeeded';
+exception
+  when foreign_key_violation then
+    null;
+end $$;
+
+do $$
+begin
+  insert into public.pantry_consumption_stock_application_allocations (
+    id,
+    household_id,
+    stock_application_id,
+    pantry_item_id,
+    applied_quantity,
+    unit,
+    pantry_quantity_before,
+    pantry_quantity_after
+  )
+  values (
+    '89100000-0000-4000-8000-000000000014',
+    '20000000-0000-4000-8000-000000000001',
+    '89000000-0000-4000-8000-000000000002',
+    '40000000-0000-4000-8000-000000000001',
+    0,
+    'count',
+    5,
+    5
+  );
+
+  raise exception 'zero stock allocation quantity unexpectedly succeeded';
+exception
+  when check_violation then
+    null;
+end $$;
+
+do $$
+begin
+  insert into public.pantry_consumption_stock_application_allocations (
+    id,
+    household_id,
+    stock_application_id,
+    pantry_item_id,
+    applied_quantity,
+    unit,
+    pantry_quantity_before,
+    pantry_quantity_after
+  )
+  values (
+    '89100000-0000-4000-8000-000000000015',
+    '20000000-0000-4000-8000-000000000001',
+    '89000000-0000-4000-8000-000000000002',
+    '40000000-0000-4000-8000-000000000001',
+    1,
+    '',
+    5,
+    4
+  );
+
+  raise exception 'blank stock allocation unit unexpectedly succeeded';
+exception
+  when check_violation then
+    null;
+end $$;
+
+do $$
+begin
+  insert into public.pantry_consumption_stock_application_allocations (
+    id,
+    household_id,
+    stock_application_id,
+    pantry_item_id,
+    applied_quantity,
+    unit,
+    pantry_quantity_before,
+    pantry_quantity_after
+  )
+  values (
+    '89100000-0000-4000-8000-000000000016',
+    '20000000-0000-4000-8000-000000000001',
+    '89000000-0000-4000-8000-000000000001',
+    '40000000-0000-4000-8000-000000000001',
+    1,
+    'count',
+    5,
+    4
+  );
+
+  raise exception 'allocation after stock application reversal unexpectedly succeeded';
+exception
+  when check_violation then
+    null;
+  when unique_violation then
+    null;
+end $$;
+
+do $$
+begin
+  insert into public.pantry_consumption_stock_application_reversals (
+    id,
+    household_id,
+    stock_application_id,
+    note
+  )
+  values (
+    '89200000-0000-4000-8000-000000000012',
+    '20000000-0000-4000-8000-000000000001',
+    '89000000-0000-4000-8000-000000000001',
+    'This should fail because the stock application already has a reversal.'
+  );
+
+  raise exception 'duplicate stock application reversal unexpectedly succeeded';
+exception
+  when unique_violation then
+    null;
+end $$;
+
+do $$
+begin
+  insert into public.pantry_consumption_stock_application_reversal_allocations (
+    id,
+    household_id,
+    stock_application_reversal_id,
+    stock_application_allocation_id,
+    pantry_item_id,
+    restored_quantity,
+    unit,
+    pantry_quantity_before,
+    pantry_quantity_after
+  )
+  values (
+    '89300000-0000-4000-8000-000000000012',
+    '20000000-0000-4000-8000-000000000001',
+    '89200000-0000-4000-8000-000000000001',
+    '89100000-0000-4000-8000-000000000002',
+    '40000000-0000-4000-8000-000000000001',
+    1,
+    'count',
+    4,
+    5
+  );
+
+  raise exception 'mismatched stock reversal allocation unexpectedly succeeded';
+exception
+  when check_violation then
+    null;
+end $$;
+
+do $$
+begin
   update public.pantry_consumption_decisions
   set note = 'This should fail because authenticated clients cannot update decisions.'
   where id = '88000000-0000-4000-8000-000000000001';
@@ -645,6 +1490,60 @@ begin
 
   if found then
     raise exception 'authenticated pantry consumption decision delete unexpectedly succeeded';
+  end if;
+exception
+  when insufficient_privilege then
+    null;
+end $$;
+
+do $$
+begin
+  update public.pantry_consumption_stock_applications
+  set note = 'This should fail because authenticated clients cannot update stock applications.'
+  where id = '89000000-0000-4000-8000-000000000001';
+
+  if found then
+    raise exception 'authenticated pantry stock application update unexpectedly succeeded';
+  end if;
+exception
+  when insufficient_privilege then
+    null;
+end $$;
+
+do $$
+begin
+  delete from public.pantry_consumption_stock_applications
+  where id = '89000000-0000-4000-8000-000000000001';
+
+  if found then
+    raise exception 'authenticated pantry stock application delete unexpectedly succeeded';
+  end if;
+exception
+  when insufficient_privilege then
+    null;
+end $$;
+
+do $$
+begin
+  update public.pantry_consumption_stock_application_reversals
+  set note = 'This should fail because authenticated clients cannot update stock reversals.'
+  where id = '89200000-0000-4000-8000-000000000001';
+
+  if found then
+    raise exception 'authenticated pantry stock reversal update unexpectedly succeeded';
+  end if;
+exception
+  when insufficient_privilege then
+    null;
+end $$;
+
+do $$
+begin
+  delete from public.pantry_consumption_stock_application_reversals
+  where id = '89200000-0000-4000-8000-000000000001';
+
+  if found then
+    raise exception 'authenticated pantry stock reversal delete unexpectedly succeeded';
   end if;
 exception
   when insufficient_privilege then
@@ -835,6 +1734,22 @@ select case when (
   select count(*) from public.pantry_consumption_decisions where id = '88000000-0000-4000-8000-000000000001'
 ) = 1 then 'ok' else ('user one consumption decision read failed ' || (select count(*) from public.pantry_consumption_decisions))::integer::text end as user_one_can_read_consumption_decision;
 
+select case when (
+  select count(*) from public.pantry_consumption_stock_applications where id = '89000000-0000-4000-8000-000000000001'
+) = 1 then 'ok' else ('user one stock application read failed ' || (select count(*) from public.pantry_consumption_stock_applications))::integer::text end as user_one_can_read_stock_application;
+
+select case when (
+  select count(*) from public.pantry_consumption_stock_application_allocations where id = '89100000-0000-4000-8000-000000000001'
+) = 1 then 'ok' else ('user one stock allocation read failed ' || (select count(*) from public.pantry_consumption_stock_application_allocations))::integer::text end as user_one_can_read_stock_allocation;
+
+select case when (
+  select count(*) from public.pantry_consumption_stock_application_reversals where id = '89200000-0000-4000-8000-000000000001'
+) = 1 then 'ok' else ('user one stock reversal read failed ' || (select count(*) from public.pantry_consumption_stock_application_reversals))::integer::text end as user_one_can_read_stock_reversal;
+
+select case when (
+  select count(*) from public.pantry_consumption_stock_application_reversal_allocations where id = '89300000-0000-4000-8000-000000000001'
+) = 1 then 'ok' else ('user one stock reversal allocation read failed ' || (select count(*) from public.pantry_consumption_stock_application_reversal_allocations))::integer::text end as user_one_can_read_stock_reversal_allocation;
+
 do $$
 begin
   insert into public.pantry_intake_decisions (
@@ -862,6 +1777,29 @@ end $$;
 
 select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000002', true);
 
+do $$
+begin
+  insert into public.pantry_consumption_stock_application_reversals (
+    id,
+    household_id,
+    stock_application_id,
+    note
+  )
+  values (
+    '89200000-0000-4000-8000-000000000013',
+    '20000000-0000-4000-8000-000000000002',
+    '89000000-0000-4000-8000-000000000002',
+    'This should fail because the stock application is in another household.'
+  );
+
+  raise exception 'cross-household stock reversal application reference unexpectedly succeeded';
+exception
+  when check_violation then
+    null;
+  when foreign_key_violation then
+    null;
+end $$;
+
 select case when (
   select count(*) from public.pantry_items where id = '40000000-0000-4000-8000-000000000001'
 ) = 0 then 'ok' else ('user two item isolation failed ' || (select count(*) from public.pantry_items))::integer::text end as user_two_cannot_read_item;
@@ -877,6 +1815,22 @@ select case when (
 select case when (
   select count(*) from public.pantry_consumption_decisions where id = '88000000-0000-4000-8000-000000000001'
 ) = 0 then 'ok' else ('user two consumption decision isolation failed ' || (select count(*) from public.pantry_consumption_decisions))::integer::text end as user_two_cannot_read_consumption_decision;
+
+select case when (
+  select count(*) from public.pantry_consumption_stock_applications where id = '89000000-0000-4000-8000-000000000001'
+) = 0 then 'ok' else ('user two stock application isolation failed ' || (select count(*) from public.pantry_consumption_stock_applications))::integer::text end as user_two_cannot_read_stock_application;
+
+select case when (
+  select count(*) from public.pantry_consumption_stock_application_allocations where id = '89100000-0000-4000-8000-000000000001'
+) = 0 then 'ok' else ('user two stock allocation isolation failed ' || (select count(*) from public.pantry_consumption_stock_application_allocations))::integer::text end as user_two_cannot_read_stock_allocation;
+
+select case when (
+  select count(*) from public.pantry_consumption_stock_application_reversals where id = '89200000-0000-4000-8000-000000000001'
+) = 0 then 'ok' else ('user two stock reversal isolation failed ' || (select count(*) from public.pantry_consumption_stock_application_reversals))::integer::text end as user_two_cannot_read_stock_reversal;
+
+select case when (
+  select count(*) from public.pantry_consumption_stock_application_reversal_allocations where id = '89300000-0000-4000-8000-000000000001'
+) = 0 then 'ok' else ('user two stock reversal allocation isolation failed ' || (select count(*) from public.pantry_consumption_stock_application_reversal_allocations))::integer::text end as user_two_cannot_read_stock_reversal_allocation;
 
 rollback;
 `;
