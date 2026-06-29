@@ -26,7 +26,7 @@ create table public.pantry_intake_decisions (
     on delete cascade,
   foreign key (created_pantry_item_id, household_id)
     references public.pantry_items(id, household_id)
-    on delete set null (created_pantry_item_id)
+    on delete restrict
 );
 
 create function public.assert_completed_grocery_item_for_intake_decision()

@@ -266,6 +266,49 @@ exception
     null;
 end $$;
 
+do $$
+begin
+  delete from public.pantry_items
+  where id = '40000000-0000-4000-8000-000000000001';
+
+  raise exception 'authenticated pantry item hard delete with confirmed intake decision unexpectedly succeeded';
+exception
+  when foreign_key_violation then
+    null;
+  when restrict_violation then
+    null;
+end $$;
+
+update public.pantry_items
+set discarded_at = now()
+where id = '40000000-0000-4000-8000-000000000001'
+  and discarded_at is null;
+
+select case when (
+  select count(*)
+  from public.pantry_intake_decisions
+  where id = '80000000-0000-4000-8000-000000000001'
+    and created_pantry_item_id = '40000000-0000-4000-8000-000000000001'
+) = 1 then 'ok' else 'discard flow broke decision traceability' end as discard_preserves_intake_decision_link;
+
+reset role;
+
+do $$
+begin
+  delete from public.pantry_items
+  where id = '40000000-0000-4000-8000-000000000001';
+
+  raise exception 'service role pantry item hard delete with confirmed intake decision unexpectedly succeeded';
+exception
+  when foreign_key_violation then
+    null;
+  when restrict_violation then
+    null;
+end $$;
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000001', true);
+
 select case when (
   select count(*) from public.pantry_items where id = '40000000-0000-4000-8000-000000000001'
 ) = 1 then 'ok' else ('user one item read failed ' || (select count(*) from public.pantry_items))::integer::text end as user_one_can_read_item;
