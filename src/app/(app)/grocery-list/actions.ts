@@ -10,15 +10,27 @@ import {
   updateGroceryListItemState
 } from "@/lib/grocery/data";
 import { normalizeManualGroceryItemInput } from "@/lib/grocery/manual-grocery-item";
+import {
+  confirmPantryIntakeCandidate,
+  skipPantryIntakeCandidate
+} from "@/lib/pantry/data";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 import { getWeekStartDate } from "@/lib/weekly-plans/week-dates";
 
-function groceryListRedirect(message: string, view?: string): never {
+function groceryListRedirect(
+  message: string,
+  view?: string,
+  listId?: string | null
+): never {
   const params = new URLSearchParams({ message });
   const groceryListView = normalizeGroceryListView(view);
 
   if (groceryListView !== "shopping") {
     params.set("view", groceryListView);
+  }
+
+  if (listId) {
+    params.set("listId", listId);
   }
 
   redirect(`/grocery-list?${params.toString()}`);
@@ -244,4 +256,84 @@ export async function advanceGroceryListLifecycleAction(formData: FormData) {
 
   revalidatePath("/grocery-list");
   groceryListRedirect("Grocery list status updated.", view);
+}
+
+export async function confirmPantryIntakeCandidateAction(formData: FormData) {
+  const groceryListItemId = textOrNull(formData.get("groceryListItemId"));
+  const listId = textOrNull(formData.get("listId"));
+  const view = normalizeGroceryListView(formData.get("view"));
+
+  if (!groceryListItemId) {
+    groceryListRedirect("Choose a pantry intake item first.", view, listId);
+  }
+
+  const householdContext = await getCurrentHouseholdContext();
+
+  if (!householdContext.household) {
+    groceryListRedirect("Link your user to a household first.", view, listId);
+  }
+
+  try {
+    await confirmPantryIntakeCandidate({
+      groceryListItemId,
+      householdId: householdContext.household.id,
+      input: {
+        displayName: textOrNull(formData.get("displayName")),
+        expirationDate: textOrNull(formData.get("expirationDate")),
+        groceryCategoryId: textOrNull(formData.get("groceryCategoryId")),
+        isOpen: false,
+        lowStockThresholdQuantity: null,
+        lowStockThresholdUnit: null,
+        mealProfileId: null,
+        notes: textOrNull(formData.get("note")),
+        openedAt: null,
+        packageDetail: null,
+        quantity: textOrNull(formData.get("quantity")),
+        quantityNote: null,
+        stockStatus: "in_stock",
+        storageLocation: textOrNull(formData.get("storageLocation")),
+        unit: textOrNull(formData.get("unit"))
+      },
+      note: textOrNull(formData.get("note"))
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Pantry intake confirm failed.";
+    groceryListRedirect(message, view, listId);
+  }
+
+  revalidatePath("/grocery-list");
+  revalidatePath("/pantry");
+  groceryListRedirect("Pantry item created.", view, listId);
+}
+
+export async function skipPantryIntakeCandidateAction(formData: FormData) {
+  const groceryListItemId = textOrNull(formData.get("groceryListItemId"));
+  const listId = textOrNull(formData.get("listId"));
+  const view = normalizeGroceryListView(formData.get("view"));
+
+  if (!groceryListItemId) {
+    groceryListRedirect("Choose a pantry intake item first.", view, listId);
+  }
+
+  const householdContext = await getCurrentHouseholdContext();
+
+  if (!householdContext.household) {
+    groceryListRedirect("Link your user to a household first.", view, listId);
+  }
+
+  try {
+    await skipPantryIntakeCandidate({
+      groceryListItemId,
+      householdId: householdContext.household.id,
+      note: textOrNull(formData.get("note"))
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Pantry intake skip failed.";
+    groceryListRedirect(message, view, listId);
+  }
+
+  revalidatePath("/grocery-list");
+  groceryListRedirect("Item skipped.", view, listId);
 }

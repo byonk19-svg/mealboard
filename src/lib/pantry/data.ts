@@ -8,6 +8,20 @@ import {
   buildPantryRestockCandidates,
   type PantryRestockGroceryList
 } from "./restock-candidates";
+import {
+  buildPantryIntakeCandidates,
+  type PantryIntakeCandidate,
+  type PantryIntakeDecision,
+  type PantryIntakeGroceryList
+} from "./intake-candidates";
+import {
+  buildConfirmedPantryIntakeDecisionInsert,
+  buildPantryItemInputFromIntakeCandidate,
+  buildSkippedPantryIntakeDecisionInsert,
+  type PantryIntakeConfirmInput,
+  type PantryIntakeConfirmResult,
+  type PantryIntakeSkipResult
+} from "./intake-review";
 import type {
   NormalizedPantryItemInput,
   PantryEvent,
@@ -73,6 +87,49 @@ type PantryRestockGroceryListRow = {
   status: PantryRestockGroceryList["status"];
 };
 
+type PantryIntakeGroceryListRow = {
+  completed_at: string | null;
+  created_at: string;
+  grocery_list_items: Array<{
+    already_have: boolean;
+    checked: boolean;
+    display_name: string;
+    food_id: string | null;
+    foods: JoinedName;
+    grocery_categories: JoinedName;
+    grocery_category_id: string | null;
+    grocery_list_id: string;
+    id: string;
+    preferred_quantity_text: string | null;
+    quantity: number | string | null;
+    sort_order: number;
+    unit: string | null;
+  }> | null;
+  id: string;
+  name: string | null;
+  status: PantryIntakeGroceryList["status"];
+  weekly_plans:
+    | { week_start_date: string | null }
+    | Array<{ week_start_date: string | null }>
+    | null;
+};
+
+type PantryIntakeDecisionRow = {
+  created_pantry_item_id: string | null;
+  grocery_list_item_id: string;
+  status: PantryIntakeDecision["status"];
+};
+
+type GroceryItemSourceRow = {
+  grocery_list_item_id: string;
+  meal_profiles: JoinedName;
+  notes: string | null;
+  quantity: number | string | null;
+  source_label: string | null;
+  source_type: string;
+  unit: string | null;
+};
+
 export type AddPantryRestockCandidateResult =
   | {
       groceryListId: string;
@@ -127,6 +184,245 @@ export async function getPantryRestockCandidates(householdId: string) {
   ]);
 
   return buildPantryRestockCandidates({ groceryLists, pantryItems });
+}
+
+export async function getPantryIntakeCandidates({
+  groceryListId,
+  householdId
+}: {
+  groceryListId?: string | null;
+  householdId: string;
+}) {
+  const supabase = await createClient();
+  return getPantryIntakeCandidatesWithClient({
+    groceryListId,
+    householdId,
+    supabase
+  });
+}
+
+export async function getPantryIntakeCandidatesWithClient({
+  groceryListId,
+  householdId,
+  supabase
+}: {
+  groceryListId?: string | null;
+  householdId: string;
+  supabase: SupabaseClient;
+}): Promise<PantryIntakeCandidate[]> {
+  const groceryLists = await getCompletedGroceryListsForPantryIntake({
+    groceryListId,
+    householdId,
+    supabase
+  });
+  const itemIds = groceryLists.flatMap((list) =>
+    list.items.map((item) => item.id)
+  );
+  const [sourcesByItemId, decisions] = await Promise.all([
+    getGroceryItemSourcesByItemIds({ groceryListItemIds: itemIds, householdId, supabase }),
+    getPantryIntakeDecisionsByItemIds({
+      groceryListItemIds: itemIds,
+      householdId,
+      supabase
+    })
+  ]);
+
+  return buildPantryIntakeCandidates({
+    decisions,
+    groceryLists: groceryLists.map((list) => ({
+      ...list,
+      items: list.items.map((item) => ({
+        ...item,
+        sources: sourcesByItemId.get(item.id) ?? []
+      }))
+    }))
+  });
+}
+
+export async function confirmPantryIntakeCandidate({
+  groceryListItemId,
+  householdId,
+  input,
+  note
+}: {
+  groceryListItemId: string;
+  householdId: string;
+  input: PantryIntakeConfirmInput;
+  note?: string | null;
+}): Promise<PantryIntakeConfirmResult> {
+  const supabase = await createClient();
+  return confirmPantryIntakeCandidateWithClient({
+    groceryListItemId,
+    householdId,
+    input,
+    note,
+    supabase
+  });
+}
+
+export async function confirmPantryIntakeCandidateWithClient({
+  groceryListItemId,
+  householdId,
+  input,
+  note,
+  supabase
+}: {
+  groceryListItemId: string;
+  householdId: string;
+  input: PantryIntakeConfirmInput;
+  note?: string | null;
+  supabase: SupabaseClient;
+}): Promise<PantryIntakeConfirmResult> {
+  const existingDecision = await getPantryIntakeDecisionByItemId({
+    groceryListItemId,
+    householdId,
+    supabase
+  });
+
+  if (existingDecision) {
+    if (existingDecision.status === "confirmed") {
+      return {
+        groceryListItemId,
+        pantryItemId: existingDecision.created_pantry_item_id,
+        status: "already_confirmed"
+      };
+    }
+
+    throw new Error("That grocery item was already skipped for pantry intake.");
+  }
+
+  const candidate = await getSinglePantryIntakeCandidate({
+    groceryListItemId,
+    householdId,
+    supabase
+  });
+  const pantryInput = buildPantryItemInputFromIntakeCandidate({
+    candidate,
+    input
+  });
+  const pantryItem = await createPantryItemWithClient({
+    householdId,
+    input: pantryInput,
+    note,
+    supabase
+  });
+
+  try {
+    const { error } = await supabase.from("pantry_intake_decisions").insert(
+      buildConfirmedPantryIntakeDecisionInsert({
+        groceryListItemId,
+        householdId,
+        note,
+        pantryItemId: pantryItem.id
+      })
+    );
+
+    if (error) {
+      throw error;
+    }
+  } catch (error) {
+    await supabase
+      .from("pantry_items")
+      .delete()
+      .eq("household_id", householdId)
+      .eq("id", pantryItem.id);
+
+    const finalDecision = await getPantryIntakeDecisionByItemId({
+      groceryListItemId,
+      householdId,
+      supabase
+    });
+
+    if (finalDecision?.status === "confirmed") {
+      return {
+        groceryListItemId,
+        pantryItemId: finalDecision.created_pantry_item_id,
+        status: "already_confirmed"
+      };
+    }
+
+    throw new Error(getSupabaseErrorMessage(error));
+  }
+
+  return {
+    groceryListItemId,
+    pantryItem,
+    status: "confirmed"
+  };
+}
+
+export async function skipPantryIntakeCandidate({
+  groceryListItemId,
+  householdId,
+  note
+}: {
+  groceryListItemId: string;
+  householdId: string;
+  note?: string | null;
+}): Promise<PantryIntakeSkipResult> {
+  const supabase = await createClient();
+  return skipPantryIntakeCandidateWithClient({
+    groceryListItemId,
+    householdId,
+    note,
+    supabase
+  });
+}
+
+export async function skipPantryIntakeCandidateWithClient({
+  groceryListItemId,
+  householdId,
+  note,
+  supabase
+}: {
+  groceryListItemId: string;
+  householdId: string;
+  note?: string | null;
+  supabase: SupabaseClient;
+}): Promise<PantryIntakeSkipResult> {
+  const existingDecision = await getPantryIntakeDecisionByItemId({
+    groceryListItemId,
+    householdId,
+    supabase
+  });
+
+  if (existingDecision) {
+    if (existingDecision.status === "skipped") {
+      return { groceryListItemId, status: "already_skipped" };
+    }
+
+    throw new Error("That grocery item was already confirmed for pantry intake.");
+  }
+
+  await getSinglePantryIntakeCandidate({
+    groceryListItemId,
+    householdId,
+    supabase
+  });
+
+  const { error } = await supabase.from("pantry_intake_decisions").insert(
+    buildSkippedPantryIntakeDecisionInsert({
+      groceryListItemId,
+      householdId,
+      note
+    })
+  );
+
+  if (error) {
+    const finalDecision = await getPantryIntakeDecisionByItemId({
+      groceryListItemId,
+      householdId,
+      supabase
+    });
+
+    if (finalDecision?.status === "skipped") {
+      return { groceryListItemId, status: "already_skipped" };
+    }
+
+    throw new Error(error.message);
+  }
+
+  return { groceryListItemId, status: "skipped" };
 }
 
 export async function addPantryRestockCandidateToGroceryList({
@@ -309,6 +605,20 @@ export async function createPantryItem({
   note?: string | null;
 }) {
   const supabase = await createClient();
+  return createPantryItemWithClient({ householdId, input, note, supabase });
+}
+
+async function createPantryItemWithClient({
+  householdId,
+  input,
+  note,
+  supabase
+}: {
+  householdId: string;
+  input: PantryItemInput;
+  note?: string | null;
+  supabase: SupabaseClient;
+}) {
   const normalizedInput = normalizePantryItemInput(input);
   const { data, error } = await supabase
     .from("pantry_items")
@@ -508,6 +818,202 @@ async function getPantryItemWithClient({
   }
 
   return mapPantryItemRow(data as PantryItemRow);
+}
+
+async function getSinglePantryIntakeCandidate({
+  groceryListItemId,
+  householdId,
+  supabase
+}: {
+  groceryListItemId: string;
+  householdId: string;
+  supabase: SupabaseClient;
+}) {
+  const { data, error } = await supabase
+    .from("grocery_list_items")
+    .select("grocery_list_id")
+    .eq("household_id", householdId)
+    .eq("id", groceryListItemId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const groceryListId = data?.grocery_list_id as string | undefined;
+
+  if (!groceryListId) {
+    throw new Error("That grocery item is no longer available.");
+  }
+
+  const candidates = await getPantryIntakeCandidatesWithClient({
+    groceryListId,
+    householdId,
+    supabase
+  });
+  const candidate = candidates.find(
+    (intakeCandidate) =>
+      intakeCandidate.groceryListItemId === groceryListItemId
+  );
+
+  if (!candidate) {
+    throw new Error("That grocery item is not available for pantry intake.");
+  }
+
+  return candidate;
+}
+
+async function getCompletedGroceryListsForPantryIntake({
+  groceryListId,
+  householdId,
+  supabase
+}: {
+  groceryListId?: string | null;
+  householdId: string;
+  supabase: SupabaseClient;
+}): Promise<PantryIntakeGroceryList[]> {
+  let query = supabase
+    .from("grocery_lists")
+    .select(
+      "id, name, status, completed_at, created_at, weekly_plans(week_start_date), grocery_list_items(id, grocery_list_id, food_id, display_name, quantity, unit, preferred_quantity_text, checked, already_have, sort_order, grocery_category_id, foods(name), grocery_categories(name))"
+    )
+    .eq("household_id", householdId)
+    .eq("status", "completed")
+    .order("completed_at", { ascending: false, nullsFirst: false });
+
+  if (groceryListId) {
+    query = query.eq("id", groceryListId);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data ?? []) as PantryIntakeGroceryListRow[]).map((list) => ({
+    completedAt: list.completed_at,
+    createdAt: list.created_at,
+    id: list.id,
+    items: (list.grocery_list_items ?? []).map((item) => ({
+      alreadyHave: item.already_have,
+      checked: item.checked,
+      displayName: item.display_name,
+      foodId: item.food_id,
+      foodName: getOptionalJoinedName(item.foods),
+      groceryCategoryId: item.grocery_category_id,
+      groceryCategoryName: getOptionalJoinedName(item.grocery_categories),
+      groceryListId: item.grocery_list_id,
+      id: item.id,
+      preferredQuantityText: item.preferred_quantity_text,
+      quantity: toNullableNumber(item.quantity),
+      sortOrder: item.sort_order,
+      sources: [],
+      unit: item.unit
+    })),
+    name: list.name,
+    status: list.status,
+    weekStartDate: getJoinedWeekStartDate(list.weekly_plans)
+  }));
+}
+
+async function getGroceryItemSourcesByItemIds({
+  groceryListItemIds,
+  householdId,
+  supabase
+}: {
+  groceryListItemIds: string[];
+  householdId: string;
+  supabase: SupabaseClient;
+}) {
+  const sourcesByItemId = new Map<
+    string,
+    PantryIntakeGroceryList["items"][number]["sources"]
+  >();
+
+  if (groceryListItemIds.length === 0) {
+    return sourcesByItemId;
+  }
+
+  const { data, error } = await supabase
+    .from("grocery_item_sources")
+    .select(
+      "grocery_list_item_id, source_type, source_label, quantity, unit, notes, meal_profiles(name)"
+    )
+    .eq("household_id", householdId)
+    .in("grocery_list_item_id", groceryListItemIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  for (const source of (data ?? []) as GroceryItemSourceRow[]) {
+    sourcesByItemId.set(source.grocery_list_item_id, [
+      ...(sourcesByItemId.get(source.grocery_list_item_id) ?? []),
+      {
+        mealProfileName: getOptionalJoinedName(source.meal_profiles),
+        notes: source.notes,
+        quantity: toNullableNumber(source.quantity),
+        sourceLabel: source.source_label,
+        sourceType: source.source_type,
+        unit: source.unit
+      }
+    ]);
+  }
+
+  return sourcesByItemId;
+}
+
+async function getPantryIntakeDecisionsByItemIds({
+  groceryListItemIds,
+  householdId,
+  supabase
+}: {
+  groceryListItemIds: string[];
+  householdId: string;
+  supabase: SupabaseClient;
+}): Promise<PantryIntakeDecision[]> {
+  if (groceryListItemIds.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from("pantry_intake_decisions")
+    .select("grocery_list_item_id, status, created_pantry_item_id")
+    .eq("household_id", householdId)
+    .in("grocery_list_item_id", groceryListItemIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data ?? []) as PantryIntakeDecisionRow[]).map((decision) => ({
+    groceryListItemId: decision.grocery_list_item_id,
+    status: decision.status
+  }));
+}
+
+async function getPantryIntakeDecisionByItemId({
+  groceryListItemId,
+  householdId,
+  supabase
+}: {
+  groceryListItemId: string;
+  householdId: string;
+  supabase: SupabaseClient;
+}) {
+  const { data, error } = await supabase
+    .from("pantry_intake_decisions")
+    .select("grocery_list_item_id, status, created_pantry_item_id")
+    .eq("household_id", householdId)
+    .eq("grocery_list_item_id", groceryListItemId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data as PantryIntakeDecisionRow | null;
 }
 
 async function getEditableGroceryListsWithClient({
@@ -779,6 +1285,19 @@ function getOptionalJoinedCategory(
   return value;
 }
 
+function getJoinedWeekStartDate(
+  value:
+    | { week_start_date: string | null }
+    | Array<{ week_start_date: string | null }>
+    | null
+) {
+  if (Array.isArray(value)) {
+    return value[0]?.week_start_date ?? null;
+  }
+
+  return value?.week_start_date ?? null;
+}
+
 function toNullableNumber(value: number | string | null) {
   if (value === null) {
     return null;
@@ -791,4 +1310,21 @@ function toNullableNumber(value: number | string | null) {
 function normalizeEventNote(value: string | null | undefined) {
   const note = String(value ?? "").trim().replace(/\s+/g, " ");
   return note.length > 0 ? note : null;
+}
+
+function getSupabaseErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    return error.message;
+  }
+
+  return "Pantry intake decision could not be saved.";
 }

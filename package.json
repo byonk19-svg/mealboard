@@ -14,6 +14,7 @@
     "e2e:grocery-mobile": "node scripts/run-playwright-with-port.mjs 3106 e2e/grocery-mobile.smoke.spec.ts --project=chromium",
     "e2e:household-members": "node scripts/run-household-members-e2e.mjs",
     "e2e:pantry": "node scripts/run-playwright-with-port.mjs 3114 e2e/smart-pantry.smoke.spec.ts --project=chromium",
+    "e2e:pantry-intake": "node scripts/run-playwright-with-port.mjs 3115 e2e/pantry-intake.smoke.spec.ts --project=chromium",
     "e2e:extension-capture": "node scripts/run-playwright-with-port.mjs 3112 e2e/extension-capture.smoke.spec.ts --project=chromium",
     "e2e:recipe-import": "node scripts/run-playwright-with-port.mjs 3107 e2e/recipe-import.smoke.spec.ts --project=chromium",
     "e2e:pwa": "node scripts/run-playwright-with-port.mjs 3109 e2e/pwa-install.smoke.spec.ts --project=chromium",

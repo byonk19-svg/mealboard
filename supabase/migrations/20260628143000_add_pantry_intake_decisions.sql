@@ -18,8 +18,8 @@ create table public.pantry_intake_decisions (
   unique (grocery_list_item_id),
   check (note is null or length(trim(note)) > 0),
   check (
-    status = 'confirmed'
-    or created_pantry_item_id is null
+    (status = 'confirmed' and created_pantry_item_id is not null)
+    or (status = 'skipped' and created_pantry_item_id is null)
   ),
   foreign key (grocery_list_item_id, household_id)
     references public.grocery_list_items(id, household_id)
@@ -29,21 +29,60 @@ create table public.pantry_intake_decisions (
     on delete set null (created_pantry_item_id)
 );
 
+create function public.assert_completed_grocery_item_for_intake_decision()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+declare
+  grocery_list_status public.grocery_list_status;
+begin
+  select gl.status
+  into grocery_list_status
+  from public.grocery_list_items gli
+  join public.grocery_lists gl
+    on gl.id = gli.grocery_list_id
+    and gl.household_id = gli.household_id
+  where gli.id = new.grocery_list_item_id
+    and gli.household_id = new.household_id;
+
+  if grocery_list_status is distinct from 'completed' then
+    raise exception 'Pantry intake decisions require a completed grocery list item.'
+      using errcode = '23514';
+  end if;
+
+  return new;
+end;
+$$;
+
 create trigger set_pantry_intake_decisions_updated_at
   before update on public.pantry_intake_decisions
   for each row execute function public.set_updated_at();
 
+create trigger assert_completed_grocery_item_for_intake_decision
+  before insert or update on public.pantry_intake_decisions
+  for each row execute function public.assert_completed_grocery_item_for_intake_decision();
+
+grant select, insert
+  on public.pantry_intake_decisions
+  to authenticated;
+
 grant select, insert, update, delete
   on public.pantry_intake_decisions
-  to authenticated, service_role;
+  to service_role;
 
 alter table public.pantry_intake_decisions enable row level security;
 
-create policy "Household members can manage pantry intake decisions"
+create policy "Household members can read pantry intake decisions"
   on public.pantry_intake_decisions
-  for all
+  for select
   to authenticated
-  using (public.is_household_member(household_id))
+  using (public.is_household_member(household_id));
+
+create policy "Household members can create pantry intake decisions"
+  on public.pantry_intake_decisions
+  for insert
+  to authenticated
   with check (public.is_household_member(household_id));
 
 create index pantry_intake_decisions_household_id_idx

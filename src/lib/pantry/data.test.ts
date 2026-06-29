@@ -1,21 +1,33 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { addPantryRestockCandidateToGroceryListWithClient } from "./data";
+import {
+  addPantryRestockCandidateToGroceryListWithClient,
+  confirmPantryIntakeCandidateWithClient,
+  getPantryIntakeCandidatesWithClient,
+  skipPantryIntakeCandidateWithClient
+} from "./data";
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn()
 }));
 
 type GroceryListRow = {
+  completed_at: string | null;
   created_at: string;
   household_id: string;
   id: string;
+  name: string | null;
   status: "draft" | "finalized" | "shopping_started" | "completed";
+  weekly_plans: { week_start_date: string | null } | null;
 };
 
 type GroceryListItemRow = {
+  already_have: boolean;
+  checked: boolean;
   display_name: string;
   food_id: string | null;
+  foods?: { name: string } | null;
+  grocery_categories?: { name: string } | null;
   grocery_category_id?: string | null;
   grocery_list_id: string;
   household_id: string;
@@ -30,9 +42,10 @@ type GroceryListItemRow = {
 type GroceryItemSourceRow = {
   grocery_list_item_id: string;
   household_id: string;
+  meal_profiles?: { name: string } | null;
   meal_profile_id: string | null;
   notes: string | null;
-  quantity: number | null;
+  quantity: number | string | null;
   source_id: string | null;
   source_label: string | null;
   source_type: string;
@@ -40,6 +53,14 @@ type GroceryItemSourceRow = {
 };
 
 type PantryItemRow = ReturnType<typeof pantryItemRow>;
+
+type PantryIntakeDecisionRow = {
+  created_pantry_item_id: string | null;
+  grocery_list_item_id: string;
+  household_id: string;
+  note?: string | null;
+  status: "confirmed" | "skipped";
+};
 
 describe("addPantryRestockCandidateToGroceryListWithClient", () => {
   it("adds one pantry restock item and source without mutating pantry state or events", async () => {
@@ -161,22 +182,282 @@ describe("addPantryRestockCandidateToGroceryListWithClient", () => {
   });
 });
 
+describe("pantry intake data functions", () => {
+  it("reads candidates from completed grocery items and suppresses decided rows", async () => {
+    const fake = createFakeSupabase({
+      groceryItemSources: [
+        groceryItemSourceRow({
+          grocery_list_item_id: "eligible-item",
+          source_label: "Chili"
+        })
+      ],
+      groceryListItems: [
+        groceryListItemRow({
+          checked: true,
+          grocery_list_id: "completed-list",
+          id: "eligible-item"
+        }),
+        groceryListItemRow({
+          checked: true,
+          grocery_list_id: "completed-list",
+          id: "decided-item"
+        })
+      ],
+      groceryLists: [
+        groceryListRow({
+          completed_at: "2026-06-27T12:00:00Z",
+          id: "completed-list",
+          status: "completed"
+        })
+      ],
+      pantryIntakeDecisions: [
+        {
+          created_pantry_item_id: null,
+          grocery_list_item_id: "decided-item",
+          household_id: "household-1",
+          status: "skipped"
+        }
+      ],
+      pantryItems: []
+    });
+
+    await expect(
+      getPantryIntakeCandidatesWithClient({
+        groceryListId: "completed-list",
+        householdId: "household-1",
+        supabase: fake.client
+      })
+    ).resolves.toEqual([
+      expect.objectContaining({
+        groceryListItemId: "eligible-item",
+        sources: [
+          expect.objectContaining({
+            sourceLabel: "Chili"
+          })
+        ]
+      })
+    ]);
+  });
+
+  it("confirms one candidate by creating pantry stock, event history, and a decision", async () => {
+    const fake = createFakeSupabase({
+      groceryListItems: [
+        groceryListItemRow({
+          checked: true,
+          grocery_list_id: "completed-list",
+          id: "eligible-item",
+          quantity: 2,
+          unit: "cans"
+        })
+      ],
+      groceryLists: [
+        groceryListRow({
+          completed_at: "2026-06-27T12:00:00Z",
+          id: "completed-list",
+          status: "completed"
+        })
+      ],
+      pantryItems: []
+    });
+
+    await expect(
+      confirmPantryIntakeCandidateWithClient({
+        groceryListItemId: "eligible-item",
+        householdId: "household-1",
+        input: {
+          displayName: "Reviewed beans",
+          expirationDate: null,
+          groceryCategoryId: null,
+          lowStockThresholdQuantity: null,
+          lowStockThresholdUnit: null,
+          mealProfileId: null,
+          notes: null,
+          openedAt: null,
+          packageDetail: null,
+          quantity: "2",
+          quantityNote: null,
+          stockStatus: "in_stock",
+          storageLocation: "Pantry",
+          unit: "cans"
+        },
+        note: "Reviewed from completed groceries",
+        supabase: fake.client
+      })
+    ).resolves.toEqual(
+      expect.objectContaining({
+        groceryListItemId: "eligible-item",
+        pantryItem: expect.objectContaining({
+          displayName: "Reviewed beans",
+          foodId: "food-beans"
+        }),
+        status: "confirmed"
+      })
+    );
+
+    expect(fake.state.pantryItems).toContainEqual(
+      expect.objectContaining({
+        display_name: "Reviewed beans",
+        food_id: "food-beans",
+        quantity: 2,
+        storage_location: "Pantry",
+        unit: "cans"
+      })
+    );
+    expect(fake.state.pantryEvents).toHaveLength(1);
+    expect(fake.state.pantryIntakeDecisions).toContainEqual(
+      expect.objectContaining({
+        created_pantry_item_id: "inserted-pantry-item-1",
+        grocery_list_item_id: "eligible-item",
+        status: "confirmed"
+      })
+    );
+    expect(fake.operations).not.toContain("grocery_list_items:update");
+    expect(fake.operations).not.toContain("grocery_item_sources:update");
+  });
+
+  it("cleans up newly-created pantry stock if a confirmed decision loses a race", async () => {
+    const fake = createFakeSupabase({
+      failNextPantryIntakeDecisionInsert: true,
+      finalPantryIntakeDecision: {
+        created_pantry_item_id: "winning-pantry-item",
+        grocery_list_item_id: "eligible-item",
+        household_id: "household-1",
+        status: "confirmed"
+      },
+      groceryListItems: [
+        groceryListItemRow({
+          checked: true,
+          grocery_list_id: "completed-list",
+          id: "eligible-item"
+        })
+      ],
+      groceryLists: [
+        groceryListRow({
+          completed_at: "2026-06-27T12:00:00Z",
+          id: "completed-list",
+          status: "completed"
+        })
+      ],
+      pantryItems: []
+    });
+
+    await expect(
+      confirmPantryIntakeCandidateWithClient({
+        groceryListItemId: "eligible-item",
+        householdId: "household-1",
+        input: {
+          displayName: "Reviewed beans",
+          expirationDate: null,
+          groceryCategoryId: null,
+          lowStockThresholdQuantity: null,
+          lowStockThresholdUnit: null,
+          mealProfileId: null,
+          notes: null,
+          openedAt: null,
+          packageDetail: null,
+          quantity: null,
+          quantityNote: null,
+          stockStatus: "in_stock",
+          storageLocation: null,
+          unit: null
+        },
+        supabase: fake.client
+      })
+    ).resolves.toEqual({
+      groceryListItemId: "eligible-item",
+      pantryItemId: "winning-pantry-item",
+      status: "already_confirmed"
+    });
+
+    expect(fake.operations).toContain("pantry_items:delete");
+    expect(fake.state.pantryItems).toEqual([]);
+  });
+
+  it("skips one candidate without creating pantry stock or events", async () => {
+    const fake = createFakeSupabase({
+      groceryListItems: [
+        groceryListItemRow({
+          checked: true,
+          grocery_list_id: "completed-list",
+          id: "eligible-item"
+        })
+      ],
+      groceryLists: [
+        groceryListRow({
+          completed_at: "2026-06-27T12:00:00Z",
+          id: "completed-list",
+          status: "completed"
+        })
+      ],
+      pantryItems: []
+    });
+
+    await expect(
+      skipPantryIntakeCandidateWithClient({
+        groceryListItemId: "eligible-item",
+        householdId: "household-1",
+        note: "No pantry stock",
+        supabase: fake.client
+      })
+    ).resolves.toEqual({
+      groceryListItemId: "eligible-item",
+      status: "skipped"
+    });
+
+    expect(fake.state.pantryIntakeDecisions).toContainEqual(
+      expect.objectContaining({
+        created_pantry_item_id: null,
+        grocery_list_item_id: "eligible-item",
+        note: "No pantry stock",
+        status: "skipped"
+      })
+    );
+    expect(fake.state.pantryItems).toEqual([]);
+    expect(fake.state.pantryEvents).toEqual([]);
+
+    await expect(
+      skipPantryIntakeCandidateWithClient({
+        groceryListItemId: "eligible-item",
+        householdId: "household-1",
+        supabase: fake.client
+      })
+    ).resolves.toEqual({
+      groceryListItemId: "eligible-item",
+      status: "already_skipped"
+    });
+  });
+});
+
 function createFakeSupabase({
+  failNextPantryIntakeDecisionInsert = false,
+  finalPantryIntakeDecision,
+  groceryItemSources = [],
   groceryLists,
   groceryListItems,
+  pantryIntakeDecisions = [],
   pantryItems,
   statusAfterCandidateRead
 }: {
+  failNextPantryIntakeDecisionInsert?: boolean;
+  finalPantryIntakeDecision?: PantryIntakeDecisionRow;
+  groceryItemSources?: GroceryItemSourceRow[];
   groceryLists: GroceryListRow[];
   groceryListItems: GroceryListItemRow[];
+  pantryIntakeDecisions?: PantryIntakeDecisionRow[];
   pantryItems: PantryItemRow[];
   statusAfterCandidateRead?: GroceryListRow["status"];
 }) {
   const operations: string[] = [];
   const state = {
-    groceryItemSources: [] as GroceryItemSourceRow[],
+    failNextPantryIntakeDecisionInsert,
+    finalPantryIntakeDecision,
+    groceryItemSources: groceryItemSources.map((source) => ({ ...source })),
     groceryListItems: groceryListItems.map((item) => ({ ...item })),
     groceryLists: groceryLists.map((list) => ({ ...list })),
+    pantryEvents: [] as Array<Record<string, unknown>>,
+    pantryIntakeDecisions: pantryIntakeDecisions.map((decision) => ({
+      ...decision
+    })),
     pantryItems: pantryItems.map((item) => ({ ...item }))
   };
   const client = {
@@ -196,9 +477,13 @@ function createFakeSupabase({
 class FakeQuery {
   private readonly operations: string[];
   private readonly state: {
+    failNextPantryIntakeDecisionInsert: boolean;
+    finalPantryIntakeDecision?: PantryIntakeDecisionRow;
     groceryItemSources: GroceryItemSourceRow[];
     groceryListItems: GroceryListItemRow[];
     groceryLists: GroceryListRow[];
+    pantryEvents: Array<Record<string, unknown>>;
+    pantryIntakeDecisions: PantryIntakeDecisionRow[];
     pantryItems: PantryItemRow[];
   };
   private readonly statusAfterCandidateRead: GroceryListRow["status"] | undefined;
@@ -206,7 +491,7 @@ class FakeQuery {
   private filters: Array<[string, unknown]> = [];
   private inFilter: [string, unknown[]] | null = null;
   private insertPayload: unknown = null;
-  private operation: "delete" | "insert" | "select" | null = null;
+  private operation: "delete" | "insert" | "select" | "update" | null = null;
   private selectColumns = "";
 
   constructor({
@@ -247,6 +532,11 @@ class FakeQuery {
     return this;
   }
 
+  update() {
+    this.operation = "update";
+    return this;
+  }
+
   is(field: string, value: unknown) {
     this.filters.push([field, value]);
     return this;
@@ -284,16 +574,41 @@ class FakeQuery {
 
     if (this.operation === "delete") {
       this.operations.push(`${this.table}:delete`);
+      this.executeDelete();
+      return { data: null, error: null };
+    }
+
+    if (this.operation === "update") {
+      this.operations.push(`${this.table}:update`);
       return { data: null, error: null };
     }
 
     if (this.table === "pantry_items") {
-      return { data: this.state.pantryItems, error: null };
+      return {
+        data: this.state.pantryItems.filter((item) => this.matchesFilters(item)),
+        error: null
+      };
+    }
+
+    if (this.table === "pantry_intake_decisions") {
+      return {
+        data: this.getPantryIntakeDecisionRows(),
+        error: null
+      };
+    }
+
+    if (this.table === "grocery_item_sources") {
+      return {
+        data: this.state.groceryItemSources.filter((source) =>
+          this.matchesFilters(source)
+        ),
+        error: null
+      };
     }
 
     if (this.table === "grocery_lists") {
       const rows = this.state.groceryLists.filter((list) =>
-        this.inFilter ? this.inFilter[1].includes(list.status) : true
+        this.matchesFilters(list)
       );
 
       return {
@@ -327,6 +642,37 @@ class FakeQuery {
       this.state.groceryItemSources.push(this.insertPayload as GroceryItemSourceRow);
     }
 
+    if (this.table === "pantry_items") {
+      const payload = this.insertPayload as Partial<PantryItemRow>;
+      const row = pantryItemRow({
+        ...payload,
+        id: `inserted-pantry-item-${this.state.pantryItems.length + 1}`
+      });
+      this.state.pantryItems.push(row);
+      return { data: row, error: null };
+    }
+
+    if (this.table === "pantry_events") {
+      const payload = Array.isArray(this.insertPayload)
+        ? this.insertPayload
+        : [this.insertPayload];
+      this.state.pantryEvents.push(...(payload as Array<Record<string, unknown>>));
+    }
+
+    if (this.table === "pantry_intake_decisions") {
+      if (this.state.failNextPantryIntakeDecisionInsert) {
+        this.state.failNextPantryIntakeDecisionInsert = false;
+        return {
+          data: null,
+          error: { message: "duplicate key value violates unique constraint" }
+        };
+      }
+
+      this.state.pantryIntakeDecisions.push(
+        this.insertPayload as PantryIntakeDecisionRow
+      );
+    }
+
     return { data: null, error: null };
   }
 
@@ -344,6 +690,20 @@ class FakeQuery {
         data: list
           ? { status: this.statusAfterCandidateRead ?? list.status }
           : null,
+        error: null
+      };
+    }
+
+    if (
+      this.table === "grocery_list_items" &&
+      this.selectColumns === "grocery_list_id"
+    ) {
+      const item = this.state.groceryListItems.find((candidateItem) =>
+        this.matchesFilters(candidateItem)
+      );
+
+      return {
+        data: item ? { grocery_list_id: item.grocery_list_id } : null,
         error: null
       };
     }
@@ -373,11 +733,49 @@ class FakeQuery {
       };
     }
 
+    if (this.table === "pantry_intake_decisions") {
+      return {
+        data: this.getPantryIntakeDecisionRows()[0] ?? null,
+        error: null
+      };
+    }
+
     return { data: null, error: null };
   }
 
+  private executeDelete() {
+    if (this.table === "pantry_items") {
+      this.state.pantryItems = this.state.pantryItems.filter(
+        (item) => !this.matchesFilters(item)
+      );
+    }
+  }
+
+  private getPantryIntakeDecisionRows() {
+    const rows = [...this.state.pantryIntakeDecisions];
+
+    if (
+      this.state.finalPantryIntakeDecision &&
+      !this.state.failNextPantryIntakeDecisionInsert
+    ) {
+      rows.push(this.state.finalPantryIntakeDecision);
+    }
+
+    return rows.filter((decision) => this.matchesFilters(decision));
+  }
+
   private matchesFilters(row: Record<string, unknown>) {
-    return this.filters.every(([field, value]) => row[field] === value);
+    const matchesEq = this.filters.every(([field, value]) => row[field] === value);
+
+    if (!matchesEq) {
+      return false;
+    }
+
+    if (!this.inFilter) {
+      return true;
+    }
+
+    return this.inFilter[1].includes(row[this.inFilter[0]]);
   }
 }
 
@@ -388,10 +786,13 @@ type QueryResult = {
 
 function groceryListRow(overrides: Partial<GroceryListRow> = {}): GroceryListRow {
   return {
+    completed_at: null,
     created_at: "2026-06-27T12:00:00Z",
     household_id: "household-1",
     id: "list-1",
+    name: "Grocery list",
     status: "draft",
+    weekly_plans: { week_start_date: "2026-06-22" },
     ...overrides
   };
 }
@@ -400,12 +801,38 @@ function groceryListItemRow(
   overrides: Partial<GroceryListItemRow> = {}
 ): GroceryListItemRow {
   return {
+    already_have: false,
+    checked: false,
     display_name: "Black beans",
     food_id: "food-beans",
+    foods: { name: "Black beans" },
+    grocery_categories: { name: "Canned goods" },
+    grocery_category_id: "category-canned",
     grocery_list_id: "list-1",
     household_id: "household-1",
     id: "grocery-item-1",
+    preferred_quantity_text: null,
+    quantity: null,
     sort_order: 0,
+    unit: null,
+    ...overrides
+  };
+}
+
+function groceryItemSourceRow(
+  overrides: Partial<GroceryItemSourceRow> = {}
+): GroceryItemSourceRow {
+  return {
+    grocery_list_item_id: "grocery-item-1",
+    household_id: "household-1",
+    meal_profile_id: null,
+    meal_profiles: null,
+    notes: null,
+    quantity: null,
+    source_id: null,
+    source_label: null,
+    source_type: "recipe",
+    unit: null,
     ...overrides
   };
 }

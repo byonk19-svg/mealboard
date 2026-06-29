@@ -22,6 +22,8 @@ import {
   type GroceryItemContextGroup
 } from "@/lib/grocery/group-grocery-list-items";
 import { getNextGroceryListStatus } from "@/lib/grocery/lifecycle";
+import { getPantryIntakeCandidates } from "@/lib/pantry/data";
+import type { PantryIntakeCandidate } from "@/lib/pantry/intake-candidates";
 import { getGroceryCategories } from "@/lib/recipes/data";
 import type { GroceryCategory } from "@/lib/recipes/types";
 import { getMealProfiles } from "@/lib/settings/data";
@@ -29,7 +31,9 @@ import type { MealProfile } from "@/lib/settings/types";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 import {
   addManualGroceryItemAction,
-  advanceGroceryListLifecycleAction
+  advanceGroceryListLifecycleAction,
+  confirmPantryIntakeCandidateAction,
+  skipPantryIntakeCandidateAction
 } from "./actions";
 import { CopyGroceryListButton } from "./copy-grocery-list-button";
 import { GroceryItemStateControls } from "./grocery-item-state-controls";
@@ -78,6 +82,13 @@ export default async function GroceryListPage({
       getMealProfiles(householdContext.household.id)
     ]);
   const isHistoricalList = Boolean(listId);
+  const pantryIntakeCandidates =
+    groceryList && isHistoricalList
+      ? await getPantryIntakeCandidates({
+          groceryListId: groceryList.id,
+          householdId
+        })
+      : [];
   const categoryGroups = groceryList
     ? groupItemsByCategory(groceryList.items)
     : [];
@@ -136,6 +147,15 @@ export default async function GroceryListPage({
             view={view}
             weekStartDate={groceryList.weekStartDate}
           />
+
+          {isHistoricalList ? (
+            <PantryIntakeReviewSection
+              candidates={pantryIntakeCandidates}
+              groceryCategories={groceryCategories}
+              listId={groceryList.id}
+              view={view}
+            />
+          ) : null}
 
           <ManualGroceryItemForm
             groceryCategories={groceryCategories}
@@ -407,6 +427,194 @@ function UnavailableHistoricalListState({
         </section>
       )}
     </div>
+  );
+}
+
+function PantryIntakeReviewSection({
+  candidates,
+  groceryCategories,
+  listId,
+  view
+}: {
+  candidates: PantryIntakeCandidate[];
+  groceryCategories: GroceryCategory[];
+  listId: string;
+  view: GroceryListView;
+}) {
+  const candidate = candidates[0] ?? null;
+
+  return (
+    <section className="calm-card p-5">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="calm-heading text-xl">Pantry intake review</h2>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+            Checked items from this completed list can become pantry stock only
+            after you confirm them. Skipping keeps them out of future review.
+          </p>
+        </div>
+        <span className="text-sm text-muted-foreground">
+          {formatItemCount(candidates.length)}
+        </span>
+      </div>
+
+      {!candidate ? (
+        <div className="mt-4 rounded-lg border border-border bg-muted/40 px-3 py-3">
+          <h3 className="font-bold text-primary">
+            No pantry intake candidates in this completed list.
+          </h3>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">
+            Already-have items, unchecked items, items without a linked food, and
+            already reviewed items do not appear here.
+          </p>
+          <Link
+            className="mt-3 inline-flex min-h-11 items-center justify-center rounded-lg border border-primary/30 px-4 py-2 text-sm font-bold text-primary hover:border-primary hover:bg-muted"
+            href="/pantry"
+          >
+            Open Pantry
+          </Link>
+        </div>
+      ) : (
+        <article className="mt-4 rounded-lg border border-border bg-muted/30 p-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h3 className="text-lg font-bold text-primary">
+                {candidate.displayName}
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {formatPantryIntakeQuantity(candidate)}
+                {candidate.groceryCategoryName
+                  ? ` - ${candidate.groceryCategoryName}`
+                  : ""}
+              </p>
+              {candidate.sources.length > 0 ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Source:{" "}
+                  {candidate.sources
+                    .map((source) => source.sourceLabel ?? source.sourceType)
+                    .join(", ")}
+                </p>
+              ) : null}
+            </div>
+            {candidates.length > 1 ? (
+              <span className="text-sm text-muted-foreground">
+                {formatItemCount(candidates.length - 1)} after this
+              </span>
+            ) : null}
+          </div>
+
+          <form
+            action={confirmPantryIntakeCandidateAction}
+            className="mt-4 space-y-4"
+          >
+            <input
+              name="groceryListItemId"
+              type="hidden"
+              value={candidate.groceryListItemId}
+            />
+            <input name="listId" type="hidden" value={listId} />
+            <input name="view" type="hidden" value={view} />
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1.3fr)_minmax(0,0.55fr)_minmax(0,0.6fr)]">
+              <label className="text-sm font-medium">
+                Pantry display name
+                <input
+                  className="mt-1 min-h-12 w-full rounded-lg border border-border bg-background px-3 py-2 text-base"
+                  defaultValue={candidate.displayName}
+                  name="displayName"
+                  required
+                  type="text"
+                />
+              </label>
+              <label className="text-sm font-medium">
+                Quantity
+                <input
+                  className="mt-1 min-h-12 w-full rounded-lg border border-border bg-background px-3 py-2 text-base"
+                  defaultValue={candidate.quantity ?? ""}
+                  min="0.01"
+                  name="quantity"
+                  step="any"
+                  type="number"
+                />
+              </label>
+              <label className="text-sm font-medium">
+                Unit
+                <input
+                  className="mt-1 min-h-12 w-full rounded-lg border border-border bg-background px-3 py-2 text-base"
+                  defaultValue={candidate.unit ?? ""}
+                  name="unit"
+                  type="text"
+                />
+              </label>
+            </div>
+            <div className="grid gap-3 md:grid-cols-3">
+              <label className="text-sm font-medium">
+                Category
+                <select
+                  className="mt-1 min-h-12 w-full rounded-lg border border-border bg-background px-3 py-2 text-base"
+                  defaultValue={candidate.groceryCategoryId ?? ""}
+                  name="groceryCategoryId"
+                >
+                  <option value="">Uncategorized</option>
+                  {groceryCategories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm font-medium">
+                Storage location
+                <input
+                  className="mt-1 min-h-12 w-full rounded-lg border border-border bg-background px-3 py-2 text-base"
+                  name="storageLocation"
+                  type="text"
+                />
+              </label>
+              <label className="text-sm font-medium">
+                Expiration date
+                <input
+                  className="mt-1 min-h-12 w-full rounded-lg border border-border bg-background px-3 py-2 text-base"
+                  name="expirationDate"
+                  type="date"
+                />
+              </label>
+            </div>
+            <label className="block text-sm font-medium">
+              Note
+              <input
+                className="mt-1 min-h-12 w-full rounded-lg border border-border bg-background px-3 py-2 text-base"
+                name="note"
+                type="text"
+              />
+            </label>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <button
+                className="min-h-11 rounded-lg bg-primary px-5 py-3 text-sm font-bold text-primary-foreground"
+                type="submit"
+              >
+                Confirm and create pantry item
+              </button>
+            </div>
+          </form>
+
+          <form action={skipPantryIntakeCandidateAction} className="mt-3">
+            <input
+              name="groceryListItemId"
+              type="hidden"
+              value={candidate.groceryListItemId}
+            />
+            <input name="listId" type="hidden" value={listId} />
+            <input name="view" type="hidden" value={view} />
+            <button
+              className="min-h-11 w-full rounded-lg border border-primary/30 px-5 py-3 text-sm font-bold text-primary hover:border-primary hover:bg-muted sm:w-auto"
+              type="submit"
+            >
+              Skip this item
+            </button>
+          </form>
+        </article>
+      )}
+    </section>
   );
 }
 
@@ -975,6 +1183,20 @@ function formatQuantity(item: GroceryListItem) {
   }
 
   return [item.quantity, item.unit].filter((value) => value !== null).join(" ");
+}
+
+function formatPantryIntakeQuantity(item: PantryIntakeCandidate) {
+  if (item.preferredQuantityText) {
+    return item.preferredQuantityText;
+  }
+
+  if (item.quantity === null && !item.unit) {
+    return "Quantity needs review";
+  }
+
+  return [item.quantity, item.unit]
+    .filter((value) => value !== null && value !== "")
+    .join(" ");
 }
 
 function formatSourceLabel(source: GroceryListItem["sources"][number]) {
