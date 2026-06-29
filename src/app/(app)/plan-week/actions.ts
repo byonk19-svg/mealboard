@@ -10,6 +10,7 @@ import {
   buildRuleBasedMealSuggestions,
   buildRuleBasedSwapSuggestions
 } from "@/lib/meal-planning/rule-based-suggestions";
+import { getPantryUseSoonSignals } from "@/lib/pantry/data";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 import { getBabyFoodStatuses, getMealProfiles } from "@/lib/settings/data";
@@ -395,11 +396,19 @@ export async function confirmWeeklyPlanItemSwap(formData: FormData) {
     planWeekRedirect(weekStartDate, "That meal is no longer in the plan.", view);
   }
 
-  const [profileDays, goals, planItems, recipes, reviewSignals] = await Promise.all([
+  const [
+    profileDays,
+    goals,
+    planItems,
+    recipes,
+    pantryUseSoonSignals,
+    reviewSignals
+  ] = await Promise.all([
     getWeeklyPlanProfileDays(household.id, itemRow.weekly_plan_id),
     getWeeklyPlanGoals(household.id, itemRow.weekly_plan_id),
     getWeeklyPlanItems(household.id, itemRow.weekly_plan_id),
     getRecipes(household.id),
+    getPantryUseSoonSignals({ householdId: household.id }),
     getRecipeReviewSignals(household.id)
   ]);
   const targetItem = planItems.find((item) => item.id === itemId);
@@ -410,6 +419,7 @@ export async function confirmWeeklyPlanItemSwap(formData: FormData) {
 
   const selectedSuggestion = buildRuleBasedSwapSuggestions({
     goals: goals.map((goal) => goal.goal),
+    pantryUseSoonSignals,
     planItems,
     profileDays,
     recipes,
@@ -562,6 +572,7 @@ export async function addRuleBasedMealSuggestions(formData: FormData) {
     profileDays,
     goals,
     planItems,
+    pantryUseSoonSignals,
     recipes,
     reviewSignals
   ] = await Promise.all([
@@ -569,12 +580,14 @@ export async function addRuleBasedMealSuggestions(formData: FormData) {
     getWeeklyPlanProfileDays(household.id, weeklyPlan.id),
     getWeeklyPlanGoals(household.id, weeklyPlan.id),
     getWeeklyPlanItems(household.id, weeklyPlan.id),
+    getPantryUseSoonSignals({ householdId: household.id }),
     getRecipes(household.id),
     getRecipeReviewSignals(household.id)
   ]);
   const suggestions = buildRuleBasedMealSuggestions({
     goals: goals.map((goal) => goal.goal),
     planItems,
+    pantryUseSoonSignals,
     profileDays,
     profiles,
     recipes,
