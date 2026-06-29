@@ -1,6 +1,6 @@
 # MealBoard MVP Readiness
 
-This document captures the current private family MVP state after the rule-based suggestions, smart swaps, Plan Week profile view, saved-food administration, Preferences food creation, actionable dashboard queue, baby weekly-plan persistence, baby Try This status handoff, pending grocery-change review/apply flow, household member lifecycle prep, owner transfer, mobile grocery spotty-service retry, generic grocery-list copy support, emergency grocery backup text, recent completed-list access and unavailable-history recovery, PWA install metadata, weekly wrap-up expansion, review-informed suggestion scoring, structured recipe URL import/private Chrome capture, section-aware recipe instructions, hardening, and E2E smoke slices. It is a handoff snapshot for future Codex work so the next phase can build from known product truth instead of rediscovering the app.
+This document captures the current private family MVP state after the rule-based suggestions, smart swaps, Plan Week profile view, saved-food administration, Preferences food creation, actionable dashboard queue, baby weekly-plan persistence, baby Try This status handoff, pending grocery-change review/apply flow, household member lifecycle prep, owner transfer, mobile grocery spotty-service retry, generic grocery-list copy support, emergency grocery backup text, recent completed-list access and unavailable-history recovery, PWA install metadata, weekly wrap-up expansion, review-informed suggestion scoring, structured recipe URL import/private Chrome capture, section-aware recipe instructions, Smart Pantry stock/restock/intake review, Cooking Mode consumption review, decision actor attribution, hardening, and E2E smoke slices. It is a handoff snapshot for future Codex work so the next phase can build from known product truth instead of rediscovering the app.
 
 ## Current Status
 
@@ -33,6 +33,9 @@ The latest verified flow covers:
 - Advance a grocery list through Draft -> Finalized -> Shopping Started -> Completed.
 - Reopen a recent completed grocery list for source context or copying without changing current shopping state.
 - Recover from stale or unavailable completed grocery list links with a clear path back to the current grocery list and recent completed lists.
+- Review completed grocery-list pantry intake candidates and either confirm pantry stock creation or skip the item; the decision is household-scoped, actor-attributed when authenticated, and one decision is allowed per grocery list item.
+- Review Smart Pantry active stock, expiration status, low/out/manual restock candidates, event history, discard state, and add-restock-to-grocery-list behavior without hidden inventory writes.
+- Complete Cooking Mode sessions and review food-backed completed ingredient consumption candidates; confirming or skipping records an actor-attributed decision without deducting pantry stock.
 - Open the optional weekly wrap-up after completed shopping.
 - Capture made/skipped meal outcomes, leftovers, source-aware unused grocery notes, and hand source-aware staple adjustment intent to Settings for explicit review before any staple changes.
 - Confirm Dashboard reflects current week planning, grocery status, next best action, setup-aware and calorie-guidance needs-attention items, and wrap-up entry when eligible.
@@ -78,14 +81,17 @@ Use a linked local household user. Do not commit `.env.local`, `.env.cloud.local
     - Draft -> Finalized
     - Finalized -> Shopping Started
     - Shopping Started -> Completed
-23. Open `/dashboard`.
-24. Confirm current week, planning status, grocery status, next best action, needs-attention queue, and wrap-up entry are reasonable.
-25. After finalizing or starting shopping, change an approved planned meal, confirm Plan Week shows pending grocery changes, apply the reviewed grocery updates, and confirm manual items/check state are preserved where applicable.
-26. Open the weekly wrap-up, save one meal outcome with leftover context if prompted, acknowledge unused groceries with a future staple adjustment if prompted, confirm Settings opens a review banner instead of changing staples automatically, or dismiss it.
-27. Open `/settings/baby`, track a Try This food when one is available, and confirm it becomes a normal baby food status without adding it to groceries automatically.
-28. Open `/settings/foods`, create a household food with defaults, archive it, and restore it.
-29. Open `/settings/household` as the owner, link an existing unlinked auth user by email, transfer ownership to that member, sign in as the new owner, transfer ownership back, remove that non-owner member, then confirm the member no longer reaches household-scoped routes.
-30. Open `/manifest.webmanifest` and confirm install icons are served.
+23. Review the completed-list pantry intake panel, confirm one checked food-backed item into Smart Pantry, skip one item, and confirm neither grocery-list state nor unrelated pantry stock changes silently.
+24. Open `/pantry`, confirm the new pantry item, event history, expiration/stock status, and restock candidate behavior are understandable.
+25. Complete a Cooking Mode session with food-backed ingredients, review pantry consumption candidates, confirm one and skip one, and confirm pantry stock quantities are unchanged.
+26. Open `/dashboard`.
+27. Confirm current week, planning status, grocery status, next best action, needs-attention queue, and wrap-up entry are reasonable.
+28. After finalizing or starting shopping, change an approved planned meal, confirm Plan Week shows pending grocery changes, apply the reviewed grocery updates, and confirm manual items/check state are preserved where applicable.
+29. Open the weekly wrap-up, save one meal outcome with leftover context if prompted, acknowledge unused groceries with a future staple adjustment if prompted, confirm Settings opens a review banner instead of changing staples automatically, or dismiss it.
+30. Open `/settings/baby`, track a Try This food when one is available, and confirm it becomes a normal baby food status without adding it to groceries automatically.
+31. Open `/settings/foods`, create a household food with defaults, archive it, and restore it.
+32. Open `/settings/household` as the owner, link an existing unlinked auth user by email, transfer ownership to that member, sign in as the new owner, transfer ownership back, remove that non-owner member, then confirm the member no longer reaches household-scoped routes.
+33. Open `/manifest.webmanifest` and confirm install icons are served.
 
 ## Known Local Environment Note
 
@@ -115,7 +121,7 @@ These are intentionally out of scope for the current MVP unless a future task ex
 - AI meal planning or AI nutrition estimation
 - H-E-B integration, H-E-B-specific export, aisle mapping, or price behavior
 - Native iPhone or Android apps
-- Full pantry inventory, barcode scanning, expiration tracking, or reminders
+- Barcode scanning, expiration reminders/automation, or automatic pantry stock mutation
 - Recipe photos, full recipe-link automation, and public Chrome Web Store extension release
 - Full macro tracking, nutrition API integrations, strict warnings, or nutrition dashboards
 - Baby nutrition, milk intake, and reaction tracking
@@ -127,8 +133,12 @@ These are intentionally out of scope for the current MVP unless a future task ex
 
 Good next slices should stay narrow and start from the verified MVP loop. Candidate directions:
 
-- Member role editing beyond owner transfer and household switching
-- Broader PWA/mobile offline resilience for grocery shopping beyond bounded item-state retry
-- Email-delivered invitations if shared household use becomes frequent
+- Pantry-aware planning and use-soon suggestions from active pantry stock.
+- Explicit stock application from confirmed consumption decisions, but only after product rules define lot allocation, partial quantities, undo/reversal, and multi-lot matching.
+- Member role editing beyond owner transfer and household switching.
+- Broader PWA/mobile offline resilience for grocery shopping beyond bounded item-state retry.
+- Email-delivered invitations if shared household use becomes frequent.
 
 Prefer one focused slice at a time, and keep cloud Supabase migration pushes as explicit approval points.
+
+Recommendation: start with pantry-aware planning/use-soon signals before stock deduction. Deducting pantry stock from cooking is a separate product decision because lot allocation, partial use, undo, and multi-lot matching need explicit rules.
