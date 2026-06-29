@@ -179,3 +179,5 @@ The first implementation should be a narrow post-MVP slice:
 7. Add Pantry Event history for meaningful pantry changes.
 
 Smart Pantry V0 should respect the review-first pantry boundary: it shows and records pantry truth, but it does not automatically change grocery lists, cooking sessions, recipes, or planning suggestions.
+
+Future cooking-to-pantry stock writes must start from `docs/PANTRY_CONSUMPTION_STOCK_APPLICATION_V0_PRD.md` and remain separate from Smart Pantry V0 manual stock management.

@@ -37,7 +37,7 @@ Every Codex task should follow these rules:
 * Do not add AI features yet.
 * Do not add H-E-B integration yet.
 * Do not add recipe photos yet.
-* Do not add automatic pantry integrations beyond reviewed Smart Pantry, restock, intake, or consumption flows.
+* Do not add automatic pantry integrations beyond reviewed Smart Pantry, restock, intake, consumption, or explicitly reviewed stock-application flows.
 * Do not add reminders/notifications.
 * Do not add a native mobile app.
 * Prefer simple, readable, testable code.
@@ -1312,12 +1312,13 @@ bounded grocery item-state retry with manual recovery, generic grocery-list copy
 review-informed suggestion scoring, baby Try This status handoff, ingredient
 merge/split review controls, structured recipe URL import, private Chrome
 recipe capture extension, Smart Pantry stock/restock/intake review, Cooking Mode
-consumption review, pantry decision actor attribution, PWA install metadata, and
-the Next/PostCSS audit override are complete.
+consumption review, pantry decision actor attribution, pantry-aware planning
+use-soon suggestions, PWA install metadata, and the Next/PostCSS audit override
+are complete.
 For the current repo state, run focused follow-up slices in this order:
 
-1. **Pantry-aware planning refinement** - make the existing use-soon suggestion influence clearer only if real use shows the current `Uses pantry soon` reason chip is too subtle.
-2. **Explicit stock application from confirmed consumption decisions** - only after product rules define lot allocation, partial quantities, undo/reversal behavior, and multi-lot matching. Do not slip automatic stock deduction into review actions.
+1. **Pantry Consumption Stock Application V0, Issue 1** - start from `docs/PANTRY_CONSUMPTION_STOCK_APPLICATION_V0_PRD.md` and `docs/issues/PANTRY_CONSUMPTION_STOCK_APPLICATION_V0_ISSUES.md`; add only the schema/RLS foundation for explicit application, allocations, reversal, idempotency, and actor/audit history. Do not slip automatic stock deduction into confirm/skip review actions.
+2. **Pantry-aware planning refinement** - make the existing use-soon suggestion influence clearer only if real use shows the current `Uses pantry soon` reason chip is too subtle.
 3. **Household member lifecycle depth** - add role editing beyond ownership transfer and household switching only after shared household use proves it is needed.
 4. **PWA/mobile offline resilience** - improve grocery-list behavior beyond bounded item-state retry without adding broad offline sync.
 5. **Email-delivered invitations** - add invitation delivery only if shared household use becomes frequent enough to justify an email flow.

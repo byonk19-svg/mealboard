@@ -2120,14 +2120,18 @@ MealBoard MVP is technically done when:
 
 ## 42. Immediate Next Step
 
-After this technical plan is approved, create:
+Current post-MVP pantry and Cooking Mode slices are tracked in dedicated docs:
 
 ```txt
-docs/CODEX_TASKS.md
+docs/SMART_PANTRY_V0_PRD.md
+docs/COOKING_MODE_V0_PRD.md
+docs/PANTRY_CONSUMPTION_STOCK_APPLICATION_V0_PRD.md
 ```
 
-That document should break the first 5 Codex tasks into copy/paste prompts with acceptance criteria.
+For the next stock-writing pantry slice, start with:
 
-Recommended first actual Codex task:
+```txt
+docs/issues/PANTRY_CONSUMPTION_STOCK_APPLICATION_V0_ISSUES.md
+```
 
-> Create the new MealBoard repo foundation only. Do not build domain features yet.
+Do not implement pantry stock mutation from Cooking Mode until the stock-application rules define lot allocation, exact-unit behavior, partial quantities, multi-lot matching, undo/reversal, idempotency, actor/audit history, and household RLS.

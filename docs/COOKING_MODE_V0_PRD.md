@@ -176,3 +176,5 @@ The first implementation should be a narrow post-MVP slice:
 6. Add completion behavior that records made/tried evidence and supports later review.
 
 Cooking Mode V0 should respect the review-first pantry/cooking boundary: no pantry stock changes happen from ingredient checks, step checks, timer expiry, or session completion.
+
+Future stock application from confirmed cooking consumption decisions must start from `docs/PANTRY_CONSUMPTION_STOCK_APPLICATION_V0_PRD.md` and stay separate from confirm/skip review actions.
