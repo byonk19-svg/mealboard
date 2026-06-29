@@ -37,6 +37,7 @@ import {
 } from "@/lib/meal-planning/rule-based-suggestions";
 import { calculateCalorieTargetGuidance } from "@/lib/nutrition/calculate-calorie-target-guidance";
 import { calculateDailyNutritionTotals } from "@/lib/nutrition/calculate-daily-totals";
+import { getPantryUseSoonSignals } from "@/lib/pantry/data";
 import { getRecipes } from "@/lib/recipes/data";
 import {
   getBabyFoodStatuses,
@@ -124,6 +125,7 @@ export default async function PlanWeekPage({
     planItems,
     recipeOptions,
     recipes,
+    pantryUseSoonSignals,
     reviewSignals,
     staples,
     pendingGroceryChanges,
@@ -135,6 +137,7 @@ export default async function PlanWeekPage({
         getWeeklyPlanItems(householdContext.household.id, weeklyPlan.id),
         getPlanRecipeOptions(householdContext.household.id),
         getRecipes(householdContext.household.id),
+        getPantryUseSoonSignals({ householdId: householdContext.household.id }),
         getRecipeReviewSignals(householdContext.household.id),
         getStaples(householdContext.household.id),
         getPendingGroceryChangesForWeeklyPlan({
@@ -146,7 +149,7 @@ export default async function PlanWeekPage({
           weeklyPlan.id
         )
       ])
-    : [[], [], [], [], [], [], [], null, []];
+    : [[], [], [], [], [], [], [], [], null, []];
   const profileDayLookup = new Map(
     profileDays.map((day) => [
       `${day.meal_profile_id}:${day.plan_date}`,
@@ -176,6 +179,7 @@ export default async function PlanWeekPage({
     ? buildRuleBasedMealSuggestions({
         goals: goals.map((goal) => goal.goal),
         planItems,
+        pantryUseSoonSignals,
         profileDays,
         profiles,
         recipes,
@@ -187,6 +191,7 @@ export default async function PlanWeekPage({
   const swapSuggestions = selectedSwapItem
     ? buildRuleBasedSwapSuggestions({
         goals: goals.map((goal) => goal.goal),
+        pantryUseSoonSignals,
         planItems,
         profileDays,
         recipes,

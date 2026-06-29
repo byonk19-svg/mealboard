@@ -1316,7 +1316,7 @@ consumption review, pantry decision actor attribution, PWA install metadata, and
 the Next/PostCSS audit override are complete.
 For the current repo state, run focused follow-up slices in this order:
 
-1. **Pantry-aware planning/use-soon suggestions** - integrate the existing use-soon signal read model into planning or suggestion ranking with visible, reviewable explanation text.
+1. **Pantry-aware planning refinement** - make the existing use-soon suggestion influence clearer only if real use shows the current `Uses pantry soon` reason chip is too subtle.
 2. **Explicit stock application from confirmed consumption decisions** - only after product rules define lot allocation, partial quantities, undo/reversal behavior, and multi-lot matching. Do not slip automatic stock deduction into review actions.
 3. **Household member lifecycle depth** - add role editing beyond ownership transfer and household switching only after shared household use proves it is needed.
 4. **PWA/mobile offline resilience** - improve grocery-list behavior beyond bounded item-state retry without adding broad offline sync.

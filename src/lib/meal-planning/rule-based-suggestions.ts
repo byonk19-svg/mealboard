@@ -1,4 +1,5 @@
 import type { RecipeWithDetails, MealType } from "@/lib/recipes/types";
+import type { PantryUseSoonSignal } from "@/lib/pantry/use-soon-signals";
 import type {
   AdultDayType,
   WeeklyGoalType,
@@ -66,6 +67,8 @@ type ScoreRecipeInput = {
   adultDayType?: AdultDayType | null;
   currentWeekRecipeCount?: number;
   goals: WeeklyGoalType[];
+  pantryUseSoonSignals?: PantryUseSoonSignal[];
+  planDate?: string | null;
   profileId: string;
   recipe: RecipeWithDetails;
   requestedMealType: MealType;
@@ -75,6 +78,7 @@ type ScoreRecipeInput = {
 type BuildSuggestionsInput = {
   goals: WeeklyGoalType[];
   planItems: WeeklyPlanItem[];
+  pantryUseSoonSignals?: PantryUseSoonSignal[];
   profileDays: WeeklyPlanProfileDay[];
   profiles: SuggestionProfile[];
   recipes: RecipeWithDetails[];
@@ -84,6 +88,7 @@ type BuildSuggestionsInput = {
 
 type BuildSwapSuggestionsInput = {
   goals: WeeklyGoalType[];
+  pantryUseSoonSignals?: PantryUseSoonSignal[];
   planItems: WeeklyPlanItem[];
   profileDays: WeeklyPlanProfileDay[];
   recipes: RecipeWithDetails[];
@@ -106,6 +111,8 @@ export function scoreRecipeForMealSlot({
   adultDayType,
   currentWeekRecipeCount = 0,
   goals,
+  pantryUseSoonSignals = [],
+  planDate,
   profileId,
   recipe,
   requestedMealType,
@@ -214,6 +221,11 @@ export function scoreRecipeForMealSlot({
     reasonLabels.push("Too much last time");
   }
 
+  if (doesRecipeUsePantrySoon({ pantryUseSoonSignals, planDate, recipe })) {
+    score += 12;
+    reasonLabels.push("Uses pantry soon");
+  }
+
   if (currentWeekRecipeCount > 0) {
     score -= getCurrentWeekRepeatPenalty(recipe.repeat_rule);
     reasonLabels.push("Already planned this week");
@@ -230,6 +242,7 @@ export function scoreRecipeForMealSlot({
 export function buildRuleBasedMealSuggestions({
   goals,
   planItems,
+  pantryUseSoonSignals = [],
   profileDays,
   profiles,
   recipes,
@@ -269,6 +282,7 @@ export function buildRuleBasedMealSuggestions({
           dateKey,
           goals,
           mealType,
+          pantryUseSoonSignals,
           profile,
           recipes,
           currentWeekRecipeCounts,
@@ -291,6 +305,7 @@ export function buildRuleBasedMealSuggestions({
 
 export function buildRuleBasedSwapSuggestions({
   goals,
+  pantryUseSoonSignals = [],
   planItems,
   profileDays,
   recipes,
@@ -342,6 +357,8 @@ export function buildRuleBasedSwapSuggestions({
         adultDayType,
         currentWeekRecipeCount: currentWeekRecipeCounts.get(recipe.id) ?? 0,
         goals,
+        pantryUseSoonSignals,
+        planDate: targetItem.plan_date,
         profileId: targetItem.meal_profile_id ?? "",
         recipe,
         requestedMealType: targetItem.meal_type,
@@ -376,6 +393,7 @@ function getBestSuggestionForSlot({
   dateKey,
   goals,
   mealType,
+  pantryUseSoonSignals,
   profile,
   recipes,
   reviewSignalByRecipeProfile
@@ -385,6 +403,7 @@ function getBestSuggestionForSlot({
   dateKey: string;
   goals: WeeklyGoalType[];
   mealType: MealType;
+  pantryUseSoonSignals: PantryUseSoonSignal[];
   profile: SuggestionProfile;
   recipes: RecipeWithDetails[];
   reviewSignalByRecipeProfile: Map<string, RecipeReviewSignal>;
@@ -396,6 +415,8 @@ function getBestSuggestionForSlot({
         adultDayType,
         currentWeekRecipeCount: currentWeekRecipeCounts.get(recipe.id) ?? 0,
         goals,
+        pantryUseSoonSignals,
+        planDate: dateKey,
         profileId: profile.id,
         recipe,
         requestedMealType: mealType,
@@ -497,6 +518,41 @@ function getReviewSignal({
   }
 
   return reviewSignalByRecipeProfile.get(`${recipeId}:${profileId}`) ?? null;
+}
+
+function doesRecipeUsePantrySoon({
+  pantryUseSoonSignals,
+  planDate,
+  recipe
+}: {
+  pantryUseSoonSignals: PantryUseSoonSignal[];
+  planDate?: string | null;
+  recipe: RecipeWithDetails;
+}) {
+  if (pantryUseSoonSignals.length === 0 || recipe.ingredients.length === 0) {
+    return false;
+  }
+
+  const useSoonFoodIds = new Set(
+    pantryUseSoonSignals
+      .filter((signal) => isPantrySignalRelevantForPlanDate({ planDate, signal }))
+      .map((signal) => signal.foodId)
+  );
+
+  return recipe.ingredients.some(
+    (ingredient) =>
+      ingredient.food_id !== null && useSoonFoodIds.has(ingredient.food_id)
+  );
+}
+
+function isPantrySignalRelevantForPlanDate({
+  planDate,
+  signal
+}: {
+  planDate?: string | null;
+  signal: PantryUseSoonSignal;
+}) {
+  return !planDate || planDate <= signal.useByDate;
 }
 
 function compareScoredRecipes(

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RecipeWithDetails } from "@/lib/recipes/types";
+import type { PantryUseSoonSignal } from "@/lib/pantry/use-soon-signals";
 import type {
   WeeklyPlanItem,
   WeeklyPlanProfileDay
@@ -177,6 +178,141 @@ describe("scoreRecipeForMealSlot", () => {
       score: 73
     });
   });
+
+  it("boosts matching pantry use-soon food ids with an explainable label", () => {
+    const result = scoreRecipeForMealSlot({
+      goals: [],
+      pantryUseSoonSignals: [pantryUseSoonSignal({ foodId: "food-tortillas" })],
+      planDate: "2026-06-29",
+      profileId: "profile-brianna",
+      recipe: recipe({
+        ingredients: [
+          recipeIngredient({
+            display_name: "Tortillas",
+            food_id: "food-tortillas"
+          })
+        ]
+      }),
+      requestedMealType: "lunch"
+    });
+
+    expect(result).toMatchObject({
+      eligible: true,
+      reasonLabels: expect.arrayContaining(["Uses pantry soon"]),
+      score: 92
+    });
+  });
+
+  it("does not match pantry signals by ingredient display name", () => {
+    const result = scoreRecipeForMealSlot({
+      goals: [],
+      pantryUseSoonSignals: [
+        pantryUseSoonSignal({
+          foodId: "food-pantry-tortillas",
+          foodName: "Tortillas"
+        })
+      ],
+      planDate: "2026-06-29",
+      profileId: "profile-brianna",
+      recipe: recipe({
+        ingredients: [
+          recipeIngredient({
+            display_name: "Tortillas",
+            food_id: "food-recipe-tortillas",
+            food_name: "Tortillas"
+          })
+        ]
+      }),
+      requestedMealType: "lunch"
+    });
+
+    expect(result).toMatchObject({
+      eligible: true,
+      reasonLabels: expect.not.arrayContaining(["Uses pantry soon"]),
+      score: 80
+    });
+  });
+
+  it("does not let pantry use-soon signals bypass blockers", () => {
+    const pantryUseSoonSignals = [pantryUseSoonSignal({ foodId: "food-tortillas" })];
+    const matchingIngredient = recipeIngredient({ food_id: "food-tortillas" });
+
+    for (const blockedRecipe of [
+      recipe({
+        ingredients: [matchingIngredient],
+        status: "retired"
+      }),
+      recipe({
+        approvals: [
+          approval({
+            approved_for_planning: false,
+            meal_profile_id: "profile-brianna"
+          })
+        ],
+        ingredients: [matchingIngredient]
+      }),
+      recipe({
+        ingredients: [matchingIngredient],
+        meal_type: "dinner"
+      }),
+      recipe({
+        ingredients: [matchingIngredient],
+        preferenceEvaluations: [
+          {
+            mealProfileId: "profile-brianna",
+            mealProfileName: "Brianna",
+            evaluation: {
+              blocks: [
+                {
+                  foodId: "food-tortillas",
+                  foodName: "Tortillas",
+                  preference: "hard_no"
+                }
+              ],
+              status: "blocked",
+              warnings: []
+            }
+          }
+        ]
+      })
+    ]) {
+      const result = scoreRecipeForMealSlot({
+        goals: [],
+        pantryUseSoonSignals,
+        planDate: "2026-06-29",
+        profileId: "profile-brianna",
+        recipe: blockedRecipe,
+        requestedMealType: "lunch"
+      });
+
+      expect(result.eligible).toBe(false);
+      expect(result.reasonLabels).not.toContain("Uses pantry soon");
+    }
+  });
+
+  it("does not boost pantry use-soon recipes after the signal use-by date", () => {
+    const result = scoreRecipeForMealSlot({
+      goals: [],
+      pantryUseSoonSignals: [
+        pantryUseSoonSignal({
+          foodId: "food-tortillas",
+          useByDate: "2026-06-30"
+        })
+      ],
+      planDate: "2026-07-07",
+      profileId: "profile-brianna",
+      recipe: recipe({
+        ingredients: [recipeIngredient({ food_id: "food-tortillas" })]
+      }),
+      requestedMealType: "lunch"
+    });
+
+    expect(result).toMatchObject({
+      eligible: true,
+      reasonLabels: expect.not.arrayContaining(["Uses pantry soon"]),
+      score: 80
+    });
+  });
 });
 
 describe("buildRuleBasedSwapSuggestions", () => {
@@ -216,6 +352,40 @@ describe("buildRuleBasedSwapSuggestions", () => {
       "alpha"
     ]);
     expect(suggestions[0]?.reasonLabels).toContain("High protein");
+  });
+
+  it("uses pantry use-soon signals when ranking swaps", () => {
+    const target = planItem({
+      id: "target",
+      recipe_id: "current-recipe"
+    });
+    const suggestions = buildRuleBasedSwapSuggestions({
+      goals: [],
+      pantryUseSoonSignals: [pantryUseSoonSignal({ foodId: "food-beans" })],
+      planItems: [target],
+      profileDays: [],
+      recipes: [
+        recipe({ id: "current-recipe", name: "Current Wrap" }),
+        recipe({
+          id: "alpha",
+          ingredients: [recipeIngredient({ food_id: "food-other" })],
+          name: "Alpha Wrap"
+        }),
+        recipe({
+          id: "beans",
+          ingredients: [recipeIngredient({ food_id: "food-beans" })],
+          name: "Bean Wrap"
+        })
+      ],
+      targetItem: target
+    });
+
+    expect(suggestions.map((suggestion) => suggestion.recipeId)).toEqual([
+      "beans",
+      "alpha"
+    ]);
+    expect(suggestions[0]?.reasonLabels).toContain("Uses pantry soon");
+    expect(suggestions[0]?.whyThis).toContain("Uses pantry soon");
   });
 
   it("returns no suggestions for locked, try-this, baby, or recipe-less items", () => {
@@ -442,6 +612,176 @@ describe("buildRuleBasedMealSuggestions", () => {
 
     expect(suggestions[0]?.recipeId).toBe("clean-recipe");
   });
+
+  it("ranks matching pantry use-soon recipes above otherwise equal alternatives", () => {
+    const suggestions = buildRuleBasedMealSuggestions({
+      goals: [],
+      pantryUseSoonSignals: [
+        pantryUseSoonSignal({
+          foodId: "food-beans",
+          useByDate: "2026-06-23"
+        })
+      ],
+      planItems: [],
+      profileDays: [
+        profileDay({
+          adult_day_type: "off_day",
+          meal_profile_id: "profile-brianna",
+          plan_date: "2026-06-22"
+        })
+      ],
+      profiles: [
+        {
+          id: "profile-brianna",
+          name: "Brianna",
+          profile_type: "adult"
+        }
+      ],
+      recipes: [
+        recipe({
+          id: "alpha",
+          ingredients: [recipeIngredient({ food_id: "food-other" })],
+          meal_type: "dinner",
+          name: "Alpha Dinner"
+        }),
+        recipe({
+          id: "beans",
+          ingredients: [recipeIngredient({ food_id: "food-beans" })],
+          meal_type: "dinner",
+          name: "Bean Dinner"
+        })
+      ],
+      weekDateKeys: ["2026-06-22"]
+    });
+
+    expect(suggestions[0]).toMatchObject({
+      reasonLabels: expect.arrayContaining(["Uses pantry soon"]),
+      recipeId: "beans",
+      score: 92
+    });
+  });
+
+  it("does not rank pantry use-soon recipes above ties for later plan dates", () => {
+    const suggestions = buildRuleBasedMealSuggestions({
+      goals: [],
+      pantryUseSoonSignals: [
+        pantryUseSoonSignal({
+          foodId: "food-beans",
+          useByDate: "2026-06-30"
+        })
+      ],
+      planItems: [],
+      profileDays: [
+        profileDay({
+          adult_day_type: "off_day",
+          meal_profile_id: "profile-brianna",
+          plan_date: "2026-07-07"
+        })
+      ],
+      profiles: [
+        {
+          id: "profile-brianna",
+          name: "Brianna",
+          profile_type: "adult"
+        }
+      ],
+      recipes: [
+        recipe({
+          id: "alpha",
+          ingredients: [recipeIngredient({ food_id: "food-other" })],
+          meal_type: "dinner",
+          name: "Alpha Dinner"
+        }),
+        recipe({
+          id: "beans",
+          ingredients: [recipeIngredient({ food_id: "food-beans" })],
+          meal_type: "dinner",
+          name: "Bean Dinner"
+        })
+      ],
+      weekDateKeys: ["2026-07-07"]
+    });
+
+    expect(suggestions[0]?.recipeId).toBe("alpha");
+    expect(suggestions[0]?.reasonLabels).not.toContain("Uses pantry soon");
+  });
+
+  it("keeps stable recipe ordering when pantry signals are absent", () => {
+    const suggestions = buildRuleBasedMealSuggestions({
+      goals: [],
+      planItems: [],
+      profileDays: [
+        profileDay({
+          adult_day_type: "off_day",
+          meal_profile_id: "profile-brianna",
+          plan_date: "2026-06-22"
+        })
+      ],
+      profiles: [
+        {
+          id: "profile-brianna",
+          name: "Brianna",
+          profile_type: "adult"
+        }
+      ],
+      recipes: [
+        recipe({
+          id: "zeta",
+          meal_type: "dinner",
+          name: "Zeta Dinner"
+        }),
+        recipe({
+          id: "alpha",
+          meal_type: "dinner",
+          name: "Alpha Dinner"
+        })
+      ],
+      weekDateKeys: ["2026-06-22"]
+    });
+
+    expect(suggestions[0]?.recipeId).toBe("alpha");
+    expect(suggestions[0]?.reasonLabels).not.toContain("Uses pantry soon");
+  });
+
+  it("keeps stable tie ordering when pantry signals boost multiple recipes", () => {
+    const suggestions = buildRuleBasedMealSuggestions({
+      goals: [],
+      pantryUseSoonSignals: [pantryUseSoonSignal({ foodId: "food-beans" })],
+      planItems: [],
+      profileDays: [
+        profileDay({
+          adult_day_type: "off_day",
+          meal_profile_id: "profile-brianna",
+          plan_date: "2026-06-22"
+        })
+      ],
+      profiles: [
+        {
+          id: "profile-brianna",
+          name: "Brianna",
+          profile_type: "adult"
+        }
+      ],
+      recipes: [
+        recipe({
+          id: "zeta",
+          ingredients: [recipeIngredient({ food_id: "food-beans" })],
+          meal_type: "dinner",
+          name: "Zeta Dinner"
+        }),
+        recipe({
+          id: "alpha",
+          ingredients: [recipeIngredient({ food_id: "food-beans" })],
+          meal_type: "dinner",
+          name: "Alpha Dinner"
+        })
+      ],
+      weekDateKeys: ["2026-06-22"]
+    });
+
+    expect(suggestions[0]?.recipeId).toBe("alpha");
+    expect(suggestions[0]?.reasonLabels).toContain("Uses pantry soon");
+  });
 });
 
 function recipe(overrides: Partial<RecipeWithDetails> = {}): RecipeWithDetails {
@@ -496,6 +836,54 @@ function approval(
     rating: "like",
     recipe_id: "recipe-1",
     status: "approved",
+    ...overrides
+  };
+}
+
+function recipeIngredient(
+  overrides: Partial<RecipeWithDetails["ingredients"][number]> = {}
+): RecipeWithDetails["ingredients"][number] {
+  return {
+    display_name: "Tortillas",
+    food_id: "food-tortillas",
+    food_name: "Tortillas",
+    grocery_category_id: null,
+    grocery_category_name: null,
+    household_id: "household-1",
+    id: "ingredient-1",
+    notes: null,
+    optional: false,
+    preparation: null,
+    quantity: null,
+    recipe_id: "recipe-1",
+    sort_order: 0,
+    unit: null,
+    ...overrides
+  };
+}
+
+function pantryUseSoonSignal(
+  overrides: Partial<PantryUseSoonSignal> = {}
+): PantryUseSoonSignal {
+  return {
+    daysUntilExpiration: 1,
+    expirationStatus: "expiring_soon",
+    foodId: "food-tortillas",
+    foodName: "Tortillas",
+    groceryCategoryId: null,
+    groceryCategoryName: null,
+    itemDisplayNames: ["Tortillas"],
+    lotCount: 1,
+    mealProfileContexts: [
+      {
+        mealProfileId: null,
+        mealProfileName: null
+      }
+    ],
+    pantryItemIds: ["pantry-item-1"],
+    reasonLabels: ["Use soon"],
+    urgency: "soon",
+    useByDate: "2026-06-30",
     ...overrides
   };
 }
