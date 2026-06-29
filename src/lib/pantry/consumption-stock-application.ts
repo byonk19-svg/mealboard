@@ -116,6 +116,7 @@ export type PantryConsumptionStockValidatedAllocation = {
   pantryItemId: string;
   pantryQuantityAfter: number;
   pantryQuantityBefore: number;
+  pantryUpdatedAt: string;
   quantity: number;
   unit: string;
 };
@@ -348,6 +349,7 @@ export function validatePantryConsumptionStockAllocations({
           pantryItemId: item.id,
           pantryQuantityAfter: subtractQuantity(item.quantity, quantity),
           pantryQuantityBefore: item.quantity,
+          pantryUpdatedAt: item.updatedAt,
           quantity,
           unit
         });

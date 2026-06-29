@@ -357,6 +357,7 @@ describe("validatePantryConsumptionStockAllocations", () => {
           pantryItemId: "lot-1",
           pantryQuantityAfter: 1,
           pantryQuantityBefore: 3,
+          pantryUpdatedAt: "2026-06-29T12:00:00Z",
           quantity: 2,
           unit: "count"
         }
