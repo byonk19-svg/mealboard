@@ -4,6 +4,7 @@ import {
   abandonCookingSessionAction,
   cancelCookingTimerAction,
   completeCookingSessionAction,
+  confirmPantryConsumptionCandidateAction,
   createCookingTimerAction,
   dismissCookingTimerAction,
   pauseCookingSessionAction,
@@ -13,6 +14,7 @@ import {
   setCurrentStepAction,
   setIngredientReadyAction,
   setStepCheckedAction,
+  skipPantryConsumptionCandidateAction,
   startCookingSessionAction,
   startCookingTimerAction
 } from "@/app/(app)/recipes/[recipeId]/cook/actions";
@@ -27,6 +29,8 @@ import type {
   CookingSessionIngredient,
   CookingTimer
 } from "@/lib/cooking-mode/types";
+import { getPantryConsumptionCandidates } from "@/lib/pantry/data";
+import type { PantryConsumptionCandidate } from "@/lib/pantry/consumption-candidates";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 
 type CookingModePageProps = {
@@ -82,6 +86,13 @@ export default async function CookingModePage({
         sessionId: session.id
       })
     : null;
+  const consumptionCandidates =
+    session?.status === "completed"
+      ? await getPantryConsumptionCandidates({
+          cookingSessionId: session.id,
+          householdId: householdContext.household.id
+        })
+      : [];
 
   return (
     <section className="space-y-6">
@@ -153,7 +164,17 @@ export default async function CookingModePage({
             )}
           </div>
           {isTerminalSession(session) ? (
-            <ReadOnlySessionDetails session={session} />
+            <>
+              <ReadOnlySessionDetails session={session} />
+              {session.status === "completed" ? (
+                <PantryConsumptionReviewSection
+                  candidates={consumptionCandidates}
+                  plannedMealId={plannedMealId ?? null}
+                  recipeId={recipe.id}
+                  sessionId={session.id}
+                />
+              ) : null}
+            </>
           ) : (
             <>
               <TimerPanel
@@ -707,6 +728,123 @@ function ReadOnlySessionDetails({ session }: { session: CookingSession }) {
   );
 }
 
+function PantryConsumptionReviewSection({
+  candidates,
+  plannedMealId,
+  recipeId,
+  sessionId
+}: {
+  candidates: PantryConsumptionCandidate[];
+  plannedMealId: string | null;
+  recipeId: string;
+  sessionId: string;
+}) {
+  const candidate = candidates[0] ?? null;
+
+  return (
+    <section className="calm-card p-5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="calm-heading text-xl">Pantry consumption review</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+            Food-backed ingredients from this completed session can be reviewed
+            for pantry consumption. Confirming or skipping records only a review
+            decision; pantry stock stays unchanged.
+          </p>
+        </div>
+        <span className="text-sm text-muted-foreground">
+          {formatItemCount(candidates.length)}
+        </span>
+      </div>
+
+      {!candidate ? (
+        <div className="mt-4 rounded-lg border border-border bg-muted/40 px-3 py-3">
+          <h3 className="font-bold text-primary">
+            No pantry consumption candidates left.
+          </h3>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">
+            Ingredients without a linked household item and already reviewed
+            ingredients do not appear here.
+          </p>
+        </div>
+      ) : (
+        <article className="mt-4 rounded-lg border border-border bg-muted/30 p-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h3 className="text-lg font-bold text-primary">
+                {candidate.displayName}
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {formatConsumptionCandidateDetails(candidate)}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Source: {candidate.recipeNameSnapshot}
+              </p>
+            </div>
+            {candidates.length > 1 ? (
+              <span className="text-sm text-muted-foreground">
+                {formatItemCount(candidates.length - 1)} after this
+              </span>
+            ) : null}
+          </div>
+
+          <form
+            action={confirmPantryConsumptionCandidateAction}
+            className="mt-4 space-y-3"
+          >
+            <CommonInputs
+              plannedMealId={plannedMealId}
+              recipeId={recipeId}
+              sessionId={sessionId}
+            />
+            <input
+              name="cookingSessionIngredientId"
+              type="hidden"
+              value={candidate.cookingSessionIngredientId}
+            />
+            <label className="block text-sm font-medium">
+              Review note
+              <input
+                className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                name="note"
+                placeholder="Used from pantry, bought fresh, partial package"
+                type="text"
+              />
+            </label>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <button
+                className="min-h-11 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/95"
+                type="submit"
+              >
+                Confirm consumption
+              </button>
+            </div>
+          </form>
+
+          <form action={skipPantryConsumptionCandidateAction} className="mt-3">
+            <CommonInputs
+              plannedMealId={plannedMealId}
+              recipeId={recipeId}
+              sessionId={sessionId}
+            />
+            <input
+              name="cookingSessionIngredientId"
+              type="hidden"
+              value={candidate.cookingSessionIngredientId}
+            />
+            <button
+              className="min-h-11 w-full rounded-md border border-primary/30 px-4 py-2 text-sm font-semibold text-primary hover:border-primary hover:bg-muted sm:w-auto"
+              type="submit"
+            >
+              Skip this ingredient
+            </button>
+          </form>
+        </article>
+      )}
+    </section>
+  );
+}
+
 function ReadOnlyMetric({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-lg border border-border bg-background/70 p-3">
@@ -908,6 +1046,25 @@ function formatIngredient(ingredient: CookingSessionIngredient) {
   ]
     .filter((value) => value !== null && value !== "")
     .join(" ");
+}
+
+function formatConsumptionCandidateDetails(candidate: PantryConsumptionCandidate) {
+  const quantity = [candidate.quantity, candidate.unit]
+    .filter((value) => value !== null && value !== "")
+    .join(" ");
+  const parts = [
+    quantity || null,
+    candidate.foodName,
+    candidate.preparation,
+    candidate.optional ? "Optional" : null,
+    candidate.isReady ? "Marked ready" : "Not marked ready"
+  ].filter(Boolean);
+
+  return parts.join(" - ");
+}
+
+function formatItemCount(value: number) {
+  return `${value} ${value === 1 ? "item" : "items"}`;
 }
 
 function formatTimer(timer: CookingTimer) {

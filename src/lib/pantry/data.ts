@@ -15,6 +15,12 @@ import {
   type PantryIntakeGroceryList
 } from "./intake-candidates";
 import {
+  buildPantryConsumptionCandidates,
+  type PantryConsumptionCandidate,
+  type PantryConsumptionCookingSession,
+  type PantryConsumptionDecision
+} from "./consumption-candidates";
+import {
   buildConfirmedPantryIntakeDecisionInsert,
   buildPantryItemInputFromIntakeCandidate,
   buildSkippedPantryIntakeDecisionInsert,
@@ -22,6 +28,12 @@ import {
   type PantryIntakeConfirmResult,
   type PantryIntakeSkipResult
 } from "./intake-review";
+import {
+  buildConfirmedPantryConsumptionDecisionInsert,
+  buildSkippedPantryConsumptionDecisionInsert,
+  type PantryConsumptionConfirmResult,
+  type PantryConsumptionSkipResult
+} from "./consumption-review";
 import type {
   NormalizedPantryItemInput,
   PantryEvent,
@@ -118,6 +130,37 @@ type PantryIntakeDecisionRow = {
   created_pantry_item_id: string | null;
   grocery_list_item_id: string;
   status: PantryIntakeDecision["status"];
+};
+
+type PantryConsumptionDecisionRow = {
+  cooking_session_ingredient_id: string;
+  status: PantryConsumptionDecision["status"];
+};
+
+type PantryConsumptionCookingSessionRow = {
+  completed_at: string | null;
+  cooking_session_ingredients: Array<{
+    display_name: string;
+    food_id: string | null;
+    foods: JoinedName;
+    id: string;
+    is_ready: boolean;
+    notes: string | null;
+    optional: boolean;
+    preparation: string | null;
+    quantity: number | string | null;
+    ready_at: string | null;
+    sort_order: number;
+    unit: string | null;
+  }> | null;
+  created_at: string;
+  id: string;
+  recipe_id: string;
+  recipe_name_snapshot: string;
+  scale_factor_snapshot: number | string;
+  servings_snapshot: number | string | null;
+  started_at: string;
+  status: PantryConsumptionCookingSession["status"];
 };
 
 type GroceryItemSourceRow = {
@@ -237,6 +280,47 @@ export async function getPantryIntakeCandidatesWithClient({
       }))
     }))
   });
+}
+
+export async function getPantryConsumptionCandidates({
+  cookingSessionId,
+  householdId
+}: {
+  cookingSessionId?: string | null;
+  householdId: string;
+}) {
+  const supabase = await createClient();
+  return getPantryConsumptionCandidatesWithClient({
+    cookingSessionId,
+    householdId,
+    supabase
+  });
+}
+
+export async function getPantryConsumptionCandidatesWithClient({
+  cookingSessionId,
+  householdId,
+  supabase
+}: {
+  cookingSessionId?: string | null;
+  householdId: string;
+  supabase: SupabaseClient;
+}): Promise<PantryConsumptionCandidate[]> {
+  const cookingSessions = await getCompletedCookingSessionsForPantryConsumption({
+    cookingSessionId,
+    householdId,
+    supabase
+  });
+  const ingredientIds = cookingSessions.flatMap((session) =>
+    session.ingredients.map((ingredient) => ingredient.id)
+  );
+  const decisions = await getPantryConsumptionDecisionsByIngredientIds({
+    cookingSessionIngredientIds: ingredientIds,
+    householdId,
+    supabase
+  });
+
+  return buildPantryConsumptionCandidates({ cookingSessions, decisions });
 }
 
 export async function confirmPantryIntakeCandidate({
@@ -423,6 +507,154 @@ export async function skipPantryIntakeCandidateWithClient({
   }
 
   return { groceryListItemId, status: "skipped" };
+}
+
+export async function confirmPantryConsumptionCandidate({
+  cookingSessionIngredientId,
+  householdId,
+  note
+}: {
+  cookingSessionIngredientId: string;
+  householdId: string;
+  note?: string | null;
+}): Promise<PantryConsumptionConfirmResult> {
+  const supabase = await createClient();
+  return confirmPantryConsumptionCandidateWithClient({
+    cookingSessionIngredientId,
+    householdId,
+    note,
+    supabase
+  });
+}
+
+export async function confirmPantryConsumptionCandidateWithClient({
+  cookingSessionIngredientId,
+  householdId,
+  note,
+  supabase
+}: {
+  cookingSessionIngredientId: string;
+  householdId: string;
+  note?: string | null;
+  supabase: SupabaseClient;
+}): Promise<PantryConsumptionConfirmResult> {
+  const existingDecision = await getPantryConsumptionDecisionByIngredientId({
+    cookingSessionIngredientId,
+    householdId,
+    supabase
+  });
+
+  if (existingDecision) {
+    if (existingDecision.status === "confirmed") {
+      return { cookingSessionIngredientId, status: "already_confirmed" };
+    }
+
+    throw new Error("That cooking ingredient was already skipped for pantry review.");
+  }
+
+  await getSinglePantryConsumptionCandidate({
+    cookingSessionIngredientId,
+    householdId,
+    supabase
+  });
+
+  const { error } = await supabase.from("pantry_consumption_decisions").insert(
+    buildConfirmedPantryConsumptionDecisionInsert({
+      cookingSessionIngredientId,
+      householdId,
+      note
+    })
+  );
+
+  if (error) {
+    const finalDecision = await getPantryConsumptionDecisionByIngredientId({
+      cookingSessionIngredientId,
+      householdId,
+      supabase
+    });
+
+    if (finalDecision?.status === "confirmed") {
+      return { cookingSessionIngredientId, status: "already_confirmed" };
+    }
+
+    throw new Error(error.message);
+  }
+
+  return { cookingSessionIngredientId, status: "confirmed" };
+}
+
+export async function skipPantryConsumptionCandidate({
+  cookingSessionIngredientId,
+  householdId,
+  note
+}: {
+  cookingSessionIngredientId: string;
+  householdId: string;
+  note?: string | null;
+}): Promise<PantryConsumptionSkipResult> {
+  const supabase = await createClient();
+  return skipPantryConsumptionCandidateWithClient({
+    cookingSessionIngredientId,
+    householdId,
+    note,
+    supabase
+  });
+}
+
+export async function skipPantryConsumptionCandidateWithClient({
+  cookingSessionIngredientId,
+  householdId,
+  note,
+  supabase
+}: {
+  cookingSessionIngredientId: string;
+  householdId: string;
+  note?: string | null;
+  supabase: SupabaseClient;
+}): Promise<PantryConsumptionSkipResult> {
+  const existingDecision = await getPantryConsumptionDecisionByIngredientId({
+    cookingSessionIngredientId,
+    householdId,
+    supabase
+  });
+
+  if (existingDecision) {
+    if (existingDecision.status === "skipped") {
+      return { cookingSessionIngredientId, status: "already_skipped" };
+    }
+
+    throw new Error("That cooking ingredient was already confirmed for pantry review.");
+  }
+
+  await getSinglePantryConsumptionCandidate({
+    cookingSessionIngredientId,
+    householdId,
+    supabase
+  });
+
+  const { error } = await supabase.from("pantry_consumption_decisions").insert(
+    buildSkippedPantryConsumptionDecisionInsert({
+      cookingSessionIngredientId,
+      householdId,
+      note
+    })
+  );
+
+  if (error) {
+    const finalDecision = await getPantryConsumptionDecisionByIngredientId({
+      cookingSessionIngredientId,
+      householdId,
+      supabase
+    });
+
+    if (finalDecision?.status === "skipped") {
+      return { cookingSessionIngredientId, status: "already_skipped" };
+    }
+
+    throw new Error(error.message);
+  }
+
+  return { cookingSessionIngredientId, status: "skipped" };
 }
 
 export async function addPantryRestockCandidateToGroceryList({
@@ -863,6 +1095,49 @@ async function getSinglePantryIntakeCandidate({
   return candidate;
 }
 
+async function getSinglePantryConsumptionCandidate({
+  cookingSessionIngredientId,
+  householdId,
+  supabase
+}: {
+  cookingSessionIngredientId: string;
+  householdId: string;
+  supabase: SupabaseClient;
+}) {
+  const { data, error } = await supabase
+    .from("cooking_session_ingredients")
+    .select("cooking_session_id")
+    .eq("household_id", householdId)
+    .eq("id", cookingSessionIngredientId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const cookingSessionId = data?.cooking_session_id as string | undefined;
+
+  if (!cookingSessionId) {
+    throw new Error("That cooking ingredient is no longer available.");
+  }
+
+  const candidates = await getPantryConsumptionCandidatesWithClient({
+    cookingSessionId,
+    householdId,
+    supabase
+  });
+  const candidate = candidates.find(
+    (consumptionCandidate) =>
+      consumptionCandidate.cookingSessionIngredientId === cookingSessionIngredientId
+  );
+
+  if (!candidate) {
+    throw new Error("That cooking ingredient is not available for pantry review.");
+  }
+
+  return candidate;
+}
+
 async function getCompletedGroceryListsForPantryIntake({
   groceryListId,
   householdId,
@@ -915,6 +1190,65 @@ async function getCompletedGroceryListsForPantryIntake({
     status: list.status,
     weekStartDate: getJoinedWeekStartDate(list.weekly_plans)
   }));
+}
+
+async function getCompletedCookingSessionsForPantryConsumption({
+  cookingSessionId,
+  householdId,
+  supabase
+}: {
+  cookingSessionId?: string | null;
+  householdId: string;
+  supabase: SupabaseClient;
+}): Promise<PantryConsumptionCookingSession[]> {
+  let query = supabase
+    .from("cooking_sessions")
+    .select(
+      "id, recipe_id, status, recipe_name_snapshot, servings_snapshot, scale_factor_snapshot, started_at, completed_at, created_at, cooking_session_ingredients(id, food_id, display_name, quantity, unit, preparation, notes, optional, sort_order, is_ready, ready_at, foods(name))"
+    )
+    .eq("household_id", householdId)
+    .eq("status", "completed")
+    .order("completed_at", { ascending: false, nullsFirst: false });
+
+  if (cookingSessionId) {
+    query = query.eq("id", cookingSessionId);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data ?? []) as PantryConsumptionCookingSessionRow[]).map(
+    (session) => ({
+      completedAt: session.completed_at,
+      createdAt: session.created_at,
+      id: session.id,
+      ingredients: (session.cooking_session_ingredients ?? []).map(
+        (ingredient) => ({
+          displayName: ingredient.display_name,
+          foodId: ingredient.food_id,
+          foodName: getOptionalJoinedName(ingredient.foods),
+          id: ingredient.id,
+          isReady: ingredient.is_ready,
+          notes: ingredient.notes,
+          optional: ingredient.optional,
+          preparation: ingredient.preparation,
+          quantity: toNullableNumber(ingredient.quantity),
+          readyAt: ingredient.ready_at,
+          sortOrder: ingredient.sort_order,
+          unit: ingredient.unit
+        })
+      ),
+      recipeId: session.recipe_id,
+      recipeNameSnapshot: session.recipe_name_snapshot,
+      scaleFactorSnapshot: Number(session.scale_factor_snapshot),
+      servingsSnapshot: toNullableNumber(session.servings_snapshot),
+      startedAt: session.started_at,
+      status: session.status
+    })
+  );
 }
 
 async function getGroceryItemSourcesByItemIds({
@@ -1014,6 +1348,58 @@ async function getPantryIntakeDecisionByItemId({
   }
 
   return data as PantryIntakeDecisionRow | null;
+}
+
+async function getPantryConsumptionDecisionsByIngredientIds({
+  cookingSessionIngredientIds,
+  householdId,
+  supabase
+}: {
+  cookingSessionIngredientIds: string[];
+  householdId: string;
+  supabase: SupabaseClient;
+}): Promise<PantryConsumptionDecision[]> {
+  if (cookingSessionIngredientIds.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from("pantry_consumption_decisions")
+    .select("cooking_session_ingredient_id, status")
+    .eq("household_id", householdId)
+    .in("cooking_session_ingredient_id", cookingSessionIngredientIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data ?? []) as PantryConsumptionDecisionRow[]).map((decision) => ({
+    cookingSessionIngredientId: decision.cooking_session_ingredient_id,
+    status: decision.status
+  }));
+}
+
+async function getPantryConsumptionDecisionByIngredientId({
+  cookingSessionIngredientId,
+  householdId,
+  supabase
+}: {
+  cookingSessionIngredientId: string;
+  householdId: string;
+  supabase: SupabaseClient;
+}) {
+  const { data, error } = await supabase
+    .from("pantry_consumption_decisions")
+    .select("cooking_session_ingredient_id, status")
+    .eq("household_id", householdId)
+    .eq("cooking_session_ingredient_id", cookingSessionIngredientId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data as PantryConsumptionDecisionRow | null;
 }
 
 async function getEditableGroceryListsWithClient({

@@ -18,6 +18,10 @@ import {
   updateCookingSessionCurrentStep,
   updateCookingSessionNotes
 } from "@/lib/cooking-mode/data";
+import {
+  confirmPantryConsumptionCandidate,
+  skipPantryConsumptionCandidate
+} from "@/lib/pantry/data";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 
 function textOrNull(value: FormDataEntryValue | null) {
@@ -233,6 +237,68 @@ export async function abandonCookingSessionAction(formData: FormData) {
   await abandonCookingSession({ householdId: household.id, sessionId });
   revalidatePath(cookPath(recipeId, plannedMealId));
   cookRedirect(recipeId, "Cooking session abandoned.", plannedMealId, sessionId);
+}
+
+export async function confirmPantryConsumptionCandidateAction(formData: FormData) {
+  const { plannedMealId, recipeId, sessionId } = parseCommon(formData);
+  const cookingSessionIngredientId = textOrNull(
+    formData.get("cookingSessionIngredientId")
+  );
+
+  if (!sessionId || !cookingSessionIngredientId) {
+    cookRedirect(recipeId, "Choose a cooking ingredient first.", plannedMealId, sessionId);
+  }
+
+  const household = await requireHousehold(recipeId, plannedMealId);
+
+  try {
+    await confirmPantryConsumptionCandidate({
+      cookingSessionIngredientId,
+      householdId: household.id,
+      note: textOrNull(formData.get("note"))
+    });
+  } catch (error) {
+    cookRedirect(
+      recipeId,
+      error instanceof Error ? error.message : "Consumption review failed.",
+      plannedMealId,
+      sessionId
+    );
+  }
+
+  revalidatePath(cookPath(recipeId, plannedMealId));
+  cookRedirect(recipeId, "Consumption confirmed.", plannedMealId, sessionId);
+}
+
+export async function skipPantryConsumptionCandidateAction(formData: FormData) {
+  const { plannedMealId, recipeId, sessionId } = parseCommon(formData);
+  const cookingSessionIngredientId = textOrNull(
+    formData.get("cookingSessionIngredientId")
+  );
+
+  if (!sessionId || !cookingSessionIngredientId) {
+    cookRedirect(recipeId, "Choose a cooking ingredient first.", plannedMealId, sessionId);
+  }
+
+  const household = await requireHousehold(recipeId, plannedMealId);
+
+  try {
+    await skipPantryConsumptionCandidate({
+      cookingSessionIngredientId,
+      householdId: household.id,
+      note: textOrNull(formData.get("note"))
+    });
+  } catch (error) {
+    cookRedirect(
+      recipeId,
+      error instanceof Error ? error.message : "Consumption review failed.",
+      plannedMealId,
+      sessionId
+    );
+  }
+
+  revalidatePath(cookPath(recipeId, plannedMealId));
+  cookRedirect(recipeId, "Consumption skipped.", plannedMealId, sessionId);
 }
 
 export async function createCookingTimerAction(formData: FormData) {
