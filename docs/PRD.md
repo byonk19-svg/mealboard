@@ -84,10 +84,10 @@ The MVP should **not** include:
 * Store price tracking.
 * Budget/cost tracking.
 * Barcode scanning.
-* Full pantry inventory.
-* Expiration tracking.
+* Smart Pantry in the MVP; Smart Pantry remains a post-MVP reviewed domain.
+* Automatic expiration tracking or reminders.
 * Push notifications, email reminders, or planning nudges.
-* Full cooking mode with checkable steps.
+* Cooking Mode in the MVP; Cooking Mode remains a post-MVP reviewed domain.
 * Public multi-household signup flow.
 * Complex ingredient alias logic.
 * Full recipe-link import that tries to automatically clean up every website without review.
@@ -742,7 +742,7 @@ Weekly wrap-up should also prompt for unreviewed tried meals.
 
 MVP should store and display recipe instructions cleanly.
 
-Full cooking mode with larger text and checkable steps is future-phase only.
+Cooking Mode is post-MVP and review-first. Ingredient checks and completed sessions do not automatically deduct pantry stock.
 
 ### 17.10 Recipe Photos
 
@@ -1150,14 +1150,16 @@ MVP should support marking grocery items as “Already Have.”
 
 ### 23.5 Future Pantry Features
 
+Post-MVP Smart Pantry features now exist as reviewed slices for manual stock, restock review, intake review, consumption review, use-soon planning signals, and pantry-aware planning boosts.
+
 Future pantry features may include:
 
-* Quantities.
-* Expiration dates.
-* Low-stock alerts.
-* Use-before-expiration planning.
+* Explicit stock application from confirmed consumption decisions.
+* Richer lot allocation and partial-use workflows.
+* Reversal and audit review surfaces.
+* Expiration reminders or automation.
 
-These are not MVP.
+These remain outside the MVP and must stay review-first unless a later product rule explicitly changes that boundary.
 
 ---
 
