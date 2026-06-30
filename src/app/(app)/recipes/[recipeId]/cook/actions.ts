@@ -19,7 +19,9 @@ import {
   updateCookingSessionNotes
 } from "@/lib/cooking-mode/data";
 import {
+  applyPantryConsumptionStock,
   confirmPantryConsumptionCandidate,
+  reversePantryConsumptionStockApplication,
   skipPantryConsumptionCandidate
 } from "@/lib/pantry/data";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
@@ -27,6 +29,17 @@ import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 function textOrNull(value: FormDataEntryValue | null) {
   const text = String(value ?? "").trim();
   return text.length > 0 ? text : null;
+}
+
+function numberOrNull(value: FormDataEntryValue | null) {
+  const text = textOrNull(value);
+
+  if (!text) {
+    return null;
+  }
+
+  const number = Number(text);
+  return Number.isFinite(number) ? number : null;
 }
 
 function cookPath(recipeId: string, plannedMealId?: string | null) {
@@ -299,6 +312,98 @@ export async function skipPantryConsumptionCandidateAction(formData: FormData) {
 
   revalidatePath(cookPath(recipeId, plannedMealId));
   cookRedirect(recipeId, "Consumption skipped.", plannedMealId, sessionId);
+}
+
+export async function applyPantryConsumptionStockAction(formData: FormData) {
+  const { plannedMealId, recipeId, sessionId } = parseCommon(formData);
+  const cookingSessionIngredientId = textOrNull(
+    formData.get("cookingSessionIngredientId")
+  );
+  const pantryItemIds = formData.getAll("allocationPantryItemId");
+  const allocationQuantities = formData.getAll("allocationQuantity");
+  const allocationUnits = formData.getAll("allocationUnit");
+
+  if (!sessionId || !cookingSessionIngredientId) {
+    cookRedirect(recipeId, "Choose a cooking ingredient first.", plannedMealId, sessionId);
+  }
+
+  const household = await requireHousehold(recipeId, plannedMealId);
+  let resultMessage = "Pantry stock applied.";
+
+  try {
+    const result = await applyPantryConsumptionStock({
+      cookingSessionIngredientId,
+      householdId: household.id,
+      input: {
+        allocations: pantryItemIds
+          .map((pantryItemId, index) => ({
+            pantryItemId: String(pantryItemId),
+            quantity: numberOrNull(allocationQuantities[index] ?? null),
+            unit: textOrNull(allocationUnits[index] ?? null)
+          }))
+          .filter((allocation) => allocation.quantity !== null),
+        appliedQuantity: numberOrNull(formData.get("appliedQuantity")),
+        appliedUnit: textOrNull(formData.get("appliedUnit"))
+      },
+      note: textOrNull(formData.get("note"))
+    });
+
+    if (result.status === "already_applied") {
+      resultMessage = "Pantry stock was already applied.";
+    }
+
+    if (result.status === "already_reversed") {
+      resultMessage = "Pantry stock application was already reversed.";
+    }
+  } catch (error) {
+    cookRedirect(
+      recipeId,
+      error instanceof Error ? error.message : "Pantry stock application failed.",
+      plannedMealId,
+      sessionId
+    );
+  }
+
+  revalidatePath(cookPath(recipeId, plannedMealId));
+  revalidatePath("/pantry");
+  cookRedirect(recipeId, resultMessage, plannedMealId, sessionId);
+}
+
+export async function reversePantryConsumptionStockApplicationAction(
+  formData: FormData
+) {
+  const { plannedMealId, recipeId, sessionId } = parseCommon(formData);
+  const stockApplicationId = textOrNull(formData.get("stockApplicationId"));
+
+  if (!sessionId || !stockApplicationId) {
+    cookRedirect(recipeId, "Choose an applied pantry stock item first.", plannedMealId, sessionId);
+  }
+
+  const household = await requireHousehold(recipeId, plannedMealId);
+  let resultMessage = "Pantry stock reversal recorded.";
+
+  try {
+    const result = await reversePantryConsumptionStockApplication({
+      householdId: household.id,
+      note: textOrNull(formData.get("note")),
+      stockApplicationId
+    });
+
+    if (result.status === "already_reversed") {
+      resultMessage = "Pantry stock was already reversed.";
+    }
+  } catch (error) {
+    cookRedirect(
+      recipeId,
+      error instanceof Error ? error.message : "Pantry stock reversal failed.",
+      plannedMealId,
+      sessionId
+    );
+  }
+
+  revalidatePath(cookPath(recipeId, plannedMealId));
+  revalidatePath("/pantry");
+  cookRedirect(recipeId, resultMessage, plannedMealId, sessionId);
 }
 
 export async function createCookingTimerAction(formData: FormData) {

@@ -13,15 +13,15 @@ const fixture = {
 test.describe("Pantry consumption review", () => {
   test.setTimeout(180_000);
 
-  test("confirms and skips completed cooking consumption candidates", async ({
+  test("confirms, applies, reverses, skips, and shows ineligible stock review", async ({
     page
   }) => {
     const seeded = seedPantryConsumptionFixture();
+    const cookUrl = `/recipes/${seeded.recipeId}/cook?sessionId=${seeded.cookingSessionId}`;
+    const pantryLotName = `E2E Consumption tortillas lot ${seeded.recipeId.slice(0, 8)}`;
 
     await signIn(page);
-    await page.goto(
-      `/recipes/${seeded.recipeId}/cook?sessionId=${seeded.cookingSessionId}`
-    );
+    await page.goto(cookUrl);
     await expect(
       page.getByRole("heading", { name: "Completed session" })
     ).toBeVisible();
@@ -40,6 +40,72 @@ test.describe("Pantry consumption review", () => {
       .click();
     await expect(page.getByText("Consumption confirmed.")).toBeVisible();
 
+    const stockReviewSection = page
+      .getByRole("heading", { name: "Pantry stock application review" })
+      .locator("xpath=ancestor::section[1]");
+    await expect(
+      stockReviewSection.getByRole("heading", {
+        name: "E2E Consumption tortillas"
+      })
+    ).toBeVisible();
+    await expect(stockReviewSection.getByText("Confirmed, not applied")).toBeVisible();
+    await expect(
+      stockReviewSection.getByText(pantryLotName, { exact: true })
+    ).toBeVisible();
+    await stockReviewSection
+      .getByLabel("Application note")
+      .fill("Applied from browser smoke");
+    await stockReviewSection
+      .getByRole("button", { name: "Apply pantry stock" })
+      .click();
+    await expect(page.getByText("Pantry stock applied.")).toBeVisible();
+    await expect(
+      page
+        .getByRole("heading", { name: "Pantry stock application review" })
+        .locator("xpath=ancestor::section[1]")
+        .getByText("Applied", { exact: true })
+    ).toBeVisible();
+
+    await page.goto("/pantry");
+    await expect(
+      page.getByRole("heading", { exact: true, name: "Pantry" })
+    ).toBeVisible();
+    await expect(page.getByText(pantryLotName)).toBeVisible();
+    await expect(
+      page
+        .getByRole("article")
+        .filter({ hasText: pantryLotName })
+        .getByText("1 count", { exact: true })
+    ).toBeVisible();
+
+    await page.goto(cookUrl);
+    const appliedStockReviewSection = page
+      .getByRole("heading", { name: "Pantry stock application review" })
+      .locator("xpath=ancestor::section[1]");
+    await appliedStockReviewSection
+      .getByLabel("Reversal note")
+      .fill("Reversed from browser smoke");
+    await appliedStockReviewSection
+      .getByRole("button", { name: "Reverse pantry stock" })
+      .click();
+    await expect(page.getByText("Pantry stock reversal recorded.")).toBeVisible();
+    await expect(
+      page
+        .getByRole("heading", { name: "Pantry stock application review" })
+        .locator("xpath=ancestor::section[1]")
+        .getByText("Reversed", { exact: true })
+    ).toBeVisible();
+
+    await page.goto("/pantry");
+    await expect(page.getByText(pantryLotName)).toBeVisible();
+    await expect(
+      page
+        .getByRole("article")
+        .filter({ hasText: pantryLotName })
+        .getByText("3 count", { exact: true })
+    ).toBeVisible();
+
+    await page.goto(cookUrl);
     const nextReviewSection = page
       .getByRole("heading", { name: "Pantry consumption review" })
       .locator("xpath=ancestor::section[1]");
@@ -50,18 +116,43 @@ test.describe("Pantry consumption review", () => {
       .getByRole("button", { name: "Skip this ingredient" })
       .click();
     await expect(page.getByText("Consumption skipped.")).toBeVisible();
+
+    const ineligibleReviewSection = page
+      .getByRole("heading", { name: "Pantry consumption review" })
+      .locator("xpath=ancestor::section[1]");
+    await expect(
+      ineligibleReviewSection.getByRole("heading", {
+        name: "E2E Consumption cumin"
+      })
+    ).toBeVisible();
+    await ineligibleReviewSection
+      .getByRole("button", { name: "Confirm consumption" })
+      .click();
+    await expect(page.getByText("Consumption confirmed.")).toBeVisible();
     await expect(
       page.getByText("No pantry consumption candidates left.")
     ).toBeVisible();
+    await expect(
+      page.getByText("No compatible pantry lot is available for this ingredient and unit.")
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Apply pantry stock" })
+    ).toHaveCount(0);
 
     await page.reload();
     await expect(
       page.getByText("No pantry consumption candidates left.")
     ).toBeVisible();
+    await expect(page.getByText("Reversed", { exact: true })).toBeVisible();
+    await expect(
+      page.getByText("No compatible pantry lot is available for this ingredient and unit.")
+    ).toBeVisible();
 
     expect(readConsumptionFixtureResult(seeded)).toEqual({
+      appliedStockApplicationCount: "1",
+      appliedStockAllocationCount: "1",
       confirmedDecisionActorMatches: "true",
-      confirmedDecisionCount: "1",
+      confirmedDecisionCount: "2",
       groceryItemSourceCount: "0",
       groceryListCount: "0",
       groceryListItemCount: "0",
@@ -70,26 +161,111 @@ test.describe("Pantry consumption review", () => {
       pantryItemOpen: "false",
       pantryItemQuantity: "3",
       pantryItemStatus: "in_stock",
+      reversedStockAllocationCount: "1",
+      reversedStockApplicationCount: "1",
       skippedDecisionActorMatches: "true",
       skippedDecisionCount: "1",
       unlinkedDecisionCount: "0"
     });
+  });
+
+  test("applies reviewed multi-lot allocation at mobile width", async ({
+    page
+  }) => {
+    const seeded = seedPantryConsumptionFixture({ extraTortillaLot: true });
+    const cookUrl = `/recipes/${seeded.recipeId}/cook?sessionId=${seeded.cookingSessionId}`;
+    const uniqueSuffix = seeded.recipeId.slice(0, 8);
+    const primaryLotName = `E2E Consumption tortillas lot ${uniqueSuffix}`;
+    const backupLotName = `E2E Consumption tortillas backup lot ${uniqueSuffix}`;
+
+    await page.setViewportSize({ height: 900, width: 390 });
+    await signIn(page);
+    await page.goto(cookUrl);
+    await expect(
+      page.getByRole("heading", { name: "Completed session" })
+    ).toBeVisible();
+
+    const reviewSection = page
+      .getByRole("heading", { name: "Pantry consumption review" })
+      .locator("xpath=ancestor::section[1]");
+    await expect(
+      reviewSection.getByRole("heading", { name: "E2E Consumption tortillas" })
+    ).toBeVisible();
+    await reviewSection
+      .getByRole("button", { name: "Confirm consumption" })
+      .click();
+    await expect(page.getByText("Consumption confirmed.")).toBeVisible();
+
+    const stockReviewSection = page
+      .getByRole("heading", { name: "Pantry stock application review" })
+      .locator("xpath=ancestor::section[1]");
+    await expect(
+      stockReviewSection.getByText(primaryLotName, { exact: true })
+    ).toBeVisible();
+    await expect(
+      stockReviewSection.getByText(backupLotName, { exact: true })
+    ).toBeVisible();
+    await expect(
+      stockReviewSection.getByRole("button", { name: "Apply reviewed allocation" })
+    ).toBeVisible();
+
+    await stockReviewSection.getByLabel(`Use from ${primaryLotName}`).fill("1");
+    await stockReviewSection.getByLabel(`Use from ${backupLotName}`).fill("1");
+    await stockReviewSection
+      .getByLabel("Application note")
+      .fill("Applied across two lots from mobile smoke");
+    await stockReviewSection
+      .getByRole("button", { name: "Apply reviewed allocation" })
+      .click();
+    await expect(page.getByText("Pantry stock applied.")).toBeVisible();
+
+    await page.goto("/pantry");
+    await expect(
+      page
+        .getByRole("article")
+        .filter({ hasText: primaryLotName })
+        .getByText("2 count", { exact: true })
+    ).toBeVisible();
+    await expect(
+      page
+        .getByRole("article")
+        .filter({ hasText: backupLotName })
+        .getByText("4 count", { exact: true })
+    ).toBeVisible();
+
+    expect(readConsumptionFixtureResult(seeded)).toMatchObject({
+      appliedStockAllocationCount: "2",
+      appliedStockApplicationCount: "1",
+      confirmedDecisionCount: "1",
+      pantryItemQuantity: "2",
+      pantryItemStatus: "in_stock",
+      reversedStockAllocationCount: "0",
+      reversedStockApplicationCount: "0"
+    });
+    expect(readPantryItemQuantity(seeded.secondPantryItemId)).toBe("4");
   });
 });
 
 type SeededConsumptionFixture = {
   confirmedIngredientId: string;
   cookingSessionId: string;
-  foodPantryId: string;
+  foodCuminId: string;
   foodSalsaId: string;
   foodTortillasId: string;
+  ineligibleIngredientId: string;
   pantryItemId: string;
   recipeId: string;
+  recipeIngredientCuminId: string;
   recipeIngredientSalsaId: string;
   recipeIngredientTortillasId: string;
   recipeStepId: string;
+  secondPantryItemId: string;
   skippedIngredientId: string;
   unlinkedIngredientId: string;
+};
+
+type SeedPantryConsumptionFixtureOptions = {
+  extraTortillaLot?: boolean;
 };
 
 async function signIn(page: Page) {
@@ -102,18 +278,23 @@ async function signIn(page: Page) {
   );
 }
 
-function seedPantryConsumptionFixture(): SeededConsumptionFixture {
+function seedPantryConsumptionFixture(
+  options: SeedPantryConsumptionFixtureOptions = {}
+): SeededConsumptionFixture {
   const seeded = {
     confirmedIngredientId: randomUUID(),
     cookingSessionId: randomUUID(),
-    foodPantryId: randomUUID(),
+    foodCuminId: randomUUID(),
     foodSalsaId: randomUUID(),
     foodTortillasId: randomUUID(),
+    ineligibleIngredientId: randomUUID(),
     pantryItemId: randomUUID(),
     recipeId: randomUUID(),
+    recipeIngredientCuminId: randomUUID(),
     recipeIngredientSalsaId: randomUUID(),
     recipeIngredientTortillasId: randomUUID(),
     recipeStepId: randomUUID(),
+    secondPantryItemId: randomUUID(),
     skippedIngredientId: randomUUID(),
     unlinkedIngredientId: randomUUID()
   };
@@ -131,9 +312,9 @@ where user_id in (
 
 insert into public.foods (id, household_id, name)
 values
-  (${sqlString(seeded.foodPantryId)}, ${sqlString(fixture.householdId)}, ${sqlString(`E2E Consumption pantry stock ${uniqueSuffix}`)}),
   (${sqlString(seeded.foodTortillasId)}, ${sqlString(fixture.householdId)}, ${sqlString(`E2E Consumption tortillas ${uniqueSuffix}`)}),
-  (${sqlString(seeded.foodSalsaId)}, ${sqlString(fixture.householdId)}, ${sqlString(`E2E Consumption salsa ${uniqueSuffix}`)});
+  (${sqlString(seeded.foodSalsaId)}, ${sqlString(fixture.householdId)}, ${sqlString(`E2E Consumption salsa ${uniqueSuffix}`)}),
+  (${sqlString(seeded.foodCuminId)}, ${sqlString(fixture.householdId)}, ${sqlString(`E2E Consumption cumin ${uniqueSuffix}`)});
 
 insert into public.pantry_items (
   id,
@@ -148,13 +329,36 @@ insert into public.pantry_items (
 values (
   ${sqlString(seeded.pantryItemId)},
   ${sqlString(fixture.householdId)},
-  ${sqlString(seeded.foodPantryId)},
-  'E2E Consumption pantry lot',
+  ${sqlString(seeded.foodTortillasId)},
+  ${sqlString(`E2E Consumption tortillas lot ${uniqueSuffix}`)},
   3,
   'count',
   'in_stock',
   false
 );
+
+${options.extraTortillaLot ? `
+insert into public.pantry_items (
+  id,
+  household_id,
+  food_id,
+  display_name,
+  quantity,
+  unit,
+  stock_status,
+  is_open
+)
+values (
+  ${sqlString(seeded.secondPantryItemId)},
+  ${sqlString(fixture.householdId)},
+  ${sqlString(seeded.foodTortillasId)},
+  ${sqlString(`E2E Consumption tortillas backup lot ${uniqueSuffix}`)},
+  5,
+  'count',
+  'in_stock',
+  false
+);
+` : ""}
 
 insert into public.recipes (
   id,
@@ -205,6 +409,16 @@ values
     1,
     'cup',
     1
+  ),
+  (
+    ${sqlString(seeded.recipeIngredientCuminId)},
+    ${sqlString(fixture.householdId)},
+    ${sqlString(seeded.recipeId)},
+    ${sqlString(seeded.foodCuminId)},
+    'E2E Consumption cumin',
+    1,
+    'tsp',
+    2
   );
 
 insert into public.recipe_steps (
@@ -286,6 +500,19 @@ values
     now()
   ),
   (
+    ${sqlString(seeded.ineligibleIngredientId)},
+    ${sqlString(fixture.householdId)},
+    ${sqlString(seeded.cookingSessionId)},
+    ${sqlString(seeded.recipeIngredientCuminId)},
+    ${sqlString(seeded.foodCuminId)},
+    'E2E Consumption cumin',
+    1,
+    'tsp',
+    2,
+    true,
+    now()
+  ),
+  (
     ${sqlString(seeded.unlinkedIngredientId)},
     ${sqlString(fixture.householdId)},
     ${sqlString(seeded.cookingSessionId)},
@@ -294,7 +521,7 @@ values
     'E2E Consumption garnish',
     1,
     'pinch',
-    2,
+    3,
     true,
     now()
   );
@@ -363,6 +590,11 @@ select
     from public.pantry_consumption_decisions
     where cooking_session_ingredient_id = ${sqlString(seeded.confirmedIngredientId)}
       and status = 'confirmed'
+  ) + (
+    select count(*)
+    from public.pantry_consumption_decisions
+    where cooking_session_ingredient_id = ${sqlString(seeded.ineligibleIngredientId)}
+      and status = 'confirmed'
   ) as confirmed_decision_count,
   (
     select (decisions.decided_by_user_id = users.id)::text
@@ -429,7 +661,43 @@ select
     select count(*)
     from public.grocery_item_sources
     where household_id = ${sqlString(fixture.householdId)}
-  ) as grocery_item_source_count;
+  ) as grocery_item_source_count,
+  (
+    select count(*)
+    from public.pantry_consumption_stock_applications applications
+    join public.pantry_consumption_decisions decisions
+      on decisions.id = applications.pantry_consumption_decision_id
+    where decisions.cooking_session_ingredient_id = ${sqlString(seeded.confirmedIngredientId)}
+  ) as applied_stock_application_count,
+  (
+    select count(*)
+    from public.pantry_consumption_stock_application_allocations allocations
+    join public.pantry_consumption_stock_applications applications
+      on applications.id = allocations.stock_application_id
+    join public.pantry_consumption_decisions decisions
+      on decisions.id = applications.pantry_consumption_decision_id
+    where decisions.cooking_session_ingredient_id = ${sqlString(seeded.confirmedIngredientId)}
+  ) as applied_stock_allocation_count,
+  (
+    select count(*)
+    from public.pantry_consumption_stock_application_reversals reversals
+    join public.pantry_consumption_stock_applications applications
+      on applications.id = reversals.stock_application_id
+    join public.pantry_consumption_decisions decisions
+      on decisions.id = applications.pantry_consumption_decision_id
+    where decisions.cooking_session_ingredient_id = ${sqlString(seeded.confirmedIngredientId)}
+  ) as reversed_stock_application_count,
+  (
+    select count(*)
+    from public.pantry_consumption_stock_application_reversal_allocations reversal_allocations
+    join public.pantry_consumption_stock_application_reversals reversals
+      on reversals.id = reversal_allocations.stock_application_reversal_id
+    join public.pantry_consumption_stock_applications applications
+      on applications.id = reversals.stock_application_id
+    join public.pantry_consumption_decisions decisions
+      on decisions.id = applications.pantry_consumption_decision_id
+    where decisions.cooking_session_ingredient_id = ${sqlString(seeded.confirmedIngredientId)}
+  ) as reversed_stock_allocation_count;
 `,
       stdio: ["pipe", "pipe", "inherit"]
     }
@@ -449,7 +717,11 @@ select
     pantryEventCount,
     groceryListCount,
     groceryListItemCount,
-    groceryItemSourceCount
+    groceryItemSourceCount,
+    appliedStockApplicationCount,
+    appliedStockAllocationCount,
+    reversedStockApplicationCount,
+    reversedStockAllocationCount
   ] = output.split(",");
 
   return {
@@ -463,10 +735,42 @@ select
     pantryItemOpen,
     pantryItemQuantity,
     pantryItemStatus,
+    appliedStockApplicationCount,
+    appliedStockAllocationCount,
+    reversedStockApplicationCount,
+    reversedStockAllocationCount,
     skippedDecisionActorMatches,
     skippedDecisionCount,
     unlinkedDecisionCount
   };
+}
+
+function readPantryItemQuantity(pantryItemId: string) {
+  return execFileSync(
+    "docker",
+    [
+      "exec",
+      "-i",
+      dbContainer,
+      "psql",
+      "-U",
+      "postgres",
+      "-d",
+      "postgres",
+      "-t",
+      "-A"
+    ],
+    {
+      input: `
+select quantity::text
+from public.pantry_items
+where id = ${sqlString(pantryItemId)};
+`,
+      stdio: ["pipe", "pipe", "inherit"]
+    }
+  )
+    .toString()
+    .trim();
 }
 
 function runLocalSql(sql: string) {
