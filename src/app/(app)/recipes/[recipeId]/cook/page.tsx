@@ -933,8 +933,13 @@ function PantryConsumptionStockReviewCard({
   sessionId: string;
 }) {
   const state = review.state;
+  const reviewableLots = getReviewableStockLots(review);
   const relevantLots =
-    state.status === "confirmed_unapplied" ? state.eligibleLots : review.pantryLots;
+    state.status === "confirmed_unapplied"
+      ? state.readiness === "ineligible"
+        ? reviewableLots
+        : state.eligibleLots
+      : review.pantryLots;
 
   return (
     <article className="rounded-lg border border-border bg-muted/30 p-4">
@@ -966,7 +971,9 @@ function PantryConsumptionStockReviewCard({
           {relevantLots.length > 0 ? (
             <div className="space-y-2">
               <p className="text-sm font-bold text-primary">
-                Compatible pantry lots
+                {state.readiness === "ineligible"
+                  ? "Pantry lots for this food"
+                  : "Compatible pantry lots"}
               </p>
               <div className="grid gap-2 md:grid-cols-2">
                 {relevantLots.map((lot) => (
@@ -987,123 +994,49 @@ function PantryConsumptionStockReviewCard({
 
           {state.readiness === "single_lot_auto" &&
           state.autoSelectedPantryItemId ? (
-            <form action={applyPantryConsumptionStockAction} className="space-y-3">
-              <CommonInputs
-                plannedMealId={plannedMealId}
-                recipeId={recipeId}
-                sessionId={sessionId}
-              />
-              <input
-                name="cookingSessionIngredientId"
-                type="hidden"
-                value={review.cookingSessionIngredientId}
-              />
-              <input
-                name="appliedQuantity"
-                type="hidden"
-                value={state.proposedQuantity ?? ""}
-              />
-              <input
-                name="appliedUnit"
-                type="hidden"
-                value={state.proposedUnit ?? ""}
-              />
-              <input
-                name="allocationPantryItemId"
-                type="hidden"
-                value={state.autoSelectedPantryItemId}
-              />
-              <input
-                name="allocationQuantity"
-                type="hidden"
-                value={state.proposedQuantity ?? ""}
-              />
-              <input
-                name="allocationUnit"
-                type="hidden"
-                value={state.proposedUnit ?? ""}
-              />
-              <label className="block text-sm font-medium">
-                Application note
-                <input
-                  className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                  name="note"
-                  placeholder="Applied from pantry lot"
-                  type="text"
-                />
-              </label>
-              <button
-                className="min-h-11 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/95"
-                type="submit"
-              >
-                Apply pantry stock
-              </button>
-            </form>
+            <StockApplicationForm
+              appliedQuantity={state.proposedQuantity}
+              appliedUnit={state.proposedUnit}
+              cookingSessionIngredientId={review.cookingSessionIngredientId}
+              lots={state.eligibleLots}
+              notePlaceholder="Applied from pantry lot"
+              plannedMealId={plannedMealId}
+              recipeId={recipeId}
+              sessionId={sessionId}
+              submitLabel="Apply pantry stock"
+            />
           ) : null}
 
           {state.readiness === "allocation_required" ? (
-            <form action={applyPantryConsumptionStockAction} className="space-y-3">
-              <CommonInputs
-                plannedMealId={plannedMealId}
-                recipeId={recipeId}
-                sessionId={sessionId}
-              />
-              <input
-                name="cookingSessionIngredientId"
-                type="hidden"
-                value={review.cookingSessionIngredientId}
-              />
-              <input
-                name="appliedQuantity"
-                type="hidden"
-                value={state.proposedQuantity ?? ""}
-              />
-              <input
-                name="appliedUnit"
-                type="hidden"
-                value={state.proposedUnit ?? ""}
-              />
-              <div className="grid gap-3 md:grid-cols-2">
-                {state.eligibleLots.map((lot) => (
-                  <label className="block text-sm font-medium" key={lot.id}>
-                    Use from {lot.displayName}
-                    <input
-                      name="allocationPantryItemId"
-                      type="hidden"
-                      value={lot.id}
-                    />
-                    <input
-                      name="allocationUnit"
-                      type="hidden"
-                      value={state.proposedUnit ?? ""}
-                    />
-                    <input
-                      className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                      min="0"
-                      name="allocationQuantity"
-                      placeholder={`0 ${state.proposedUnit ?? ""}`}
-                      step="any"
-                      type="number"
-                    />
-                  </label>
-                ))}
-              </div>
-              <label className="block text-sm font-medium">
-                Application note
-                <input
-                  className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                  name="note"
-                  placeholder="Applied across selected lots"
-                  type="text"
-                />
-              </label>
-              <button
-                className="min-h-11 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/95"
-                type="submit"
-              >
-                Apply reviewed allocation
-              </button>
-            </form>
+            <StockApplicationForm
+              appliedQuantity={state.proposedQuantity}
+              appliedUnit={state.proposedUnit}
+              cookingSessionIngredientId={review.cookingSessionIngredientId}
+              lots={state.eligibleLots}
+              notePlaceholder="Applied across selected lots"
+              plannedMealId={plannedMealId}
+              recipeId={recipeId}
+              sessionId={sessionId}
+              submitLabel="Apply reviewed allocation"
+            />
+          ) : null}
+
+          {state.readiness === "ineligible" && reviewableLots.length > 0 ? (
+            <StockApplicationForm
+              appliedQuantity={state.proposedQuantity}
+              appliedUnit={state.proposedUnit ?? reviewableLots[0]?.unit ?? null}
+              cookingSessionIngredientId={review.cookingSessionIngredientId}
+              lots={reviewableLots}
+              notePlaceholder="Applied after quantity/unit review"
+              plannedMealId={plannedMealId}
+              recipeId={recipeId}
+              sessionId={sessionId}
+              submitLabel={
+                reviewableLots.length === 1
+                  ? "Apply pantry stock"
+                  : "Apply reviewed allocation"
+              }
+            />
           ) : null}
         </div>
       ) : null}
@@ -1160,6 +1093,119 @@ function PantryConsumptionStockReviewCard({
         </p>
       ) : null}
     </article>
+  );
+}
+
+function StockApplicationForm({
+  appliedQuantity,
+  appliedUnit,
+  cookingSessionIngredientId,
+  lots,
+  notePlaceholder,
+  plannedMealId,
+  recipeId,
+  sessionId,
+  submitLabel
+}: {
+  appliedQuantity: number | null;
+  appliedUnit: string | null;
+  cookingSessionIngredientId: string;
+  lots: PantryConsumptionStockReview["pantryLots"];
+  notePlaceholder: string;
+  plannedMealId: string | null;
+  recipeId: string;
+  sessionId: string;
+  submitLabel: string;
+}) {
+  return (
+    <form action={applyPantryConsumptionStockAction} className="space-y-3">
+      <CommonInputs
+        plannedMealId={plannedMealId}
+        recipeId={recipeId}
+        sessionId={sessionId}
+      />
+      <input
+        name="cookingSessionIngredientId"
+        type="hidden"
+        value={cookingSessionIngredientId}
+      />
+      <div className="grid gap-3 md:grid-cols-2">
+        <label className="block text-sm font-medium">
+          Applied quantity
+          <input
+            className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+            defaultValue={formatNumberInputValue(appliedQuantity)}
+            min="0"
+            name="appliedQuantity"
+            required
+            step="any"
+            type="number"
+          />
+        </label>
+        <label className="block text-sm font-medium">
+          Applied unit
+          <input
+            className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+            defaultValue={appliedUnit ?? ""}
+            name="appliedUnit"
+            placeholder="count"
+            required
+            type="text"
+          />
+        </label>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        {lots.map((lot) => (
+          <div
+            className="rounded-md border border-border bg-background px-3 py-3"
+            key={lot.id}
+          >
+            <input name="allocationPantryItemId" type="hidden" value={lot.id} />
+            <label className="block text-sm font-medium">
+              Use from {lot.displayName}
+              <input
+                className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                defaultValue={
+                  lots.length === 1
+                    ? formatNumberInputValue(appliedQuantity)
+                    : ""
+                }
+                min="0"
+                name="allocationQuantity"
+                placeholder={`0 ${appliedUnit ?? lot.unit ?? ""}`}
+                step="any"
+                type="number"
+              />
+            </label>
+            <label className="mt-3 block text-sm font-medium">
+              Allocation unit for {lot.displayName}
+              <input
+                className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                defaultValue={appliedUnit ?? lot.unit ?? ""}
+                name="allocationUnit"
+                placeholder={lot.unit ?? "count"}
+                type="text"
+              />
+            </label>
+          </div>
+        ))}
+      </div>
+      <label className="block text-sm font-medium">
+        Application note
+        <input
+          className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+          name="note"
+          placeholder={notePlaceholder}
+          type="text"
+        />
+      </label>
+      <button
+        className="min-h-11 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/95"
+        type="submit"
+      >
+        {submitLabel}
+      </button>
+    </form>
   );
 }
 
@@ -1433,6 +1479,28 @@ function formatStockReviewIngredientDetails(review: PantryConsumptionStockReview
 
 function formatQuantityUnit(quantity: number | null, unit: string | null) {
   return [quantity, unit].filter((value) => value !== null && value !== "").join(" ");
+}
+
+function formatNumberInputValue(value: number | null) {
+  return value === null ? "" : String(value);
+}
+
+function getReviewableStockLots(review: PantryConsumptionStockReview) {
+  return review.pantryLots
+    .filter(
+      (lot) =>
+        lot.discardedAt === null &&
+        lot.foodId === review.foodId &&
+        lot.quantity !== null &&
+        lot.quantity > 0 &&
+        lot.stockStatus !== "out" &&
+        lot.stockStatus !== "unknown"
+    )
+    .sort(
+      (left, right) =>
+        left.displayName.localeCompare(right.displayName) ||
+        left.id.localeCompare(right.id)
+    );
 }
 
 function formatStockReviewStatus(

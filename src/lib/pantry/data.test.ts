@@ -1602,6 +1602,14 @@ describe("pantry consumption data functions", () => {
           unit: "count"
         }),
         pantryItemRow({
+          display_name: "Tortillas",
+          food_id: "food-lookalike-tortillas",
+          id: "same-name-wrong-food-lot",
+          quantity: 2,
+          stock_status: "in_stock",
+          unit: "count"
+        }),
+        pantryItemRow({
           food_id: "food-tortillas",
           id: "wrong-unit-lot",
           quantity: 2,
@@ -1625,6 +1633,26 @@ describe("pantry consumption data functions", () => {
         supabase: fake.client
       })
     ).rejects.toThrow("One selected pantry lot is no longer available.");
+    await expect(
+      applyPantryConsumptionStockWithClient({
+        cookingSessionIngredientId: "eligible-ingredient",
+        householdId: "household-1",
+        input: {
+          allocations: [
+            {
+              pantryItemId: "same-name-wrong-food-lot",
+              quantity: 1,
+              unit: "count"
+            }
+          ],
+          appliedQuantity: 1,
+          appliedUnit: "count"
+        },
+        supabase: fake.client
+      })
+    ).rejects.toThrow(
+      "One selected pantry lot does not match the cooking ingredient."
+    );
     await expect(
       applyPantryConsumptionStockWithClient({
         cookingSessionIngredientId: "eligible-ingredient",

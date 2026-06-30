@@ -157,6 +157,6 @@ The applied quantity and unit must be structured and explicit at application tim
 
 ## Further Notes
 
-Pantry Consumption Stock Application V0 is a review-first slice. The schema, rules, data-layer apply, data-layer reversal, and explicit review UI are now in place; the remaining implementation should lock down the full path with focused regression coverage.
+Pantry Consumption Stock Application V0 is a review-first slice. The schema, rules, data-layer apply, data-layer reversal, explicit review UI, and full-path regression coverage are now in place. Further changes should come from real-use findings or an explicitly scoped follow-up issue.
 
 If the implementation discovers that V0 cannot support safe partial quantities or multi-lot allocation without a larger UI, the safe fallback is single-lot explicit application only. The fallback still must keep confirm/skip review actions write-free.

@@ -49,7 +49,9 @@ test.describe("Pantry consumption review", () => {
       })
     ).toBeVisible();
     await expect(stockReviewSection.getByText("Confirmed, not applied")).toBeVisible();
-    await expect(stockReviewSection.getByText(pantryLotName)).toBeVisible();
+    await expect(
+      stockReviewSection.getByText(pantryLotName, { exact: true })
+    ).toBeVisible();
     await stockReviewSection
       .getByLabel("Application note")
       .fill("Applied from browser smoke");

@@ -380,13 +380,18 @@ export async function reversePantryConsumptionStockApplicationAction(
   }
 
   const household = await requireHousehold(recipeId, plannedMealId);
+  let resultMessage = "Pantry stock reversal recorded.";
 
   try {
-    await reversePantryConsumptionStockApplication({
+    const result = await reversePantryConsumptionStockApplication({
       householdId: household.id,
       note: textOrNull(formData.get("note")),
       stockApplicationId
     });
+
+    if (result.status === "already_reversed") {
+      resultMessage = "Pantry stock was already reversed.";
+    }
   } catch (error) {
     cookRedirect(
       recipeId,
@@ -398,7 +403,7 @@ export async function reversePantryConsumptionStockApplicationAction(
 
   revalidatePath(cookPath(recipeId, plannedMealId));
   revalidatePath("/pantry");
-  cookRedirect(recipeId, "Pantry stock reversal recorded.", plannedMealId, sessionId);
+  cookRedirect(recipeId, resultMessage, plannedMealId, sessionId);
 }
 
 export async function createCookingTimerAction(formData: FormData) {

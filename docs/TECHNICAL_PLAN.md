@@ -2128,10 +2128,11 @@ docs/COOKING_MODE_V0_PRD.md
 docs/PANTRY_CONSUMPTION_STOCK_APPLICATION_V0_PRD.md
 ```
 
-For the next post-UI pantry slice, start with:
+For the completed reviewed stock-application path, keep the issue plan as the
+reference for the V0 lifecycle:
 
 ```txt
 docs/issues/PANTRY_CONSUMPTION_STOCK_APPLICATION_V0_ISSUES.md
 ```
 
-Use Issue 6 for full-path regression and browser validation. Keep confirm/skip review actions write-free; pantry quantities should change only through reviewed apply/reverse actions.
+Issues 1-6 are complete. Keep confirm/skip review actions write-free; pantry quantities should change only through reviewed apply/reverse actions. The next pantry stock changes should come from real-use dogfood or an explicitly scoped follow-up, not automatic stock mutation.
