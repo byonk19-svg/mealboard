@@ -2128,10 +2128,10 @@ docs/COOKING_MODE_V0_PRD.md
 docs/PANTRY_CONSUMPTION_STOCK_APPLICATION_V0_PRD.md
 ```
 
-For the next stock-writing pantry slice, start with:
+For the next post-reversal pantry slice, start with:
 
 ```txt
 docs/issues/PANTRY_CONSUMPTION_STOCK_APPLICATION_V0_ISSUES.md
 ```
 
-Do not implement pantry stock mutation from Cooking Mode until the stock-application rules define lot allocation, exact-unit behavior, partial quantities, multi-lot matching, undo/reversal, idempotency, actor/audit history, and household RLS.
+Use Issue 5 for the explicit review UI, then Issue 6 for full-path regression and browser validation. Keep confirm/skip review actions write-free; pantry quantities should change only through reviewed apply/reverse actions.

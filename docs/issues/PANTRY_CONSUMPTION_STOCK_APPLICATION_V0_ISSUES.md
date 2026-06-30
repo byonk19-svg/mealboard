@@ -9,6 +9,10 @@ Source docs:
 
 This is a local issue plan only. Do not publish these issues to GitHub, Linear, or any external tracker unless explicitly requested later.
 
+## Current Implementation Status
+
+Issues 1-4 are complete after the data-layer reversal slice. The next implementation slice is Issue 5, the explicit stock-application review UI. Issue 6 should follow with full-path regression and browser validation.
+
 ## Scope
 
 Pantry Consumption Stock Application V0 adds an explicit, reviewed stock write after a confirmed pantry consumption decision. It does not change the meaning of confirm/skip: confirming consumption records a review decision, skipping remains write-free, and pantry stock changes only through a separate apply action.

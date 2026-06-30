@@ -157,6 +157,6 @@ The applied quantity and unit must be structured and explicit at application tim
 
 ## Further Notes
 
-Pantry Consumption Stock Application V0 is a rules-first slice. Implementation should not start by adding stock mutation code. The first code issue should add the minimum schema needed for exactly-once application/allocation/reversal after these product rules are accepted.
+Pantry Consumption Stock Application V0 is a review-first slice. After the schema, rules, data-layer apply, and data-layer reversal issues, the remaining implementation should expose those states through an explicit review UI and then lock down the full path with focused regression coverage.
 
 If the implementation discovers that V0 cannot support safe partial quantities or multi-lot allocation without a larger UI, the safe fallback is single-lot explicit application only. The fallback still must keep confirm/skip review actions write-free.

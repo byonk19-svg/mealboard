@@ -1965,6 +1965,14 @@ values
     '30000000-0000-4000-8000-000000000001',
     'RLS apply apples cross lot',
     105
+  ),
+  (
+    '92000000-0000-4000-8000-000000000106',
+    '20000000-0000-4000-8000-000000000001',
+    '91000000-0000-4000-8000-000000000099',
+    '30000000-0000-4000-8000-000000000001',
+    'RLS reverse apples stale lot',
+    106
   )
 on conflict (id) do nothing;
 
@@ -2002,6 +2010,15 @@ values
     '30000000-0000-4000-8000-000000000001',
     'RLS apply apples overdraw lot',
     1,
+    'count',
+    'in_stock'
+  ),
+  (
+    '40000000-0000-4000-8000-000000000106',
+    '20000000-0000-4000-8000-000000000001',
+    '30000000-0000-4000-8000-000000000001',
+    'RLS reverse apples stale lot',
+    4,
     'count',
     'in_stock'
   )
@@ -2052,6 +2069,13 @@ values
     '92000000-0000-4000-8000-000000000105',
     'confirmed',
     'Confirmed for RPC stock apply cross-household lot.'
+  ),
+  (
+    '88000000-0000-4000-8000-000000000106',
+    '20000000-0000-4000-8000-000000000001',
+    '92000000-0000-4000-8000-000000000106',
+    'confirmed',
+    'Confirmed for RPC stock reverse stale-lot smoke.'
   );
 
 create temp table pantry_apply_result as
@@ -2192,8 +2216,146 @@ exception
     null;
 end $$;
 
+create temp table pantry_reverse_result as
+select *
+from public.reverse_pantry_consumption_stock(
+  '20000000-0000-4000-8000-000000000001',
+  (select stock_application_id from pantry_apply_result),
+  'Reversed from RLS verifier.'
+);
+
+select case when (
+  select status from pantry_reverse_result
+) = 'reversed' then 'ok' else 'RPC stock reversal did not report reversed' end as rpc_stock_reversal_reports_reversed;
+
+select case when (
+  select quantity from public.pantry_items where id = '40000000-0000-4000-8000-000000000101'
+) = 4 and (
+  select quantity from public.pantry_items where id = '40000000-0000-4000-8000-000000000102'
+) = 3 then 'ok' else 'RPC stock reversal did not restore selected lots' end as rpc_stock_reversal_restores_selected_lots;
+
+select case when (
+  select count(*)
+  from public.pantry_consumption_stock_application_reversal_allocations allocations
+  join pantry_reverse_result result
+    on result.stock_application_reversal_id = allocations.stock_application_reversal_id
+) = 2 then 'ok' else 'RPC stock reversal did not write reversal allocation audit rows' end as rpc_stock_reversal_writes_allocations;
+
+select case when (
+  select reversed_by_user_id
+  from public.pantry_consumption_stock_application_reversals reversals
+  join pantry_reverse_result result
+    on result.stock_application_reversal_id = reversals.id
+) = '10000000-0000-4000-8000-000000000001'
+then 'ok' else 'RPC stock reversal actor was not captured' end as rpc_stock_reversal_records_actor;
+
+create temp table pantry_reverse_retry_result as
+select *
+from public.reverse_pantry_consumption_stock(
+  '20000000-0000-4000-8000-000000000001',
+  (select stock_application_id from pantry_apply_result),
+  'Retried reversal from RLS verifier.'
+);
+
+select case when (
+  select status from pantry_reverse_retry_result
+) = 'already_reversed' then 'ok' else 'RPC stock reversal retry did not report already_reversed' end as rpc_stock_reversal_retry_is_idempotent;
+
+select case when (
+  select quantity from public.pantry_items where id = '40000000-0000-4000-8000-000000000101'
+) = 4 and (
+  select quantity from public.pantry_items where id = '40000000-0000-4000-8000-000000000102'
+) = 3 then 'ok' else 'RPC stock reversal retry restored stock twice' end as rpc_stock_reversal_retry_does_not_restore_twice;
+
+select case when (
+  select status
+  from public.apply_pantry_consumption_stock(
+    '20000000-0000-4000-8000-000000000001',
+    '88000000-0000-4000-8000-000000000101',
+    3,
+    'count',
+    jsonb_build_array(
+      jsonb_build_object(
+        'pantryItemId',
+        '40000000-0000-4000-8000-000000000101',
+        'quantity',
+        1,
+        'unit',
+        'count'
+      ),
+      jsonb_build_object(
+        'pantryItemId',
+        '40000000-0000-4000-8000-000000000102',
+        'quantity',
+        2,
+        'unit',
+        'count'
+      )
+    ),
+    'This should return already_reversed.'
+  )
+) = 'already_reversed' then 'ok' else 'RPC stock application after reversal did not report already_reversed' end as rpc_stock_apply_after_reversal_is_terminal;
+
+create temp table pantry_reverse_stale_apply_result as
+select *
+from public.apply_pantry_consumption_stock(
+  '20000000-0000-4000-8000-000000000001',
+  '88000000-0000-4000-8000-000000000106',
+  1,
+  'count',
+  jsonb_build_array(
+    jsonb_build_object(
+      'pantryItemId',
+      '40000000-0000-4000-8000-000000000106',
+      'quantity',
+      1,
+      'unit',
+      'count',
+      'expectedQuantityBefore',
+      (select quantity from public.pantry_items where id = '40000000-0000-4000-8000-000000000106'),
+      'expectedUpdatedAt',
+      (select updated_at from public.pantry_items where id = '40000000-0000-4000-8000-000000000106')
+    )
+  ),
+  'Applied before stale reversal smoke.'
+);
+
+update public.pantry_items
+set quantity = 4
+where id = '40000000-0000-4000-8000-000000000106';
+
+update public.pantry_items
+set quantity = 3
+where id = '40000000-0000-4000-8000-000000000106';
+
+do $$
+begin
+  perform 1
+  from public.reverse_pantry_consumption_stock(
+    '20000000-0000-4000-8000-000000000001',
+    (select stock_application_id from pantry_reverse_stale_apply_result),
+    'This should fail because the lot changed after application.'
+  );
+
+  raise exception 'RPC stock reversal for stale lot unexpectedly succeeded';
+exception
+  when check_violation then
+    null;
+end $$;
+
+select case when (
+  select quantity from public.pantry_items where id = '40000000-0000-4000-8000-000000000106'
+) = 3 and not exists (
+  select 1
+  from public.pantry_consumption_stock_application_reversals
+  where stock_application_id = (select stock_application_id from pantry_reverse_stale_apply_result)
+) then 'ok' else 'RPC stock reversal stale lot left partial writes' end as rpc_stock_reversal_stale_has_no_partial_writes;
+
 drop table pantry_apply_result;
 drop table pantry_apply_retry_result;
+drop table pantry_reverse_result;
+drop table pantry_reverse_retry_result;
+drop table pantry_reverse_stale_apply_result;
 
 do $$
 begin
