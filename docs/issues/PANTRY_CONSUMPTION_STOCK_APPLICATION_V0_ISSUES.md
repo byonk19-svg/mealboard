@@ -11,7 +11,7 @@ This is a local issue plan only. Do not publish these issues to GitHub, Linear, 
 
 ## Current Implementation Status
 
-Issues 1-4 are complete after the data-layer reversal slice. The next implementation slice is Issue 5, the explicit stock-application review UI. Issue 6 should follow with full-path regression and browser validation.
+Issues 1-5 are complete after the explicit stock-application review UI slice. The next implementation slice is Issue 6, full-path regression and browser validation.
 
 ## Scope
 

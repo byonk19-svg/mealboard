@@ -2128,10 +2128,10 @@ docs/COOKING_MODE_V0_PRD.md
 docs/PANTRY_CONSUMPTION_STOCK_APPLICATION_V0_PRD.md
 ```
 
-For the next post-reversal pantry slice, start with:
+For the next post-UI pantry slice, start with:
 
 ```txt
 docs/issues/PANTRY_CONSUMPTION_STOCK_APPLICATION_V0_ISSUES.md
 ```
 
-Use Issue 5 for the explicit review UI, then Issue 6 for full-path regression and browser validation. Keep confirm/skip review actions write-free; pantry quantities should change only through reviewed apply/reverse actions.
+Use Issue 6 for full-path regression and browser validation. Keep confirm/skip review actions write-free; pantry quantities should change only through reviewed apply/reverse actions.

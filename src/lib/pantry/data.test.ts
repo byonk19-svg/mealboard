@@ -6,6 +6,7 @@ import {
   confirmPantryConsumptionCandidateWithClient,
   confirmPantryIntakeCandidateWithClient,
   getPantryConsumptionCandidatesWithClient,
+  getPantryConsumptionStockReviewsWithClient,
   getPantryIntakeCandidatesWithClient,
   getPantryUseSoonSignalsWithClient,
   reversePantryConsumptionStockApplicationWithClient,
@@ -630,6 +631,221 @@ describe("pantry consumption data functions", () => {
         foodId: "food-tortillas",
         foodName: "Tortillas",
         recipeNameSnapshot: "Wraps"
+      })
+    ]);
+  });
+
+  it("reads stock review states for confirmed, applied, reversed, skipped, and ineligible decisions", async () => {
+    const fake = createFakeSupabase({
+      cookingSessionIngredients: [
+        cookingSessionIngredientRow({
+          display_name: "Confirmed tortillas",
+          food_id: "food-confirmed",
+          id: "confirmed-ingredient",
+          quantity: 2,
+          sort_order: 1,
+          unit: "count"
+        }),
+        cookingSessionIngredientRow({
+          display_name: "Applied rice",
+          food_id: "food-applied",
+          id: "applied-ingredient",
+          quantity: 1,
+          sort_order: 2,
+          unit: "cup"
+        }),
+        cookingSessionIngredientRow({
+          display_name: "Reversed beans",
+          food_id: "food-reversed",
+          id: "reversed-ingredient",
+          quantity: 1,
+          sort_order: 3,
+          unit: "can"
+        }),
+        cookingSessionIngredientRow({
+          display_name: "Skipped salsa",
+          food_id: "food-skipped",
+          id: "skipped-ingredient",
+          quantity: 1,
+          sort_order: 4,
+          unit: "jar"
+        }),
+        cookingSessionIngredientRow({
+          display_name: "Ineligible spice",
+          food_id: "food-ineligible",
+          id: "ineligible-ingredient",
+          quantity: 1,
+          sort_order: 5,
+          unit: "tsp"
+        })
+      ],
+      cookingSessions: [
+        cookingSessionRow({
+          completed_at: "2026-06-28T12:00:00Z",
+          id: "completed-session",
+          status: "completed"
+        })
+      ],
+      groceryLists: [],
+      groceryListItems: [],
+      pantryConsumptionDecisions: [
+        {
+          cooking_session_ingredient_id: "confirmed-ingredient",
+          household_id: "household-1",
+          id: "decision-confirmed",
+          status: "confirmed"
+        },
+        {
+          cooking_session_ingredient_id: "applied-ingredient",
+          household_id: "household-1",
+          id: "decision-applied",
+          status: "confirmed"
+        },
+        {
+          cooking_session_ingredient_id: "reversed-ingredient",
+          household_id: "household-1",
+          id: "decision-reversed",
+          status: "confirmed"
+        },
+        {
+          cooking_session_ingredient_id: "skipped-ingredient",
+          household_id: "household-1",
+          id: "decision-skipped",
+          status: "skipped"
+        },
+        {
+          cooking_session_ingredient_id: "ineligible-ingredient",
+          household_id: "household-1",
+          id: "decision-ineligible",
+          status: "confirmed"
+        }
+      ],
+      pantryConsumptionStockApplicationAllocations: [
+        {
+          applied_quantity: 1,
+          household_id: "household-1",
+          id: "allocation-applied",
+          pantry_item_id: "lot-applied",
+          pantry_lot_revision_after: 1,
+          pantry_quantity_after: 4,
+          pantry_quantity_before: 5,
+          pantry_updated_at_after: "2026-06-29T12:00:00Z",
+          stock_application_id: "application-applied",
+          unit: "cup"
+        },
+        {
+          applied_quantity: 1,
+          household_id: "household-1",
+          id: "allocation-reversed",
+          pantry_item_id: "lot-reversed",
+          pantry_lot_revision_after: 1,
+          pantry_quantity_after: 2,
+          pantry_quantity_before: 3,
+          pantry_updated_at_after: "2026-06-29T12:00:00Z",
+          stock_application_id: "application-reversed",
+          unit: "can"
+        }
+      ],
+      pantryConsumptionStockApplications: [
+        {
+          applied_quantity: 1,
+          applied_unit: "cup",
+          household_id: "household-1",
+          id: "application-applied",
+          pantry_consumption_decision_id: "decision-applied"
+        },
+        {
+          applied_quantity: 1,
+          applied_unit: "can",
+          household_id: "household-1",
+          id: "application-reversed",
+          pantry_consumption_decision_id: "decision-reversed"
+        }
+      ],
+      pantryConsumptionStockApplicationReversals: [
+        {
+          household_id: "household-1",
+          id: "reversal-reversed",
+          stock_application_id: "application-reversed"
+        }
+      ],
+      pantryItems: [
+        pantryItemRow({
+          display_name: "Confirmed lot",
+          food_id: "food-confirmed",
+          id: "lot-confirmed",
+          quantity: 4,
+          stock_status: "in_stock",
+          unit: "count"
+        }),
+        pantryItemRow({
+          display_name: "Applied lot",
+          food_id: "food-applied",
+          id: "lot-applied",
+          quantity: 4,
+          stock_status: "in_stock",
+          unit: "cup"
+        }),
+        pantryItemRow({
+          display_name: "Reversed lot",
+          food_id: "food-reversed",
+          id: "lot-reversed",
+          quantity: 3,
+          stock_status: "in_stock",
+          unit: "can"
+        })
+      ]
+    });
+
+    await expect(
+      getPantryConsumptionStockReviewsWithClient({
+        cookingSessionId: "completed-session",
+        householdId: "household-1",
+        supabase: fake.client
+      })
+    ).resolves.toEqual([
+      expect.objectContaining({
+        cookingSessionIngredientId: "confirmed-ingredient",
+        state: expect.objectContaining({
+          autoSelectedPantryItemId: "lot-confirmed",
+          readiness: "single_lot_auto",
+          status: "confirmed_unapplied"
+        })
+      }),
+      expect.objectContaining({
+        cookingSessionIngredientId: "applied-ingredient",
+        state: expect.objectContaining({
+          application: expect.objectContaining({
+            allocations: [
+              expect.objectContaining({
+                id: "allocation-applied",
+                pantryItemId: "lot-applied"
+              })
+            ],
+            id: "application-applied"
+          }),
+          status: "applied"
+        })
+      }),
+      expect.objectContaining({
+        cookingSessionIngredientId: "reversed-ingredient",
+        state: expect.objectContaining({
+          application: expect.objectContaining({ id: "application-reversed" }),
+          reversal: expect.objectContaining({ id: "reversal-reversed" }),
+          status: "reversed"
+        })
+      }),
+      expect.objectContaining({
+        cookingSessionIngredientId: "skipped-ingredient",
+        state: { status: "skipped" }
+      }),
+      expect.objectContaining({
+        cookingSessionIngredientId: "ineligible-ingredient",
+        state: expect.objectContaining({
+          readiness: "ineligible",
+          reason: "no_eligible_lot",
+          status: "confirmed_unapplied"
+        })
       })
     ]);
   });
@@ -2139,6 +2355,15 @@ class FakeQuery {
       return {
         data: this.state.pantryConsumptionStockApplications.filter((application) =>
           this.matchesFilters(application)
+        ),
+        error: null
+      };
+    }
+
+    if (this.table === "pantry_consumption_stock_application_allocations") {
+      return {
+        data: this.state.pantryConsumptionStockApplicationAllocations.filter(
+          (allocation) => this.matchesFilters(allocation)
         ),
         error: null
       };

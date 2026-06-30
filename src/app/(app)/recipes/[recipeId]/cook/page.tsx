@@ -7,8 +7,10 @@ import {
   confirmPantryConsumptionCandidateAction,
   createCookingTimerAction,
   dismissCookingTimerAction,
+  applyPantryConsumptionStockAction,
   pauseCookingSessionAction,
   pauseCookingTimerAction,
+  reversePantryConsumptionStockApplicationAction,
   resumeCookingSessionAction,
   saveCookingNotesAction,
   setCurrentStepAction,
@@ -29,8 +31,12 @@ import type {
   CookingSessionIngredient,
   CookingTimer
 } from "@/lib/cooking-mode/types";
-import { getPantryConsumptionCandidates } from "@/lib/pantry/data";
+import {
+  getPantryConsumptionCandidates,
+  getPantryConsumptionStockReviews
+} from "@/lib/pantry/data";
 import type { PantryConsumptionCandidate } from "@/lib/pantry/consumption-candidates";
+import type { PantryConsumptionStockReview } from "@/lib/pantry/data";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 
 type CookingModePageProps = {
@@ -89,6 +95,13 @@ export default async function CookingModePage({
   const consumptionCandidates =
     session?.status === "completed"
       ? await getPantryConsumptionCandidates({
+          cookingSessionId: session.id,
+          householdId: householdContext.household.id
+        })
+      : [];
+  const stockReviews =
+    session?.status === "completed"
+      ? await getPantryConsumptionStockReviews({
           cookingSessionId: session.id,
           householdId: householdContext.household.id
         })
@@ -167,12 +180,20 @@ export default async function CookingModePage({
             <>
               <ReadOnlySessionDetails session={session} />
               {session.status === "completed" ? (
-                <PantryConsumptionReviewSection
-                  candidates={consumptionCandidates}
-                  plannedMealId={plannedMealId ?? null}
-                  recipeId={recipe.id}
-                  sessionId={session.id}
-                />
+                <>
+                  <PantryConsumptionReviewSection
+                    candidates={consumptionCandidates}
+                    plannedMealId={plannedMealId ?? null}
+                    recipeId={recipe.id}
+                    sessionId={session.id}
+                  />
+                  <PantryConsumptionStockReviewSection
+                    plannedMealId={plannedMealId ?? null}
+                    recipeId={recipe.id}
+                    reviews={stockReviews}
+                    sessionId={session.id}
+                  />
+                </>
               ) : null}
             </>
           ) : (
@@ -845,6 +866,343 @@ function PantryConsumptionReviewSection({
   );
 }
 
+function PantryConsumptionStockReviewSection({
+  plannedMealId,
+  recipeId,
+  reviews,
+  sessionId
+}: {
+  plannedMealId: string | null;
+  recipeId: string;
+  reviews: PantryConsumptionStockReview[];
+  sessionId: string;
+}) {
+  return (
+    <section className="calm-card p-5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="calm-heading text-xl">
+            Pantry stock application review
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+            Confirmed consumption can be applied to pantry stock here. Apply and
+            reverse are separate reviewed actions.
+          </p>
+        </div>
+        <span className="text-sm text-muted-foreground">
+          {formatItemCount(reviews.length)}
+        </span>
+      </div>
+
+      {reviews.length === 0 ? (
+        <div className="mt-4 rounded-lg border border-border bg-muted/40 px-3 py-3">
+          <h3 className="font-bold text-primary">
+            No pantry stock applications to review.
+          </h3>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">
+            Confirm or skip pantry consumption first. Unreviewed ingredients do
+            not apply stock automatically.
+          </p>
+        </div>
+      ) : (
+        <div className="mt-4 space-y-4">
+          {reviews.map((review) => (
+            <PantryConsumptionStockReviewCard
+              key={review.cookingSessionIngredientId}
+              plannedMealId={plannedMealId}
+              recipeId={recipeId}
+              review={review}
+              sessionId={sessionId}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function PantryConsumptionStockReviewCard({
+  plannedMealId,
+  recipeId,
+  review,
+  sessionId
+}: {
+  plannedMealId: string | null;
+  recipeId: string;
+  review: PantryConsumptionStockReview;
+  sessionId: string;
+}) {
+  const state = review.state;
+  const relevantLots =
+    state.status === "confirmed_unapplied" ? state.eligibleLots : review.pantryLots;
+
+  return (
+    <article className="rounded-lg border border-border bg-muted/30 p-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="text-lg font-bold text-primary">
+            {review.displayName}
+          </h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {formatStockReviewIngredientDetails(review)}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Source: {review.recipeNameSnapshot}
+          </p>
+        </div>
+        <span className="w-fit rounded-full border border-border bg-background px-3 py-1 text-xs font-bold text-primary">
+          {formatStockReviewStatus(state.status)}
+        </span>
+      </div>
+
+      {state.status === "confirmed_unapplied" ? (
+        <div className="mt-4 space-y-4">
+          {state.readiness === "ineligible" ? (
+            <p className="rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
+              {formatStockReviewIneligibleReason(state.reason)}
+            </p>
+          ) : null}
+
+          {relevantLots.length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-sm font-bold text-primary">
+                Compatible pantry lots
+              </p>
+              <div className="grid gap-2 md:grid-cols-2">
+                {relevantLots.map((lot) => (
+                  <div
+                    className="rounded-md border border-border bg-background px-3 py-2 text-sm"
+                    key={lot.id}
+                  >
+                    <p className="font-semibold text-primary">{lot.displayName}</p>
+                    <p className="mt-1 text-muted-foreground">
+                      {formatQuantityUnit(lot.quantity, lot.unit)}
+                      {lot.expirationDate ? ` - expires ${lot.expirationDate}` : ""}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {state.readiness === "single_lot_auto" &&
+          state.autoSelectedPantryItemId ? (
+            <form action={applyPantryConsumptionStockAction} className="space-y-3">
+              <CommonInputs
+                plannedMealId={plannedMealId}
+                recipeId={recipeId}
+                sessionId={sessionId}
+              />
+              <input
+                name="cookingSessionIngredientId"
+                type="hidden"
+                value={review.cookingSessionIngredientId}
+              />
+              <input
+                name="appliedQuantity"
+                type="hidden"
+                value={state.proposedQuantity ?? ""}
+              />
+              <input
+                name="appliedUnit"
+                type="hidden"
+                value={state.proposedUnit ?? ""}
+              />
+              <input
+                name="allocationPantryItemId"
+                type="hidden"
+                value={state.autoSelectedPantryItemId}
+              />
+              <input
+                name="allocationQuantity"
+                type="hidden"
+                value={state.proposedQuantity ?? ""}
+              />
+              <input
+                name="allocationUnit"
+                type="hidden"
+                value={state.proposedUnit ?? ""}
+              />
+              <label className="block text-sm font-medium">
+                Application note
+                <input
+                  className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  name="note"
+                  placeholder="Applied from pantry lot"
+                  type="text"
+                />
+              </label>
+              <button
+                className="min-h-11 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/95"
+                type="submit"
+              >
+                Apply pantry stock
+              </button>
+            </form>
+          ) : null}
+
+          {state.readiness === "allocation_required" ? (
+            <form action={applyPantryConsumptionStockAction} className="space-y-3">
+              <CommonInputs
+                plannedMealId={plannedMealId}
+                recipeId={recipeId}
+                sessionId={sessionId}
+              />
+              <input
+                name="cookingSessionIngredientId"
+                type="hidden"
+                value={review.cookingSessionIngredientId}
+              />
+              <input
+                name="appliedQuantity"
+                type="hidden"
+                value={state.proposedQuantity ?? ""}
+              />
+              <input
+                name="appliedUnit"
+                type="hidden"
+                value={state.proposedUnit ?? ""}
+              />
+              <div className="grid gap-3 md:grid-cols-2">
+                {state.eligibleLots.map((lot) => (
+                  <label className="block text-sm font-medium" key={lot.id}>
+                    Use from {lot.displayName}
+                    <input
+                      name="allocationPantryItemId"
+                      type="hidden"
+                      value={lot.id}
+                    />
+                    <input
+                      name="allocationUnit"
+                      type="hidden"
+                      value={state.proposedUnit ?? ""}
+                    />
+                    <input
+                      className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                      min="0"
+                      name="allocationQuantity"
+                      placeholder={`0 ${state.proposedUnit ?? ""}`}
+                      step="any"
+                      type="number"
+                    />
+                  </label>
+                ))}
+              </div>
+              <label className="block text-sm font-medium">
+                Application note
+                <input
+                  className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  name="note"
+                  placeholder="Applied across selected lots"
+                  type="text"
+                />
+              </label>
+              <button
+                className="min-h-11 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/95"
+                type="submit"
+              >
+                Apply reviewed allocation
+              </button>
+            </form>
+          ) : null}
+        </div>
+      ) : null}
+
+      {state.status === "applied" || state.status === "reversed" ? (
+        <div className="mt-4 space-y-3">
+          <StockApplicationAllocationList
+            pantryLots={review.pantryLots}
+            state={state}
+          />
+          {state.status === "applied" ? (
+            <form
+              action={reversePantryConsumptionStockApplicationAction}
+              className="space-y-3"
+            >
+              <CommonInputs
+                plannedMealId={plannedMealId}
+                recipeId={recipeId}
+                sessionId={sessionId}
+              />
+              <input
+                name="stockApplicationId"
+                type="hidden"
+                value={state.application.id}
+              />
+              <label className="block text-sm font-medium">
+                Reversal note
+                <input
+                  className="mt-1 min-h-11 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  name="note"
+                  placeholder="Undo accidental stock application"
+                  type="text"
+                />
+              </label>
+              <button
+                className="min-h-11 rounded-md border border-primary/30 px-4 py-2 text-sm font-semibold text-primary hover:border-primary hover:bg-background"
+                type="submit"
+              >
+                Reverse pantry stock
+              </button>
+            </form>
+          ) : (
+            <p className="rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
+              This stock application was reversed. It cannot be applied again.
+            </p>
+          )}
+        </div>
+      ) : null}
+
+      {state.status === "skipped" ? (
+        <p className="mt-4 rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
+          This ingredient was skipped for pantry consumption. Skipped items do
+          not apply stock.
+        </p>
+      ) : null}
+    </article>
+  );
+}
+
+function StockApplicationAllocationList({
+  pantryLots,
+  state
+}: {
+  pantryLots: PantryConsumptionStockReview["pantryLots"];
+  state: Extract<
+    PantryConsumptionStockReview["state"],
+    { status: "applied" | "reversed" }
+  >;
+}) {
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-bold text-primary">
+        {state.status === "applied" ? "Applied allocations" : "Reversed allocations"}
+      </p>
+      <div className="grid gap-2 md:grid-cols-2">
+        {state.application.allocations.map((allocation) => {
+          const lot = pantryLots.find(
+            (pantryLot) => pantryLot.id === allocation.pantryItemId
+          );
+
+          return (
+            <div
+              className="rounded-md border border-border bg-background px-3 py-2 text-sm"
+              key={allocation.id}
+            >
+              <p className="font-semibold text-primary">
+                {lot?.displayName ?? "Pantry lot"}
+              </p>
+              <p className="mt-1 text-muted-foreground">
+                {formatQuantityUnit(allocation.appliedQuantity, allocation.unit)}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function ReadOnlyMetric({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-lg border border-border bg-background/70 p-3">
@@ -1061,6 +1419,51 @@ function formatConsumptionCandidateDetails(candidate: PantryConsumptionCandidate
   ].filter(Boolean);
 
   return parts.join(" - ");
+}
+
+function formatStockReviewIngredientDetails(review: PantryConsumptionStockReview) {
+  const parts = [
+    formatQuantityUnit(review.quantity, review.unit),
+    review.foodName,
+    "Reviewed for pantry consumption"
+  ].filter(Boolean);
+
+  return parts.join(" - ");
+}
+
+function formatQuantityUnit(quantity: number | null, unit: string | null) {
+  return [quantity, unit].filter((value) => value !== null && value !== "").join(" ");
+}
+
+function formatStockReviewStatus(
+  status: PantryConsumptionStockReview["state"]["status"]
+) {
+  if (status === "confirmed_unapplied") {
+    return "Confirmed, not applied";
+  }
+
+  if (status === "invalid_stale") {
+    return "Needs review";
+  }
+
+  return formatToken(status);
+}
+
+function formatStockReviewIneligibleReason(
+  reason: Extract<
+    PantryConsumptionStockReview["state"],
+    { status: "confirmed_unapplied" }
+  >["reason"]
+) {
+  if (reason === "missing_quantity") {
+    return "This ingredient has no structured quantity, so pantry stock cannot be applied.";
+  }
+
+  if (reason === "missing_unit") {
+    return "This ingredient has no structured unit, so pantry stock cannot be applied.";
+  }
+
+  return "No compatible pantry lot is available for this ingredient and unit.";
 }
 
 function formatItemCount(value: number) {

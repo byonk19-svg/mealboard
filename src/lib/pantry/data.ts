@@ -25,11 +25,15 @@ import {
   type PantryConsumptionDecision
 } from "./consumption-candidates";
 import {
+  buildPantryConsumptionStockState,
   validatePantryConsumptionStockAllocations,
   validatePantryConsumptionStockApplicationInput,
   type PantryConsumptionStockAllocationDraft,
   type PantryConsumptionStockAllocationValidationReason,
-  type PantryConsumptionStockApplicationValidationReason
+  type PantryConsumptionStockApplication,
+  type PantryConsumptionStockApplicationValidationReason,
+  type PantryConsumptionStockLot,
+  type PantryConsumptionStockState
 } from "./consumption-stock-application";
 import {
   derivePantryUseSoonSignals,
@@ -158,6 +162,19 @@ type PantryConsumptionStockApplicationRow = {
   pantry_consumption_decision_id: string;
 };
 
+type PantryConsumptionStockApplicationAllocationRow = {
+  applied_quantity: number | string;
+  id: string;
+  pantry_item_id: string;
+  stock_application_id: string;
+  unit: string;
+};
+
+type PantryConsumptionStockApplicationReversalRow = {
+  id: string;
+  stock_application_id: string;
+};
+
 type PantryConsumptionCookingSessionRow = {
   completed_at: string | null;
   cooking_session_ingredients: Array<{
@@ -222,6 +239,19 @@ export type ReversePantryConsumptionStockResult = {
   status: "already_reversed" | "reversed";
   stockApplicationId: string;
   stockApplicationReversalId: string;
+};
+
+export type PantryConsumptionStockReview = {
+  cookingSessionIngredientId: string;
+  displayName: string;
+  foodId: string;
+  foodName: string | null;
+  pantryLots: PantryConsumptionStockLot[];
+  quantity: number | null;
+  recipeNameSnapshot: string;
+  sortOrder: number;
+  state: PantryConsumptionStockState;
+  unit: string | null;
 };
 
 export async function getPantryItems(
@@ -400,6 +430,119 @@ export async function getPantryConsumptionCandidatesWithClient({
   });
 
   return buildPantryConsumptionCandidates({ cookingSessions, decisions });
+}
+
+export async function getPantryConsumptionStockReviews({
+  cookingSessionId,
+  householdId
+}: {
+  cookingSessionId: string;
+  householdId: string;
+}) {
+  const supabase = await createClient();
+  return getPantryConsumptionStockReviewsWithClient({
+    cookingSessionId,
+    householdId,
+    supabase
+  });
+}
+
+export async function getPantryConsumptionStockReviewsWithClient({
+  cookingSessionId,
+  householdId,
+  supabase
+}: {
+  cookingSessionId: string;
+  householdId: string;
+  supabase: SupabaseClient;
+}): Promise<PantryConsumptionStockReview[]> {
+  const cookingSessions = await getCompletedCookingSessionsForPantryConsumption({
+    cookingSessionId,
+    householdId,
+    supabase
+  });
+  const reviewedIngredients = cookingSessions.flatMap((session) =>
+    session.ingredients
+      .filter((ingredient) => ingredient.foodId)
+      .map((ingredient) => ({
+        ...ingredient,
+        recipeNameSnapshot: session.recipeNameSnapshot
+      }))
+  );
+  const ingredientIds = reviewedIngredients.map((ingredient) => ingredient.id);
+  const decisions = await getPantryConsumptionDecisionRowsByIngredientIds({
+    cookingSessionIngredientIds: ingredientIds,
+    householdId,
+    supabase
+  });
+  const decisionsByIngredientId = new Map(
+    decisions.map((decision) => [decision.cooking_session_ingredient_id, decision])
+  );
+  const decisionIds = decisions
+    .map((decision) => decision.id)
+    .filter((id): id is string => Boolean(id));
+  const [applicationsByDecisionId, pantryItems] = await Promise.all([
+    getPantryConsumptionStockApplicationsByDecisionIds({
+      decisionIds,
+      householdId,
+      supabase
+    }),
+    getPantryItemsWithClient({
+      householdId,
+      options: { includeDiscarded: true },
+      supabase
+    })
+  ]);
+  const pantryLots = pantryItems.map(mapPantryItemToConsumptionStockLot);
+
+  return reviewedIngredients
+    .map((ingredient) => {
+      const decision = decisionsByIngredientId.get(ingredient.id) ?? null;
+
+      if (!decision) {
+        return null;
+      }
+
+      const application = decision.id
+        ? applicationsByDecisionId.get(decision.id) ?? null
+        : null;
+
+      return {
+        cookingSessionIngredientId: ingredient.id,
+        displayName: ingredient.displayName,
+        foodId: ingredient.foodId as string,
+        foodName: ingredient.foodName,
+        pantryLots,
+        quantity: ingredient.quantity,
+        recipeNameSnapshot: ingredient.recipeNameSnapshot,
+        sortOrder: ingredient.sortOrder,
+        state: buildPantryConsumptionStockState({
+          application,
+          candidate: {
+            cookingSessionIngredientId: ingredient.id,
+            foodId: ingredient.foodId as string,
+            quantity: ingredient.quantity,
+            unit: ingredient.unit
+          },
+          decision: {
+            cookingSessionIngredientId: decision.cooking_session_ingredient_id,
+            status: decision.status
+          },
+          householdId,
+          pantryItems: pantryLots
+        }),
+        unit: ingredient.unit
+      } satisfies PantryConsumptionStockReview;
+    })
+    .filter((review): review is PantryConsumptionStockReview => Boolean(review))
+    .sort(
+      (left, right) =>
+        left.sortOrder - right.sortOrder ||
+        left.displayName.localeCompare(right.displayName) ||
+        left.cookingSessionIngredientId.localeCompare(
+          right.cookingSessionIngredientId
+        )
+    );
 }
 
 export async function confirmPantryIntakeCandidate({
@@ -1747,6 +1890,32 @@ async function getPantryConsumptionDecisionsByIngredientIds({
   }));
 }
 
+async function getPantryConsumptionDecisionRowsByIngredientIds({
+  cookingSessionIngredientIds,
+  householdId,
+  supabase
+}: {
+  cookingSessionIngredientIds: string[];
+  householdId: string;
+  supabase: SupabaseClient;
+}): Promise<PantryConsumptionDecisionRow[]> {
+  if (cookingSessionIngredientIds.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from("pantry_consumption_decisions")
+    .select("id, cooking_session_ingredient_id, status")
+    .eq("household_id", householdId)
+    .in("cooking_session_ingredient_id", cookingSessionIngredientIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []) as PantryConsumptionDecisionRow[];
+}
+
 async function getPantryConsumptionDecisionByIngredientId({
   cookingSessionIngredientId,
   householdId,
@@ -1791,6 +1960,157 @@ async function hasPantryConsumptionStockApplication({
   }
 
   return Boolean(data as PantryConsumptionStockApplicationRow | null);
+}
+
+async function getPantryConsumptionStockApplicationsByDecisionIds({
+  decisionIds,
+  householdId,
+  supabase
+}: {
+  decisionIds: string[];
+  householdId: string;
+  supabase: SupabaseClient;
+}): Promise<Map<string, PantryConsumptionStockApplication>> {
+  const applicationsByDecisionId = new Map<
+    string,
+    PantryConsumptionStockApplication
+  >();
+
+  if (decisionIds.length === 0) {
+    return applicationsByDecisionId;
+  }
+
+  const { data: applicationData, error: applicationError } = await supabase
+    .from("pantry_consumption_stock_applications")
+    .select("id, pantry_consumption_decision_id")
+    .eq("household_id", householdId)
+    .in("pantry_consumption_decision_id", decisionIds);
+
+  if (applicationError) {
+    throw new Error(applicationError.message);
+  }
+
+  const applications = (applicationData ?? []) as PantryConsumptionStockApplicationRow[];
+  const applicationIds = applications.map((application) => application.id);
+
+  if (applicationIds.length === 0) {
+    return applicationsByDecisionId;
+  }
+
+  const [allocationsByApplicationId, reversalsByApplicationId] =
+    await Promise.all([
+      getPantryConsumptionStockAllocationsByApplicationIds({
+        applicationIds,
+        householdId,
+        supabase
+      }),
+      getPantryConsumptionStockReversalsByApplicationIds({
+        applicationIds,
+        householdId,
+        supabase
+      })
+    ]);
+
+  for (const application of applications) {
+    applicationsByDecisionId.set(application.pantry_consumption_decision_id, {
+      allocations: allocationsByApplicationId.get(application.id) ?? [],
+      id: application.id,
+      reversal: reversalsByApplicationId.get(application.id) ?? null
+    });
+  }
+
+  return applicationsByDecisionId;
+}
+
+async function getPantryConsumptionStockAllocationsByApplicationIds({
+  applicationIds,
+  householdId,
+  supabase
+}: {
+  applicationIds: string[];
+  householdId: string;
+  supabase: SupabaseClient;
+}) {
+  const allocationsByApplicationId = new Map<
+    string,
+    PantryConsumptionStockApplication["allocations"]
+  >();
+
+  if (applicationIds.length === 0) {
+    return allocationsByApplicationId;
+  }
+
+  const { data, error } = await supabase
+    .from("pantry_consumption_stock_application_allocations")
+    .select("id, stock_application_id, pantry_item_id, applied_quantity, unit")
+    .eq("household_id", householdId)
+    .in("stock_application_id", applicationIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  for (const allocation of (data ?? []) as PantryConsumptionStockApplicationAllocationRow[]) {
+    allocationsByApplicationId.set(allocation.stock_application_id, [
+      ...(allocationsByApplicationId.get(allocation.stock_application_id) ?? []),
+      {
+        appliedQuantity: Number(allocation.applied_quantity),
+        id: allocation.id,
+        pantryItemId: allocation.pantry_item_id,
+        unit: allocation.unit
+      }
+    ]);
+  }
+
+  for (const [applicationId, allocations] of allocationsByApplicationId) {
+    allocationsByApplicationId.set(
+      applicationId,
+      allocations.sort(
+        (left, right) =>
+          left.pantryItemId.localeCompare(right.pantryItemId) ||
+          left.id.localeCompare(right.id)
+      )
+    );
+  }
+
+  return allocationsByApplicationId;
+}
+
+async function getPantryConsumptionStockReversalsByApplicationIds({
+  applicationIds,
+  householdId,
+  supabase
+}: {
+  applicationIds: string[];
+  householdId: string;
+  supabase: SupabaseClient;
+}) {
+  const reversalsByApplicationId = new Map<
+    string,
+    NonNullable<PantryConsumptionStockApplication["reversal"]>
+  >();
+
+  if (applicationIds.length === 0) {
+    return reversalsByApplicationId;
+  }
+
+  const { data, error } = await supabase
+    .from("pantry_consumption_stock_application_reversals")
+    .select("id, stock_application_id")
+    .eq("household_id", householdId)
+    .in("stock_application_id", applicationIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  for (const reversal of (data ?? []) as PantryConsumptionStockApplicationReversalRow[]) {
+    reversalsByApplicationId.set(reversal.stock_application_id, {
+      id: reversal.id
+    });
+  }
+
+  return reversalsByApplicationId;
 }
 
 async function getEditableGroceryListsWithClient({
@@ -2017,6 +2337,23 @@ function mapPantryItemRow(row: PantryItemRow): PantryItem {
     storageLocation: row.storage_location,
     unit: row.unit,
     updatedAt: row.updated_at
+  };
+}
+
+function mapPantryItemToConsumptionStockLot(
+  item: PantryItem
+): PantryConsumptionStockLot {
+  return {
+    discardedAt: item.discardedAt,
+    displayName: item.displayName,
+    expirationDate: item.expirationDate,
+    foodId: item.foodId,
+    householdId: item.householdId,
+    id: item.id,
+    quantity: item.quantity,
+    stockStatus: item.stockStatus,
+    unit: item.unit,
+    updatedAt: item.updatedAt
   };
 }
 
