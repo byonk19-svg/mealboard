@@ -8,6 +8,7 @@ import {
   getPantryConsumptionCandidatesWithClient,
   getPantryIntakeCandidatesWithClient,
   getPantryUseSoonSignalsWithClient,
+  reversePantryConsumptionStockApplicationWithClient,
   skipPantryConsumptionCandidateWithClient,
   skipPantryIntakeCandidateWithClient
 } from "./data";
@@ -62,6 +63,7 @@ type PantryItemRow = Record<string, unknown> & {
   food_id: string;
   household_id: string;
   id: string;
+  pantry_lot_revision?: number;
   quantity: number | string | null;
   stock_status: string;
   unit: string | null;
@@ -128,8 +130,10 @@ type PantryConsumptionStockApplicationAllocationRow = {
   household_id: string;
   id: string;
   pantry_item_id: string;
+  pantry_lot_revision_after?: number | null;
   pantry_quantity_after: number;
   pantry_quantity_before: number;
+  pantry_updated_at_after?: string | null;
   stock_application_id: string;
   unit: string;
 };
@@ -137,7 +141,21 @@ type PantryConsumptionStockApplicationAllocationRow = {
 type PantryConsumptionStockApplicationReversalRow = {
   household_id: string;
   id: string;
+  note?: string | null;
+  reversed_by_user_id?: string | null;
   stock_application_id: string;
+};
+
+type PantryConsumptionStockApplicationReversalAllocationRow = {
+  household_id: string;
+  id: string;
+  pantry_item_id: string;
+  pantry_quantity_after: number;
+  pantry_quantity_before: number;
+  restored_quantity: number;
+  stock_application_allocation_id: string;
+  stock_application_reversal_id: string;
+  unit: string;
 };
 
 describe("addPantryRestockCandidateToGroceryListWithClient", () => {
@@ -1517,6 +1535,342 @@ describe("pantry consumption data functions", () => {
     expect(stale.state.pantryItems[0]).toEqual(expect.objectContaining({ quantity: 1 }));
     expect(stale.state.pantryConsumptionStockApplications).toEqual([]);
   });
+
+  it("reverses one stock application and restores each allocated pantry lot exactly", async () => {
+    const fake = createFakeSupabase({
+      groceryItemSources: [groceryItemSourceRow()],
+      groceryLists: [groceryListRow()],
+      groceryListItems: [groceryListItemRow()],
+      pantryConsumptionDecisions: [
+        {
+          cooking_session_ingredient_id: "eligible-ingredient",
+          household_id: "household-1",
+          id: "consumption-decision-1",
+          status: "confirmed"
+        }
+      ],
+      pantryConsumptionStockApplicationAllocations: [
+        {
+          applied_quantity: 1,
+          household_id: "household-1",
+          id: "allocation-a",
+          pantry_item_id: "lot-a",
+          pantry_lot_revision_after: 1,
+          pantry_quantity_after: 0,
+          pantry_quantity_before: 1,
+          pantry_updated_at_after: "2026-06-29T12:00:00Z",
+          stock_application_id: "existing-application",
+          unit: "count"
+        },
+        {
+          applied_quantity: 2,
+          household_id: "household-1",
+          id: "allocation-b",
+          pantry_item_id: "lot-b",
+          pantry_quantity_after: 3,
+          pantry_quantity_before: 5,
+          pantry_lot_revision_after: 1,
+          pantry_updated_at_after: "2026-06-29T12:00:00Z",
+          stock_application_id: "existing-application",
+          unit: "count"
+        }
+      ],
+      pantryConsumptionStockApplications: [
+        {
+          applied_quantity: 3,
+          applied_unit: "count",
+          household_id: "household-1",
+          id: "existing-application",
+          note: null,
+          pantry_consumption_decision_id: "consumption-decision-1"
+        }
+      ],
+      pantryItems: [
+        pantryItemRow({
+          food_id: "food-tortillas",
+          id: "lot-a",
+          pantry_lot_revision: 1,
+          quantity: 0,
+          stock_status: "in_stock",
+          unit: "count",
+          updated_at: "2026-06-29T12:00:00Z"
+        }),
+        pantryItemRow({
+          food_id: "food-tortillas",
+          id: "lot-b",
+          pantry_lot_revision: 1,
+          quantity: 3,
+          stock_status: "in_stock",
+          unit: "count",
+          updated_at: "2026-06-29T12:00:00Z"
+        })
+      ]
+    });
+    const grocerySnapshot = JSON.stringify({
+      groceryItemSources: fake.state.groceryItemSources,
+      groceryListItems: fake.state.groceryListItems,
+      groceryLists: fake.state.groceryLists
+    });
+
+    await expect(
+      reversePantryConsumptionStockApplicationWithClient({
+        householdId: "household-1",
+        note: " Accidental apply ",
+        stockApplicationId: "existing-application",
+        supabase: fake.client
+      })
+    ).resolves.toEqual({
+      status: "reversed",
+      stockApplicationId: "existing-application",
+      stockApplicationReversalId: "stock-application-reversal-1"
+    });
+
+    expect(fake.operations).toContain("rpc:reverse_pantry_consumption_stock");
+    expect(fake.state.pantryItems.find((item) => item.id === "lot-a")).toEqual(
+      expect.objectContaining({ quantity: 1 })
+    );
+    expect(fake.state.pantryItems.find((item) => item.id === "lot-b")).toEqual(
+      expect.objectContaining({ quantity: 5 })
+    );
+    expect(fake.state.pantryConsumptionStockApplicationReversals).toEqual([
+      expect.objectContaining({
+        id: "stock-application-reversal-1",
+        note: "Accidental apply",
+        reversed_by_user_id: "user-1",
+        stock_application_id: "existing-application"
+      })
+    ]);
+    expect(fake.state.pantryConsumptionStockApplicationReversalAllocations).toEqual([
+      expect.objectContaining({
+        pantry_item_id: "lot-a",
+        pantry_quantity_after: 1,
+        pantry_quantity_before: 0,
+        restored_quantity: 1,
+        stock_application_allocation_id: "allocation-a",
+        stock_application_reversal_id: "stock-application-reversal-1"
+      }),
+      expect.objectContaining({
+        pantry_item_id: "lot-b",
+        pantry_quantity_after: 5,
+        pantry_quantity_before: 3,
+        restored_quantity: 2,
+        stock_application_allocation_id: "allocation-b",
+        stock_application_reversal_id: "stock-application-reversal-1"
+      })
+    ]);
+    expect(fake.state.pantryConsumptionDecisions[0]).toEqual(
+      expect.objectContaining({ status: "confirmed" })
+    );
+    expect(
+      JSON.stringify({
+        groceryItemSources: fake.state.groceryItemSources,
+        groceryListItems: fake.state.groceryListItems,
+        groceryLists: fake.state.groceryLists
+      })
+    ).toBe(grocerySnapshot);
+  });
+
+  it("returns already_reversed without restoring stock twice", async () => {
+    const fake = createFakeSupabase({
+      groceryLists: [],
+      groceryListItems: [],
+      pantryConsumptionStockApplicationAllocations: [
+        {
+          applied_quantity: 2,
+          household_id: "household-1",
+          id: "allocation-a",
+          pantry_item_id: "lot-a",
+          pantry_lot_revision_after: 1,
+          pantry_quantity_after: 3,
+          pantry_quantity_before: 5,
+          pantry_updated_at_after: "2026-06-29T12:00:00Z",
+          stock_application_id: "existing-application",
+          unit: "count"
+        }
+      ],
+      pantryConsumptionStockApplicationReversalAllocations: [
+        {
+          household_id: "household-1",
+          id: "reversal-allocation-a",
+          pantry_item_id: "lot-a",
+          pantry_quantity_after: 5,
+          pantry_quantity_before: 3,
+          restored_quantity: 2,
+          stock_application_allocation_id: "allocation-a",
+          stock_application_reversal_id: "existing-reversal",
+          unit: "count"
+        }
+      ],
+      pantryConsumptionStockApplicationReversals: [
+        {
+          household_id: "household-1",
+          id: "existing-reversal",
+          stock_application_id: "existing-application"
+        }
+      ],
+      pantryConsumptionStockApplications: [
+        {
+          applied_quantity: 2,
+          applied_unit: "count",
+          household_id: "household-1",
+          id: "existing-application",
+          pantry_consumption_decision_id: "consumption-decision-1"
+        }
+      ],
+      pantryItems: [
+        pantryItemRow({
+          food_id: "food-tortillas",
+          id: "lot-a",
+          quantity: 5,
+          stock_status: "in_stock",
+          unit: "count"
+        })
+      ]
+    });
+
+    await expect(
+      reversePantryConsumptionStockApplicationWithClient({
+        householdId: "household-1",
+        stockApplicationId: "existing-application",
+        supabase: fake.client
+      })
+    ).resolves.toEqual({
+      status: "already_reversed",
+      stockApplicationId: "existing-application",
+      stockApplicationReversalId: "existing-reversal"
+    });
+
+    expect(fake.state.pantryItems[0]).toEqual(expect.objectContaining({ quantity: 5 }));
+    expect(fake.state.pantryConsumptionStockApplicationReversals).toHaveLength(1);
+    expect(fake.state.pantryConsumptionStockApplicationReversalAllocations).toHaveLength(1);
+  });
+
+  it("rejects missing and cross-household stock applications without reversal writes", async () => {
+    const fake = createFakeSupabase({
+      groceryLists: [],
+      groceryListItems: [],
+      pantryConsumptionStockApplications: [
+        {
+          applied_quantity: 1,
+          applied_unit: "count",
+          household_id: "household-2",
+          id: "other-household-application",
+          pantry_consumption_decision_id: "other-decision"
+        }
+      ],
+      pantryItems: [
+        pantryItemRow({
+          food_id: "food-tortillas",
+          id: "lot-a",
+          quantity: 3,
+          stock_status: "in_stock",
+          unit: "count"
+        })
+      ]
+    });
+
+    await expect(
+      reversePantryConsumptionStockApplicationWithClient({
+        householdId: "household-1",
+        stockApplicationId: "other-household-application",
+        supabase: fake.client
+      })
+    ).rejects.toThrow(
+      "Pantry stock reversal requires an existing stock application in this household."
+    );
+
+    expect(fake.state.pantryItems[0]).toEqual(expect.objectContaining({ quantity: 3 }));
+    expect(fake.state.pantryConsumptionStockApplicationReversals).toEqual([]);
+    expect(fake.state.pantryConsumptionStockApplicationReversalAllocations).toEqual([]);
+  });
+
+  it("rejects same-quantity stale lots and incomplete reversal inputs without partial stock writes", async () => {
+    const stale = createFakeSupabase({
+      groceryLists: [],
+      groceryListItems: [],
+      pantryConsumptionStockApplicationAllocations: [
+        {
+          applied_quantity: 2,
+          household_id: "household-1",
+          id: "allocation-a",
+          pantry_item_id: "lot-a",
+          pantry_quantity_after: 3,
+          pantry_quantity_before: 5,
+          pantry_updated_at_after: "2026-06-29T12:00:00Z",
+          stock_application_id: "existing-application",
+          unit: "count"
+        }
+      ],
+      pantryConsumptionStockApplications: [
+        {
+          applied_quantity: 2,
+          applied_unit: "count",
+          household_id: "household-1",
+          id: "existing-application",
+          pantry_consumption_decision_id: "consumption-decision-1"
+        }
+      ],
+      pantryItems: [
+        pantryItemRow({
+          food_id: "food-tortillas",
+          id: "lot-a",
+          pantry_lot_revision: 2,
+          quantity: 3,
+          stock_status: "in_stock",
+          unit: "count",
+          updated_at: "2026-06-29T12:00:01Z"
+        })
+      ]
+    });
+    const incomplete = createFakeSupabase({
+      groceryLists: [],
+      groceryListItems: [],
+      pantryConsumptionStockApplications: [
+        {
+          applied_quantity: 2,
+          applied_unit: "count",
+          household_id: "household-1",
+          id: "existing-application",
+          pantry_consumption_decision_id: "consumption-decision-1"
+        }
+      ],
+      pantryItems: [
+        pantryItemRow({
+          food_id: "food-tortillas",
+          id: "lot-a",
+          quantity: 3,
+          stock_status: "in_stock",
+          unit: "count"
+        })
+      ]
+    });
+
+    await expect(
+      reversePantryConsumptionStockApplicationWithClient({
+        householdId: "household-1",
+        stockApplicationId: "existing-application",
+        supabase: stale.client
+      })
+    ).rejects.toThrow(
+      "Pantry stock reversal selected a stale or unavailable pantry lot."
+    );
+    await expect(
+      reversePantryConsumptionStockApplicationWithClient({
+        householdId: "household-1",
+        stockApplicationId: "existing-application",
+        supabase: incomplete.client
+      })
+    ).rejects.toThrow(
+      "Pantry stock reversal requires stock application allocations."
+    );
+
+    expect(stale.state.pantryItems[0]).toEqual(expect.objectContaining({ quantity: 3 }));
+    expect(stale.state.pantryConsumptionStockApplicationReversals).toEqual([]);
+    expect(incomplete.state.pantryItems[0]).toEqual(
+      expect.objectContaining({ quantity: 3 })
+    );
+    expect(incomplete.state.pantryConsumptionStockApplicationReversals).toEqual([]);
+  });
 });
 
 function createFakeSupabase({
@@ -1530,6 +1884,7 @@ function createFakeSupabase({
   groceryListItems,
   pantryConsumptionDecisions = [],
   pantryConsumptionStockApplicationAllocations = [],
+  pantryConsumptionStockApplicationReversalAllocations = [],
   pantryConsumptionStockApplications = [],
   pantryConsumptionStockApplicationReversals = [],
   pantryIntakeDecisions = [],
@@ -1546,6 +1901,7 @@ function createFakeSupabase({
   groceryListItems: GroceryListItemRow[];
   pantryConsumptionDecisions?: PantryConsumptionDecisionRow[];
   pantryConsumptionStockApplicationAllocations?: PantryConsumptionStockApplicationAllocationRow[];
+  pantryConsumptionStockApplicationReversalAllocations?: PantryConsumptionStockApplicationReversalAllocationRow[];
   pantryConsumptionStockApplications?: PantryConsumptionStockApplicationRow[];
   pantryConsumptionStockApplicationReversals?: PantryConsumptionStockApplicationReversalRow[];
   pantryIntakeDecisions?: PantryIntakeDecisionRow[];
@@ -1570,6 +1926,10 @@ function createFakeSupabase({
     })),
     pantryConsumptionStockApplicationAllocations:
       pantryConsumptionStockApplicationAllocations.map((allocation) => ({
+        ...allocation
+      })),
+    pantryConsumptionStockApplicationReversalAllocations:
+      pantryConsumptionStockApplicationReversalAllocations.map((allocation) => ({
         ...allocation
       })),
     pantryConsumptionStockApplications: pantryConsumptionStockApplications.map(
@@ -1597,19 +1957,30 @@ function createFakeSupabase({
     },
     rpc(name: string, params: Record<string, unknown>) {
       operations.push(`rpc:${name}`);
-      if (name !== "apply_pantry_consumption_stock") {
+      if (name === "apply_pantry_consumption_stock") {
+        return new FakeRpcResult(
+          executeApplyPantryConsumptionStockRpc({
+            params,
+            state
+          })
+        );
+      }
+
+      if (name === "reverse_pantry_consumption_stock") {
+        return new FakeRpcResult(
+          executeReversePantryConsumptionStockRpc({
+            params,
+            state
+          })
+        );
+      }
+
+      {
         return new FakeRpcResult({
           data: null,
           error: { message: `Unsupported RPC ${name}` }
         });
       }
-
-      return new FakeRpcResult(
-        executeApplyPantryConsumptionStockRpc({
-          params,
-          state
-        })
-      );
     }
   } as unknown as SupabaseClient;
 
@@ -1628,6 +1999,7 @@ type FakeSupabaseState = {
   pantryEvents: Array<Record<string, unknown>>;
   pantryConsumptionDecisions: PantryConsumptionDecisionRow[];
   pantryConsumptionStockApplicationAllocations: PantryConsumptionStockApplicationAllocationRow[];
+  pantryConsumptionStockApplicationReversalAllocations: PantryConsumptionStockApplicationReversalAllocationRow[];
   pantryConsumptionStockApplications: PantryConsumptionStockApplicationRow[];
   pantryConsumptionStockApplicationReversals: PantryConsumptionStockApplicationReversalRow[];
   pantryIntakeDecisions: PantryIntakeDecisionRow[];
@@ -2214,6 +2586,10 @@ function executeApplyPantryConsumptionStockRpc({
     const before = Number(item.quantity);
     const after = before - allocation.quantity;
     item.quantity = after;
+    item.updated_at = `2026-06-29T12:00:${String(
+      state.pantryConsumptionStockApplicationAllocations.length + 1
+    ).padStart(2, "0")}Z`;
+    item.pantry_lot_revision = Number(item.pantry_lot_revision ?? 0) + 1;
     state.pantryConsumptionStockApplicationAllocations.push({
       applied_quantity: allocation.quantity,
       household_id: householdId,
@@ -2221,8 +2597,10 @@ function executeApplyPantryConsumptionStockRpc({
         state.pantryConsumptionStockApplicationAllocations.length + 1
       }`,
       pantry_item_id: item.id,
+      pantry_lot_revision_after: Number(item.pantry_lot_revision),
       pantry_quantity_after: after,
       pantry_quantity_before: before,
+      pantry_updated_at_after: item.updated_at,
       stock_application_id: stockApplicationId,
       unit: allocation.unit
     });
@@ -2232,6 +2610,142 @@ function executeApplyPantryConsumptionStockRpc({
     data: {
       status: "applied",
       stock_application_id: stockApplicationId
+    },
+    error: null
+  };
+}
+
+function executeReversePantryConsumptionStockRpc({
+  params,
+  state
+}: {
+  params: Record<string, unknown>;
+  state: FakeSupabaseState;
+}): QueryResult {
+  state.beforeRpc?.(state);
+
+  const householdId = params.p_household_id as string;
+  const stockApplicationId = params.p_stock_application_id as string;
+  const note = params.p_note as string | null;
+  const existingReversal =
+    state.pantryConsumptionStockApplicationReversals.find(
+      (reversal) =>
+        reversal.household_id === householdId &&
+        reversal.stock_application_id === stockApplicationId
+    ) ?? null;
+
+  if (existingReversal) {
+    return {
+      data: {
+        status: "already_reversed",
+        stock_application_id: stockApplicationId,
+        stock_application_reversal_id: existingReversal.id
+      },
+      error: null
+    };
+  }
+
+  const application = state.pantryConsumptionStockApplications.find(
+    (candidateApplication) =>
+      candidateApplication.household_id === householdId &&
+      candidateApplication.id === stockApplicationId
+  );
+
+  if (!application) {
+    return {
+      data: null,
+      error: {
+        message:
+          "Pantry stock reversal requires an existing stock application in this household."
+      }
+    };
+  }
+
+  const allocations = state.pantryConsumptionStockApplicationAllocations.filter(
+    (allocation) =>
+      allocation.household_id === householdId &&
+      allocation.stock_application_id === stockApplicationId
+  );
+
+  if (allocations.length === 0) {
+    return {
+      data: null,
+      error: {
+        message: "Pantry stock reversal requires stock application allocations."
+      }
+    };
+  }
+
+  const touchedLots = allocations.map((allocation) => ({
+    allocation,
+    item: state.pantryItems.find(
+      (candidateItem) =>
+        candidateItem.household_id === householdId &&
+        candidateItem.id === allocation.pantry_item_id
+    )
+  }));
+
+  if (
+    touchedLots.some(
+      ({ allocation, item }) =>
+        !item ||
+        item.discarded_at !== null ||
+        item.quantity === null ||
+        Number(item.quantity) !== allocation.pantry_quantity_after ||
+        Number(item.pantry_lot_revision ?? 0) !==
+          allocation.pantry_lot_revision_after ||
+        item.unit !== allocation.unit
+    )
+  ) {
+    return {
+      data: null,
+      error: {
+        message:
+          "Pantry stock reversal selected a stale or unavailable pantry lot."
+      }
+    };
+  }
+
+  const reversalId = `stock-application-reversal-${
+    state.pantryConsumptionStockApplicationReversals.length + 1
+  }`;
+  state.pantryConsumptionStockApplicationReversals.push({
+    household_id: householdId,
+    id: reversalId,
+    note,
+    reversed_by_user_id: "user-1",
+    stock_application_id: stockApplicationId
+  });
+
+  for (const { allocation, item } of touchedLots) {
+    if (!item) {
+      continue;
+    }
+
+    const before = Number(item.quantity);
+    const after = before + allocation.applied_quantity;
+    item.quantity = after;
+    item.pantry_lot_revision = Number(item.pantry_lot_revision ?? 0) + 1;
+    state.pantryConsumptionStockApplicationReversalAllocations.push({
+      household_id: householdId,
+      id: `stock-application-reversal-allocation-${
+        state.pantryConsumptionStockApplicationReversalAllocations.length + 1
+      }`,
+      pantry_item_id: item.id,
+      pantry_quantity_after: after,
+      pantry_quantity_before: before,
+      restored_quantity: allocation.applied_quantity,
+      stock_application_allocation_id: allocation.id,
+      stock_application_reversal_id: reversalId,
+      unit: allocation.unit
+    });
+  }
+
+  return {
+    data: {
+      status: "reversed",
+      stock_application_id: stockApplicationId,
+      stock_application_reversal_id: reversalId
     },
     error: null
   };
@@ -2355,6 +2869,7 @@ function pantryItemRow(overrides: Partial<Record<string, unknown>> = {}) {
     package_detail: null,
     quantity: null,
     quantity_note: null,
+    pantry_lot_revision: 0,
     stock_status: "low",
     storage_location: null,
     unit: null,

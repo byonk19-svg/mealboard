@@ -218,6 +218,12 @@ export type ApplyPantryConsumptionStockResult = {
   stockApplicationId: string;
 };
 
+export type ReversePantryConsumptionStockResult = {
+  status: "already_reversed" | "reversed";
+  stockApplicationId: string;
+  stockApplicationReversalId: string;
+};
+
 export async function getPantryItems(
   householdId: string,
   options: { includeDiscarded?: boolean } = {}
@@ -909,6 +915,66 @@ async function applyPantryConsumptionStockViaRpc({
     cookingSessionIngredientId,
     status: result.status,
     stockApplicationId: result.stock_application_id
+  };
+}
+
+export async function reversePantryConsumptionStockApplication({
+  householdId,
+  note,
+  stockApplicationId
+}: {
+  householdId: string;
+  note?: string | null;
+  stockApplicationId: string;
+}): Promise<ReversePantryConsumptionStockResult> {
+  const supabase = await createClient();
+  return reversePantryConsumptionStockApplicationWithClient({
+    householdId,
+    note,
+    stockApplicationId,
+    supabase
+  });
+}
+
+export async function reversePantryConsumptionStockApplicationWithClient({
+  householdId,
+  note,
+  stockApplicationId,
+  supabase
+}: {
+  householdId: string;
+  note?: string | null;
+  stockApplicationId: string;
+  supabase: SupabaseClient;
+}): Promise<ReversePantryConsumptionStockResult> {
+  const { data, error } = await supabase
+    .rpc("reverse_pantry_consumption_stock", {
+      p_household_id: householdId,
+      p_note: normalizeEventNote(note),
+      p_stock_application_id: stockApplicationId
+    })
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const result = data as
+    | {
+        status: ReversePantryConsumptionStockResult["status"];
+        stock_application_id: string;
+        stock_application_reversal_id: string;
+      }
+    | null;
+
+  if (!result?.stock_application_id || !result.stock_application_reversal_id) {
+    throw new Error("Pantry stock reversal did not return an audit row.");
+  }
+
+  return {
+    status: result.status,
+    stockApplicationId: result.stock_application_id,
+    stockApplicationReversalId: result.stock_application_reversal_id
   };
 }
 

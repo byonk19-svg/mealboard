@@ -134,11 +134,11 @@ These are intentionally out of scope for the current MVP unless a future task ex
 Good next slices should stay narrow and start from the verified MVP loop. Candidate directions:
 
 - Pantry-aware planning UX refinement, only if real use shows the current `Uses pantry soon` reason chip is too subtle.
-- Explicit stock application from confirmed consumption decisions, starting with `docs/PANTRY_CONSUMPTION_STOCK_APPLICATION_V0_PRD.md` and `docs/issues/PANTRY_CONSUMPTION_STOCK_APPLICATION_V0_ISSUES.md`; do not implement stock mutation until those rules are accepted.
+- Pantry consumption stock application UI, starting with Issue 5 in `docs/issues/PANTRY_CONSUMPTION_STOCK_APPLICATION_V0_ISSUES.md`; keep confirm/skip review actions write-free and expose apply/reverse as separate reviewed pantry stock actions.
 - Member role editing beyond owner transfer and household switching.
 - Broader PWA/mobile offline resilience for grocery shopping beyond bounded item-state retry.
 - Email-delivered invitations if shared household use becomes frequent.
 
 Prefer one focused slice at a time, and keep cloud Supabase migration pushes as explicit approval points.
 
-Recommendation: treat stock deduction from cooking as a rules-first product fork. The next implementation step should start from the stock-application PRD and issue plan so lot allocation, partial use, exact-unit behavior, undo/reversal, multi-lot matching, idempotency, and actor/audit history are explicit before any pantry quantity write exists.
+Recommendation: finish the reviewed stock-application surface next. The schema, rules, explicit apply action, and reversal action now define lot allocation, partial use, exact-unit behavior, undo/reversal, multi-lot matching, idempotency, and actor/audit history; the next slice should make those states visible and actionable without adding hidden stock mutation from Cooking Mode completion, confirm/skip review, grocery completion, or Already Have state.
