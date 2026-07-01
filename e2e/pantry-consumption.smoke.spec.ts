@@ -99,6 +99,25 @@ test.describe("Pantry consumption review", () => {
         .locator("xpath=ancestor::section[1]")
         .getByText("Reversed", { exact: true })
     ).toBeVisible();
+    const reversedStockReviewSection = page
+      .getByRole("heading", { name: "Pantry stock application review" })
+      .locator("xpath=ancestor::section[1]");
+    const reversedStockReviewCard = reversedStockReviewSection
+      .getByRole("article")
+      .filter({ hasText: "E2E Consumption tortillas" });
+    await expect(
+      reversedStockReviewCard.getByRole("button", {
+        name: "Reverse pantry stock"
+      })
+    ).toHaveCount(0);
+    await expect(
+      reversedStockReviewCard.getByRole("button", { name: "Apply pantry stock" })
+    ).toHaveCount(0);
+    await expect(
+      reversedStockReviewCard.getByRole("button", {
+        name: "Apply reviewed allocation"
+      })
+    ).toHaveCount(0);
 
     await page.goto("/pantry");
     await expect(page.getByText(pantryLotName)).toBeVisible();
@@ -183,6 +202,27 @@ test.describe("Pantry consumption review", () => {
       page.getByText("No pantry consumption candidates left.")
     ).toBeVisible();
     await expect(page.getByText("Reversed", { exact: true })).toBeVisible();
+    const reloadedReversedStockReviewSection = page
+      .getByRole("heading", { name: "Pantry stock application review" })
+      .locator("xpath=ancestor::section[1]");
+    const reloadedReversedStockReviewCard = reloadedReversedStockReviewSection
+      .getByRole("article")
+      .filter({ hasText: "E2E Consumption tortillas" });
+    await expect(
+      reloadedReversedStockReviewCard.getByRole("button", {
+        name: "Reverse pantry stock"
+      })
+    ).toHaveCount(0);
+    await expect(
+      reloadedReversedStockReviewCard.getByRole("button", {
+        name: "Apply pantry stock"
+      })
+    ).toHaveCount(0);
+    await expect(
+      reloadedReversedStockReviewCard.getByRole("button", {
+        name: "Apply reviewed allocation"
+      })
+    ).toHaveCount(0);
     await expect(
       page
         .getByText("No compatible pantry lot is auto-ready for this ingredient and unit.")
@@ -248,6 +288,11 @@ test.describe("Pantry consumption review", () => {
     ).toBeVisible();
     await expect(
       stockReviewSection.getByRole("button", { name: "Apply reviewed allocation" })
+    ).toBeVisible();
+    await expect(
+      stockReviewSection.getByText(
+        "Split exactly 2 count across these lots before applying."
+      )
     ).toBeVisible();
 
     await stockReviewSection.getByLabel(`Use from ${primaryLotName}`).fill("1");

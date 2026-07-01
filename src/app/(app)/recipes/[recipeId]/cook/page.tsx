@@ -1121,6 +1121,8 @@ function StockApplicationForm({
   sessionId: string;
   submitLabel: string;
 }) {
+  const allocationTarget = formatQuantityUnit(appliedQuantity, appliedUnit);
+
   return (
     <form action={applyPantryConsumptionStockAction} className="space-y-3">
       <CommonInputs
@@ -1158,6 +1160,12 @@ function StockApplicationForm({
           />
         </label>
       </div>
+      {lots.length > 1 ? (
+        <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+          Split exactly {allocationTarget || "the applied quantity"} across
+          these lots before applying.
+        </p>
+      ) : null}
       <div className="grid gap-3 md:grid-cols-2">
         {lots.map((lot) => (
           <div
