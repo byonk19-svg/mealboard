@@ -44,6 +44,7 @@ Implemented MVP surfaces include:
 - Playwright smoke coverage for protected route auth boundaries, plus credential-gated core-loop, settings-foods, household-member, and mobile grocery smokes
 
 See `docs/MVP_READINESS.md` for the manual smoke checklist, known gaps, deferred features, and local environment notes.
+See `docs/RELEASE_READINESS.md` before treating a branch, deploy, or private MVP build as ready for household use.
 
 ## Local Setup
 
