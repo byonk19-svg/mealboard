@@ -5,7 +5,7 @@ import { resolveLoginReturnPath } from "@/lib/auth/return-path";
 import { createClient } from "@/lib/supabase/server";
 
 const loginImageUrl =
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuAzKBXpksQynChiYbVoPEkyK55rfmm0RlkDjw0yAi6QYv9fr9jtu4WObpKnyizza7d4zlz4xmfTB2JauCCl1bESM-qraG6HbxSkyoID-xIdTIjrKItQRUNxuHIP9-0aIJXczzuQvD1aRUzZyci_h3S0LaeLLkD8W-1fVQ-NEZEdMbD0XhRuu4AzK1-T8gNLrEtrBXes8x5Nmg5wg0nVclCeV7sP_pZo4yANLcWLNfgcLiYUprV_yvYVPA";
+  "/images/mealboard/login-kitchen-counter.png";
 
 type LoginPageProps = {
   searchParams: Promise<{
@@ -57,6 +57,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             alt="Fresh ingredients arranged on a bright kitchen counter."
             className="object-cover"
             fill
+            priority
             sizes="(min-width: 768px) 50vw, 100vw"
             src={loginImageUrl}
           />
