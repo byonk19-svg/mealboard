@@ -60,6 +60,8 @@ function isProtectedAppPath(pathname: string) {
   return (
     pathname === "/dashboard" ||
     pathname === "/grocery-list" ||
+    pathname === "/pantry" ||
+    pathname.startsWith("/pantry/") ||
     pathname === "/plan-week" ||
     pathname === "/recipes" ||
     pathname.startsWith("/recipes/") ||
