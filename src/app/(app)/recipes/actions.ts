@@ -153,6 +153,13 @@ function parseRecipePayload(formData: FormData, path: string) {
     recipeRedirect(path, "Recipe source URL must start with http:// or https://.");
   }
 
+  const parsedNutritionConfidence: EstimateConfidence | null =
+    nutritionConfidence && isEstimateConfidence(nutritionConfidence)
+      ? nutritionConfidence
+      : null;
+  const parsedRepeatRule: RecipeRepeatRule | null =
+    repeatRule && isRecipeRepeatRule(repeatRule) ? repeatRule : null;
+
   const servings = parseOptionalNumber(formData.get("servings"), "Servings", {
     min: 0.01
   });
@@ -206,14 +213,14 @@ function parseRecipePayload(formData: FormData, path: string) {
     prep_minutes: prepMinutes.value,
     cook_minutes: cookMinutes.value,
     effort_level: textOrNull(formData.get("effortLevel")),
-    repeat_rule: repeatRule,
+    repeat_rule: parsedRepeatRule,
     instructions: textOrNull(formData.get("instructions")),
     notes: textOrNull(formData.get("notes")),
     source_title: textOrNull(formData.get("sourceTitle")),
     source_url: sourceUrl,
     estimated_calories_per_serving: calories.value,
     estimated_protein_grams_per_serving: protein.value,
-    nutrition_confidence: nutritionConfidence
+    nutrition_confidence: parsedNutritionConfidence
   };
 }
 
