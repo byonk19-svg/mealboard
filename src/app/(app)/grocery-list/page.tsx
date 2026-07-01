@@ -39,7 +39,7 @@ import { CopyGroceryListButton } from "./copy-grocery-list-button";
 import { GroceryItemStateControls } from "./grocery-item-state-controls";
 
 const groceryCtaImageUrl =
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuCNzTsXI0Ku10zSBGGamdNWC_RanwSg3R_8MNuJn0lnRsAkCMYlhGwtrkpe3MscUiMj5fvOP0jcOeOzClQKTLP2qwTaC2btC7NDfC9CEiodw8p6brWlY2abk4bp2vNxoN2Bk3P3L3SNjaLoZwg_yCgDfrzXrrqM0z36-COZUiLy6tkNIdMsU_Csr5LHnCCyN12UyHzOm61Z1kSWCqboq8SXHoFovj6LtTgwX8eMSAU5jEhspBEUcRWJJQ";
+  "/images/mealboard/grocery-list-market-bag.png";
 
 type GroceryListPageProps = {
   searchParams: Promise<{

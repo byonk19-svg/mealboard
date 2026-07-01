@@ -78,7 +78,7 @@ import {
 import { getWeekDates, getWeekStartDate } from "@/lib/weekly-plans/week-dates";
 
 const planWeekImageUrl =
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuDCTgosnQ9ZPeRUgUEGAA_6hf2j05Ng5cZ_LoI7SRoBCpqKsVvRDd5Kg9rAC6NHPJAemS2EzJsT-JQMjum_tg471Ko7Jx8FL2SD4nmAGtHtNgky09F7m6NHvA_hEgFUGdQkbWSWEPcyVdp9NP-LzU8FwDXU7FzHAVxMV943rNyNFBVnaFq-7ljvh3UHXKertZJACN8wAeDfa4c---E180gX8Mmd0osNrA7jqnLO6cY4rWTCXDVisRgvwA";
+  "/images/mealboard/plan-week-notebook.png";
 
 type PlanWeekPageProps = {
   searchParams: Promise<{
@@ -110,9 +110,7 @@ export default async function PlanWeekPage({
     getWeeklyPlan(householdContext.household.id, weekStartDate)
   ]);
   const adultProfiles = profiles.filter(
-    (profile) =>
-      profile.profile_type === "adult" &&
-      ["Brianna", "Elaine"].includes(profile.name)
+    (profile) => profile.profile_type === "adult"
   );
   const planningProfiles = profiles.filter((profile) =>
     ["adult", "baby", "shared"].includes(profile.profile_type)
@@ -315,6 +313,7 @@ export default async function PlanWeekPage({
               alt="A calm kitchen table with a blank planning notebook."
               className="h-full w-full object-cover"
               fill
+              priority
               sizes="(min-width: 1024px) 320px, 100vw"
               src={planWeekImageUrl}
             />
@@ -337,7 +336,7 @@ export default async function PlanWeekPage({
                 <div>
                   <h2 className="calm-heading text-xl">Adult day types</h2>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    Mark Brianna and Elaine as work or off days for this week.
+                    Mark adult profiles as work or off days for this week.
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground sm:hidden">
                     Scroll the day grid sideways to see the full week.

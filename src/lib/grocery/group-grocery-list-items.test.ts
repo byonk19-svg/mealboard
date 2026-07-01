@@ -76,6 +76,46 @@ describe("group grocery list items", () => {
     ]);
   });
 
+  it("keeps custom adult profile groups before baby, shared, and household fallback groups", () => {
+    const alexSnack = groceryItem("item-alex-snack", "Protein bar", [
+      source("source-1", {
+        label: "Protein bar for Alex snack on 2026-06-03",
+        mealProfileName: "Alex",
+        recipeName: null
+      })
+    ]);
+    const jordanLunch = groceryItem("item-jordan-lunch", "Turkey wrap", [
+      source("source-2", {
+        label: "Turkey wrap for Jordan lunch on 2026-06-03",
+        mealProfileName: "Jordan",
+        recipeName: "Turkey wrap"
+      })
+    ]);
+    const babyFood = groceryItem("item-baby-food", "Banana", [
+      source("source-3", {
+        label: "Banana for Baby snack on 2026-06-03",
+        mealProfileName: "Baby",
+        recipeName: null
+      })
+    ]);
+    const napkins = groceryItem("item-napkins", "Napkins", [
+      source("source-4", {
+        label: "Household item",
+        mealProfileName: null,
+        recipeName: null
+      })
+    ]);
+
+    expect(
+      groupGroceryItemsByProfile([
+        napkins,
+        babyFood,
+        jordanLunch,
+        alexSnack
+      ]).map((group) => group.groupName)
+    ).toEqual(["Alex", "Jordan", "Baby", "Household"]);
+  });
+
   it("places items without a meal profile in Household", () => {
     const paperTowels = groceryItem("item-paper-towels", "Paper towels", [
       source("source-1", {

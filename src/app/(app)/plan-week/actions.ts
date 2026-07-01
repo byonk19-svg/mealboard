@@ -437,6 +437,15 @@ export async function confirmWeeklyPlanItemSwap(formData: FormData) {
     );
   }
 
+  if (!targetItem.recipe_id) {
+    planWeekRedirect(
+      weekStartDate,
+      "Only planned recipes can be swapped.",
+      view
+    );
+  }
+
+  const currentRecipeId = targetItem.recipe_id;
   const { data: updatedItem, error } = await supabase
     .from("weekly_plan_items")
     .update({
@@ -450,7 +459,7 @@ export async function confirmWeeklyPlanItemSwap(formData: FormData) {
     .eq("household_id", household.id)
     .eq("id", targetItem.id)
     .eq("is_locked", false)
-    .eq("recipe_id", targetItem.recipe_id)
+    .eq("recipe_id", currentRecipeId)
     .select("id")
     .maybeSingle();
 
