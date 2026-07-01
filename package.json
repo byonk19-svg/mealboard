@@ -26,6 +26,7 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run",
+    "types:supabase:local": "supabase gen types typescript --local > src/types/database.ts",
     "typecheck": "tsc --noEmit",
     "verify": "node scripts/verify-local.mjs",
     "verify:pantry-rls": "node scripts/verify-pantry-rls.mjs"
