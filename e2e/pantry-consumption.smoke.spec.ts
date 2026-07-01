@@ -19,6 +19,7 @@ test.describe("Pantry consumption review", () => {
     const seeded = seedPantryConsumptionFixture();
     const cookUrl = `/recipes/${seeded.recipeId}/cook?sessionId=${seeded.cookingSessionId}`;
     const pantryLotName = `E2E Consumption tortillas lot ${seeded.recipeId.slice(0, 8)}`;
+    const cuminLotName = `E2E Consumption cumin lot ${seeded.recipeId.slice(0, 8)}`;
 
     await signIn(page);
     await page.goto(cookUrl);
@@ -49,6 +50,9 @@ test.describe("Pantry consumption review", () => {
       })
     ).toBeVisible();
     await expect(stockReviewSection.getByText("Confirmed, not applied")).toBeVisible();
+    await expect(
+      stockReviewSection.getByText("Pantry quantities change only after Apply.")
+    ).toBeVisible();
     await expect(
       stockReviewSection.getByText(pantryLotName, { exact: true })
     ).toBeVisible();
@@ -129,14 +133,49 @@ test.describe("Pantry consumption review", () => {
       .getByRole("button", { name: "Confirm consumption" })
       .click();
     await expect(page.getByText("Consumption confirmed.")).toBeVisible();
+    const manualReviewCard = page
+      .getByRole("article")
+      .filter({ hasText: "E2E Consumption cumin" });
+    await expect(
+      manualReviewCard.getByText(cuminLotName, { exact: true })
+    ).toBeVisible();
+    await expect(
+      manualReviewCard.getByText(
+        "No compatible pantry lot is auto-ready for this ingredient and unit."
+      )
+    ).toBeVisible();
+    await expect(
+      manualReviewCard.getByText("review quantity/unit details below")
+    ).toBeVisible();
+    await expect(
+      manualReviewCard.getByRole("button", { name: "Apply pantry stock" })
+    ).toBeVisible();
+
+    const noLotReviewSection = page
+      .getByRole("heading", { name: "Pantry consumption review" })
+      .locator("xpath=ancestor::section[1]");
+    await expect(
+      noLotReviewSection.getByRole("heading", {
+        name: "E2E Consumption oregano"
+      })
+    ).toBeVisible();
+    await noLotReviewSection
+      .getByRole("button", { name: "Confirm consumption" })
+      .click();
+    await expect(page.getByText("Consumption confirmed.")).toBeVisible();
     await expect(
       page.getByText("No pantry consumption candidates left.")
     ).toBeVisible();
+    const noLotCard = page
+      .getByRole("article")
+      .filter({ hasText: "E2E Consumption oregano" });
     await expect(
-      page.getByText("No compatible pantry lot is available for this ingredient and unit.")
+      noLotCard.getByText(
+        "No compatible pantry lot is auto-ready for this ingredient and unit."
+      )
     ).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Apply pantry stock" })
+      noLotCard.getByRole("button", { name: "Apply pantry stock" })
     ).toHaveCount(0);
 
     await page.reload();
@@ -145,14 +184,16 @@ test.describe("Pantry consumption review", () => {
     ).toBeVisible();
     await expect(page.getByText("Reversed", { exact: true })).toBeVisible();
     await expect(
-      page.getByText("No compatible pantry lot is available for this ingredient and unit.")
+      page
+        .getByText("No compatible pantry lot is auto-ready for this ingredient and unit.")
+        .first()
     ).toBeVisible();
 
     expect(readConsumptionFixtureResult(seeded)).toEqual({
       appliedStockApplicationCount: "1",
       appliedStockAllocationCount: "1",
       confirmedDecisionActorMatches: "true",
-      confirmedDecisionCount: "2",
+      confirmedDecisionCount: "3",
       groceryItemSourceCount: "0",
       groceryListCount: "0",
       groceryListItemCount: "0",
@@ -250,12 +291,15 @@ type SeededConsumptionFixture = {
   confirmedIngredientId: string;
   cookingSessionId: string;
   foodCuminId: string;
+  foodOreganoId: string;
   foodSalsaId: string;
   foodTortillasId: string;
   ineligibleIngredientId: string;
+  noLotIngredientId: string;
   pantryItemId: string;
   recipeId: string;
   recipeIngredientCuminId: string;
+  recipeIngredientOreganoId: string;
   recipeIngredientSalsaId: string;
   recipeIngredientTortillasId: string;
   recipeStepId: string;
@@ -285,12 +329,15 @@ function seedPantryConsumptionFixture(
     confirmedIngredientId: randomUUID(),
     cookingSessionId: randomUUID(),
     foodCuminId: randomUUID(),
+    foodOreganoId: randomUUID(),
     foodSalsaId: randomUUID(),
     foodTortillasId: randomUUID(),
     ineligibleIngredientId: randomUUID(),
+    noLotIngredientId: randomUUID(),
     pantryItemId: randomUUID(),
     recipeId: randomUUID(),
     recipeIngredientCuminId: randomUUID(),
+    recipeIngredientOreganoId: randomUUID(),
     recipeIngredientSalsaId: randomUUID(),
     recipeIngredientTortillasId: randomUUID(),
     recipeStepId: randomUUID(),
@@ -314,7 +361,8 @@ insert into public.foods (id, household_id, name)
 values
   (${sqlString(seeded.foodTortillasId)}, ${sqlString(fixture.householdId)}, ${sqlString(`E2E Consumption tortillas ${uniqueSuffix}`)}),
   (${sqlString(seeded.foodSalsaId)}, ${sqlString(fixture.householdId)}, ${sqlString(`E2E Consumption salsa ${uniqueSuffix}`)}),
-  (${sqlString(seeded.foodCuminId)}, ${sqlString(fixture.householdId)}, ${sqlString(`E2E Consumption cumin ${uniqueSuffix}`)});
+  (${sqlString(seeded.foodCuminId)}, ${sqlString(fixture.householdId)}, ${sqlString(`E2E Consumption cumin ${uniqueSuffix}`)}),
+  (${sqlString(seeded.foodOreganoId)}, ${sqlString(fixture.householdId)}, ${sqlString(`E2E Consumption oregano ${uniqueSuffix}`)});
 
 insert into public.pantry_items (
   id,
@@ -333,6 +381,25 @@ values (
   ${sqlString(`E2E Consumption tortillas lot ${uniqueSuffix}`)},
   3,
   'count',
+  'in_stock',
+  false
+);
+
+insert into public.pantry_items (
+  household_id,
+  food_id,
+  display_name,
+  quantity,
+  unit,
+  stock_status,
+  is_open
+)
+values (
+  ${sqlString(fixture.householdId)},
+  ${sqlString(seeded.foodCuminId)},
+  ${sqlString(`E2E Consumption cumin lot ${uniqueSuffix}`)},
+  4,
+  'tbsp',
   'in_stock',
   false
 );
@@ -419,6 +486,16 @@ values
     1,
     'tsp',
     2
+  ),
+  (
+    ${sqlString(seeded.recipeIngredientOreganoId)},
+    ${sqlString(fixture.householdId)},
+    ${sqlString(seeded.recipeId)},
+    ${sqlString(seeded.foodOreganoId)},
+    'E2E Consumption oregano',
+    1,
+    'tsp',
+    3
   );
 
 insert into public.recipe_steps (
@@ -513,6 +590,19 @@ values
     now()
   ),
   (
+    ${sqlString(seeded.noLotIngredientId)},
+    ${sqlString(fixture.householdId)},
+    ${sqlString(seeded.cookingSessionId)},
+    ${sqlString(seeded.recipeIngredientOreganoId)},
+    ${sqlString(seeded.foodOreganoId)},
+    'E2E Consumption oregano',
+    1,
+    'tsp',
+    3,
+    true,
+    now()
+  ),
+  (
     ${sqlString(seeded.unlinkedIngredientId)},
     ${sqlString(fixture.householdId)},
     ${sqlString(seeded.cookingSessionId)},
@@ -521,7 +611,7 @@ values
     'E2E Consumption garnish',
     1,
     'pinch',
-    3,
+    4,
     true,
     now()
   );
@@ -594,6 +684,11 @@ select
     select count(*)
     from public.pantry_consumption_decisions
     where cooking_session_ingredient_id = ${sqlString(seeded.ineligibleIngredientId)}
+      and status = 'confirmed'
+  ) + (
+    select count(*)
+    from public.pantry_consumption_decisions
+    where cooking_session_ingredient_id = ${sqlString(seeded.noLotIngredientId)}
       and status = 'confirmed'
   ) as confirmed_decision_count,
   (

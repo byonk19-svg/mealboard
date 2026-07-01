@@ -962,6 +962,10 @@ function PantryConsumptionStockReviewCard({
 
       {state.status === "confirmed_unapplied" ? (
         <div className="mt-4 space-y-4">
+          <p className="rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
+            Pantry quantities change only after Apply. Confirmed consumption
+            stays as a review decision until a lot allocation is submitted.
+          </p>
           {state.readiness === "ineligible" ? (
             <p className="rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
               {formatStockReviewIneligibleReason(state.reason)}
@@ -1524,14 +1528,14 @@ function formatStockReviewIneligibleReason(
   >["reason"]
 ) {
   if (reason === "missing_quantity") {
-    return "This ingredient has no structured quantity, so pantry stock cannot be applied.";
+    return "This ingredient has no structured quantity, so no stock write is ready yet. Leave it unapplied, or review quantity details below when a same-food pantry lot is listed.";
   }
 
   if (reason === "missing_unit") {
-    return "This ingredient has no structured unit, so pantry stock cannot be applied.";
+    return "This ingredient has no structured unit, so no stock write is ready yet. Leave it unapplied, or review unit details below when a same-food pantry lot is listed.";
   }
 
-  return "No compatible pantry lot is available for this ingredient and unit.";
+  return "No compatible pantry lot is auto-ready for this ingredient and unit. Leave it unapplied, or review quantity/unit details below when a same-food pantry lot is listed.";
 }
 
 function formatItemCount(value: number) {
