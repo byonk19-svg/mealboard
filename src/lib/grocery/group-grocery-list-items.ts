@@ -6,13 +6,11 @@ export type GroceryItemContextGroup = {
   items: GroceryListItem[];
 };
 
-const PROFILE_SORT_ORDER = new Map([
-  ["Brianna", 1],
-  ["Elaine", 2],
-  ["Baby", 3],
-  ["Shared", 4],
-  ["Shared/Family", 4],
-  ["Household", 5]
+const NAMED_PROFILE_GROUP_SORT_ORDER = new Map([
+  ["Baby", 2],
+  ["Shared", 3],
+  ["Shared/Family", 3],
+  ["Household", 4]
 ]);
 
 export function groupGroceryItemsByProfile(
@@ -39,8 +37,8 @@ export function groupGroceryItemsByProfile(
   }
 
   return Array.from(groups.values()).sort((a, b) => {
-    const aOrder = PROFILE_SORT_ORDER.get(a.groupName) ?? Number.MAX_SAFE_INTEGER;
-    const bOrder = PROFILE_SORT_ORDER.get(b.groupName) ?? Number.MAX_SAFE_INTEGER;
+    const aOrder = getProfileGroupSortOrder(a.groupName);
+    const bOrder = getProfileGroupSortOrder(b.groupName);
 
     if (aOrder !== bOrder) {
       return aOrder - bOrder;
@@ -48,6 +46,10 @@ export function groupGroceryItemsByProfile(
 
     return a.groupName.localeCompare(b.groupName);
   });
+}
+
+function getProfileGroupSortOrder(groupName: string) {
+  return NAMED_PROFILE_GROUP_SORT_ORDER.get(groupName) ?? 1;
 }
 
 export function groupGroceryItemsByMeal(
