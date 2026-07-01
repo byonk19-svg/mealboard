@@ -181,18 +181,28 @@ export default async function CookingModePage({
               <ReadOnlySessionDetails session={session} />
               {session.status === "completed" ? (
                 <>
+                  {stockReviews.length > 0 ? (
+                    <PantryConsumptionStockReviewSection
+                      plannedMealId={plannedMealId ?? null}
+                      recipeId={recipe.id}
+                      reviews={stockReviews}
+                      sessionId={session.id}
+                    />
+                  ) : null}
                   <PantryConsumptionReviewSection
                     candidates={consumptionCandidates}
                     plannedMealId={plannedMealId ?? null}
                     recipeId={recipe.id}
                     sessionId={session.id}
                   />
-                  <PantryConsumptionStockReviewSection
-                    plannedMealId={plannedMealId ?? null}
-                    recipeId={recipe.id}
-                    reviews={stockReviews}
-                    sessionId={session.id}
-                  />
+                  {stockReviews.length === 0 ? (
+                    <PantryConsumptionStockReviewSection
+                      plannedMealId={plannedMealId ?? null}
+                      recipeId={recipe.id}
+                      reviews={stockReviews}
+                      sessionId={session.id}
+                    />
+                  ) : null}
                 </>
               ) : null}
             </>
@@ -1154,6 +1164,10 @@ function StockApplicationForm({
           />
         </label>
       </div>
+      <p className="text-sm leading-6 text-muted-foreground">
+        Applied quantity is the amount consumed. Allocation quantities below
+        must add up to it, using the same exact pantry unit.
+      </p>
       <div className="grid gap-3 md:grid-cols-2">
         {lots.map((lot) => (
           <div

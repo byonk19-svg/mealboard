@@ -84,14 +84,15 @@ Use a linked local household user. Do not commit `.env.local`, `.env.cloud.local
 23. Review the completed-list pantry intake panel, confirm one checked food-backed item into Smart Pantry, skip one item, and confirm neither grocery-list state nor unrelated pantry stock changes silently.
 24. Open `/pantry`, confirm the new pantry item, event history, expiration/stock status, and restock candidate behavior are understandable.
 25. Complete a Cooking Mode session with food-backed ingredients, review pantry consumption candidates, confirm one and skip one, and confirm pantry stock quantities are unchanged.
-26. Open `/dashboard`.
-27. Confirm current week, planning status, grocery status, next best action, needs-attention queue, and wrap-up entry are reasonable.
-28. After finalizing or starting shopping, change an approved planned meal, confirm Plan Week shows pending grocery changes, apply the reviewed grocery updates, and confirm manual items/check state are preserved where applicable.
-29. Open the weekly wrap-up, save one meal outcome with leftover context if prompted, acknowledge unused groceries with a future staple adjustment if prompted, confirm Settings opens a review banner instead of changing staples automatically, or dismiss it.
-30. Open `/settings/baby`, track a Try This food when one is available, and confirm it becomes a normal baby food status without adding it to groceries automatically.
-31. Open `/settings/foods`, create a household food with defaults, archive it, and restore it.
-32. Open `/settings/household` as the owner, link an existing unlinked auth user by email, transfer ownership to that member, sign in as the new owner, transfer ownership back, remove that non-owner member, then confirm the member no longer reaches household-scoped routes.
-33. Open `/manifest.webmanifest` and confirm install icons are served.
+26. For reviewed pantry stock dogfood, after confirming consumption, explicitly apply one real ingredient to pantry lots, reverse one intentional mistake, and note allocation-choice friction, reversal discoverability, wording confusion, and any exact-unit or lot-selection guessing. Promote a follow-up only when the same friction repeats across multiple real meals.
+27. Open `/dashboard`.
+28. Confirm current week, planning status, grocery status, next best action, needs-attention queue, and wrap-up entry are reasonable.
+29. After finalizing or starting shopping, change an approved planned meal, confirm Plan Week shows pending grocery changes, apply the reviewed grocery updates, and confirm manual items/check state are preserved where applicable.
+30. Open the weekly wrap-up, save one meal outcome with leftover context if prompted, acknowledge unused groceries with a future staple adjustment if prompted, confirm Settings opens a review banner instead of changing staples automatically, or dismiss it.
+31. Open `/settings/baby`, track a Try This food when one is available, and confirm it becomes a normal baby food status without adding it to groceries automatically.
+32. Open `/settings/foods`, create a household food with defaults, archive it, and restore it.
+33. Open `/settings/household` as the owner, link an existing unlinked auth user by email, transfer ownership to that member, sign in as the new owner, transfer ownership back, remove that non-owner member, then confirm the member no longer reaches household-scoped routes.
+34. Open `/manifest.webmanifest` and confirm install icons are served.
 
 ## Known Local Environment Note
 
@@ -134,7 +135,7 @@ These are intentionally out of scope for the current MVP unless a future task ex
 Good next slices should stay narrow and start from the verified MVP loop. Candidate directions:
 
 - Pantry-aware planning UX refinement, only if real use shows the current `Uses pantry soon` reason chip is too subtle.
-- Reviewed pantry stock dogfood for the completed cooking-to-pantry stock application path, before adding more pantry mutation behavior.
+- Reviewed pantry stock dogfood for the completed cooking-to-pantry stock application path, promoting code follow-ups only after repeated real-meal friction.
 - Member role editing beyond owner transfer and household switching.
 - Broader PWA/mobile offline resilience for grocery shopping beyond bounded item-state retry.
 - Email-delivered invitations if shared household use becomes frequent.

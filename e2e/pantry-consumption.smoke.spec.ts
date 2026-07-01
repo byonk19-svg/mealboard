@@ -5,9 +5,7 @@ import { randomUUID } from "node:crypto";
 const dbContainer =
   process.env.MEALBOARD_E2E_DB_CONTAINER ?? "supabase_db_mealboard";
 const fixture = {
-  email: "mealboard-e2e-pantry-consumption@example.test",
-  householdId: "00000000-0000-4000-8000-000000012001",
-  password: "Mealboard-e2e-pantry-consumption-12345!"
+  householdId: "00000000-0000-4000-8000-000000012001"
 };
 
 test.describe("Pantry consumption review", () => {
@@ -20,7 +18,7 @@ test.describe("Pantry consumption review", () => {
     const cookUrl = `/recipes/${seeded.recipeId}/cook?sessionId=${seeded.cookingSessionId}`;
     const pantryLotName = `E2E Consumption tortillas lot ${seeded.recipeId.slice(0, 8)}`;
 
-    await signIn(page);
+    await signIn(page, seeded);
     await page.goto(cookUrl);
     await expect(
       page.getByRole("heading", { name: "Completed session" })
@@ -179,7 +177,7 @@ test.describe("Pantry consumption review", () => {
     const backupLotName = `E2E Consumption tortillas backup lot ${uniqueSuffix}`;
 
     await page.setViewportSize({ height: 900, width: 390 });
-    await signIn(page);
+    await signIn(page, seeded);
     await page.goto(cookUrl);
     await expect(
       page.getByRole("heading", { name: "Completed session" })
@@ -249,11 +247,13 @@ test.describe("Pantry consumption review", () => {
 type SeededConsumptionFixture = {
   confirmedIngredientId: string;
   cookingSessionId: string;
+  email: string;
   foodCuminId: string;
   foodSalsaId: string;
   foodTortillasId: string;
   ineligibleIngredientId: string;
   pantryItemId: string;
+  password: string;
   recipeId: string;
   recipeIngredientCuminId: string;
   recipeIngredientSalsaId: string;
@@ -268,10 +268,10 @@ type SeedPantryConsumptionFixtureOptions = {
   extraTortillaLot?: boolean;
 };
 
-async function signIn(page: Page) {
+async function signIn(page: Page, seeded: SeededConsumptionFixture) {
   await page.goto("/login");
-  await page.getByLabel("Email").fill(fixture.email);
-  await page.getByLabel("Password").fill(fixture.password);
+  await page.getByLabel("Email").fill(seeded.email);
+  await page.getByLabel("Password").fill(seeded.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(
     /\/dashboard|\/plan-week|\/recipes|\/pantry|\/grocery-list|\/settings/
@@ -299,6 +299,11 @@ function seedPantryConsumptionFixture(
     unlinkedIngredientId: randomUUID()
   };
   const uniqueSuffix = seeded.recipeId.slice(0, 8);
+  const seededWithCredentials = {
+    ...seeded,
+    email: `mealboard-e2e-pantry-consumption-${uniqueSuffix}@example.test`,
+    password: `Mealboard-e2e-pantry-consumption-${uniqueSuffix}-12345!`
+  };
 
   runLocalSql(`
 insert into public.households (id, name)
@@ -307,7 +312,7 @@ on conflict (id) do update set name = excluded.name;
 
 delete from public.household_memberships
 where user_id in (
-  select id from auth.users where lower(email) = lower(${sqlString(fixture.email)})
+  select id from auth.users where lower(email) = lower(${sqlString(seededWithCredentials.email)})
 );
 
 insert into public.foods (id, household_id, name)
@@ -555,14 +560,14 @@ where id = ${sqlString(seeded.cookingSessionId)}
   execFileSync(process.execPath, ["scripts/bootstrap-local-e2e-user.mjs"], {
     env: {
       ...process.env,
-      MEALBOARD_E2E_EMAIL: fixture.email,
+      MEALBOARD_E2E_EMAIL: seededWithCredentials.email,
       MEALBOARD_E2E_HOUSEHOLD_ID: fixture.householdId,
-      MEALBOARD_E2E_PASSWORD: fixture.password
+      MEALBOARD_E2E_PASSWORD: seededWithCredentials.password
     },
     stdio: "inherit"
   });
 
-  return seeded;
+  return seededWithCredentials;
 }
 
 function readConsumptionFixtureResult(seeded: SeededConsumptionFixture) {
@@ -600,7 +605,7 @@ select
     select (decisions.decided_by_user_id = users.id)::text
     from public.pantry_consumption_decisions decisions
     join auth.users users
-      on lower(users.email) = lower(${sqlString(fixture.email)})
+      on lower(users.email) = lower(${sqlString(seeded.email)})
     where decisions.cooking_session_ingredient_id = ${sqlString(seeded.confirmedIngredientId)}
   ) as confirmed_decision_actor_matches,
   (
@@ -613,7 +618,7 @@ select
     select (decisions.decided_by_user_id = users.id)::text
     from public.pantry_consumption_decisions decisions
     join auth.users users
-      on lower(users.email) = lower(${sqlString(fixture.email)})
+      on lower(users.email) = lower(${sqlString(seeded.email)})
     where decisions.cooking_session_ingredient_id = ${sqlString(seeded.skippedIngredientId)}
   ) as skipped_decision_actor_matches,
   (
