@@ -7,7 +7,7 @@ import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 import { getWeekDates, getWeekStartDate } from "@/lib/weekly-plans/week-dates";
 
 const dashboardImageUrl =
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuAAfqXoCZpKmZxtqR8X-rIvcVspWc_LRD4XSf2lO7gvbxcAddrje6jiiOcU8ihq742gVn5PSiP-znshDXrio6m80F4IgBTbAWqg-8Vxg38mvcTtCvoATgPHMyJwvUOYAAvtJRpJjIEneTEKI1LHYBJOPSuWk2UH7Gie7DGU7qs5J_0zL38eUpXXyUpI3fdubd3KQTbq1m0filRbFc7_AIXWmuUqL4CjpjGSAPDGcSgRV-031QCAgYP9cQ";
+  "/images/mealboard/dashboard-week-board.png";
 
 export default async function DashboardPage() {
   const householdContext = await getCurrentHouseholdContext();
@@ -65,6 +65,7 @@ export default async function DashboardPage() {
                 alt="Fresh ingredients arranged on a calm kitchen counter."
                 className="h-full w-full object-cover grayscale-[0.15]"
                 fill
+                priority
                 sizes="(min-width: 1024px) 240px, 100vw"
                 src={dashboardImageUrl}
               />
