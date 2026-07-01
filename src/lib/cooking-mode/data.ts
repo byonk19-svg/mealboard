@@ -27,8 +27,11 @@ import type {
   CookingTimerStatus
 } from "@/lib/cooking-mode/types";
 import { createClient } from "@/lib/supabase/server";
+import type { Database } from "@/types/database";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
+type CookingTimerUpdate =
+  Database["public"]["Tables"]["cooking_timers"]["Update"];
 
 type RecipeRow = {
   id: string;
@@ -792,7 +795,7 @@ async function transitionCookingTimer({
   transition: (
     timer: CookingTimerShape,
     now: Date
-  ) => Record<string, string | number | null | undefined>;
+  ) => CookingTimerUpdate;
 }) {
   const supabase = await createClient();
   const session = await requireCookingSession({

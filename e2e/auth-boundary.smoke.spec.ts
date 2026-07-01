@@ -6,6 +6,7 @@ const protectedRoutes = [
   "/recipes/import",
   "/recipes/import/review?source=e2e&draft=missing",
   "/plan-week",
+  "/pantry",
   "/grocery-list",
   "/settings/household",
   "/settings/baby"

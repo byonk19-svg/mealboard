@@ -18,6 +18,7 @@ import {
   buildManualGrocerySourceLabel,
   type NormalizedManualGroceryItemInput
 } from "./manual-grocery-item";
+import type { Database } from "@/types/database";
 
 export type GroceryListStatus =
   | "draft"
@@ -161,6 +162,9 @@ type LatestGroceryListItemSortOrderRow = {
 type MealProfileNameRow = {
   name: string;
 };
+
+type GroceryListUpdate =
+  Database["public"]["Tables"]["grocery_lists"]["Update"];
 
 type GroceryListRow = {
   completed_at?: string | null;
@@ -1087,12 +1091,14 @@ export async function advanceGroceryListLifecycle({
   }
 
   const timestampField = getGroceryLifecycleTimestampField(nextStatus);
+  const updatePayload: GroceryListUpdate = {
+    status: nextStatus
+  };
+  updatePayload[timestampField] = new Date().toISOString();
+
   const { data: updatedList, error: updateError } = await supabase
     .from("grocery_lists")
-    .update({
-      [timestampField]: new Date().toISOString(),
-      status: nextStatus
-    })
+    .update(updatePayload)
     .eq("household_id", householdId)
     .eq("id", groceryListId)
     .eq("status", currentStatus)

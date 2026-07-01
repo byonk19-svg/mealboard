@@ -110,9 +110,7 @@ export default async function PlanWeekPage({
     getWeeklyPlan(householdContext.household.id, weekStartDate)
   ]);
   const adultProfiles = profiles.filter(
-    (profile) =>
-      profile.profile_type === "adult" &&
-      ["Brianna", "Elaine"].includes(profile.name)
+    (profile) => profile.profile_type === "adult"
   );
   const planningProfiles = profiles.filter((profile) =>
     ["adult", "baby", "shared"].includes(profile.profile_type)
@@ -338,7 +336,7 @@ export default async function PlanWeekPage({
                 <div>
                   <h2 className="calm-heading text-xl">Adult day types</h2>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    Mark Brianna and Elaine as work or off days for this week.
+                    Mark adult profiles as work or off days for this week.
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground sm:hidden">
                     Scroll the day grid sideways to see the full week.

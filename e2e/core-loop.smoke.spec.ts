@@ -92,27 +92,32 @@ test.describe("MealBoard core loop", () => {
     await addSuggestedMeals.focus();
     await addSuggestedMeals.press("Enter");
     await waitForPlannedMeal(page, suggestionName);
+    const suggestedPlannedMeal = page
+      .getByRole("article", { name: `Planned meal ${suggestionName}` })
+      .first();
     await expect(
-      page
-        .getByRole("article", { name: `Planned meal ${suggestionName}` })
-        .getByText("Needs approval")
+      suggestedPlannedMeal.getByText("Needs approval").first()
     ).toBeVisible();
     await page.getByRole("link", { name: "Profile view" }).click();
     await expect(page).toHaveURL(/view=profile/, { timeout: 45_000 });
     await expect(page.getByRole("heading", { exact: true, name: "Baby" })).toBeVisible();
-    const profilePlannedMeal = page.getByRole("article", {
-      name: `Planned meal ${recipeName}`
-    });
-    await expect(profilePlannedMeal.getByText("Needs approval")).toBeVisible();
+    const profilePlannedMeal = page
+      .getByRole("article", {
+        name: `Planned meal ${recipeName}`
+      })
+      .first();
+    await expect(profilePlannedMeal.getByText("Needs approval").first()).toBeVisible();
     await profilePlannedMeal
       .getByRole("button", { name: "Approve for groceries" })
       .click();
     await expect(page).toHaveURL(/view=profile/, { timeout: 45_000 });
-    const approvedPlannedMeal = page.getByRole("article", {
-      name: `Planned meal ${recipeName}`
-    });
+    const approvedPlannedMeal = page
+      .getByRole("article", {
+        name: `Planned meal ${recipeName}`
+      })
+      .first();
     await expect(
-      approvedPlannedMeal.getByText("Approved for groceries")
+      approvedPlannedMeal.getByText("Approved for groceries").first()
     ).toBeVisible({ timeout: 30_000 });
     await page.getByRole("link", { name: "Day view" }).click();
     await expect(approvedPlannedMeal).toBeVisible();
@@ -204,7 +209,7 @@ test.describe("MealBoard core loop", () => {
     await page.goto("/dashboard");
     await expect(page.getByRole("heading", { name: "Current Week" })).toBeVisible();
     await expect(page.getByText("Planning status")).toBeVisible();
-    await expect(page.getByText("Grocery status")).toBeVisible();
+    await expect(page.getByText("Grocery status").first()).toBeVisible();
     await page.goto(`/weekly-wrap-up/${weeklyPlanId}`);
     await expect(
       page.getByRole("heading", { name: "Review what needs attention" })
@@ -229,7 +234,7 @@ function getFutureSundayDateKey(seed: number) {
 async function waitForPlannedMeal(page: Page, recipeName: string) {
   const plannedMeal = page.getByRole("article", {
     name: `Planned meal ${recipeName}`
-  });
+  }).first();
 
   for (let attempt = 0; attempt < 6; attempt += 1) {
     try {
