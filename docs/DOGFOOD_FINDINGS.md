@@ -197,15 +197,16 @@ Weekly wrap-up opened successfully from the completed current-week dashboard sta
 ### UX Friction / Confusing Moments
 
 - The dashboard still surfaces setup hygiene items such as Baby setup, calorie targets, and low-confidence nutrition estimates while the grocery loop is progressing. That is accurate, but it makes the dashboard feel busier during a narrowly scoped shopping task.
-- After shopping completion, the next best action becomes `Review recipes` while weekly wrap-up appears as an attention item and optional card. This is acceptable for private MVP use, but weekly wrap-up is arguably the more task-continuous next action after completing current-week shopping.
+- Resolved after this pass: after shopping completion, weekly wrap-up is now the dashboard primary next-best action when an open wrap-up is available. Recipe review remains visible through setup/attention items when still relevant.
 
 ### Recommended Next Task
 
-No broad dashboard redesign is needed from this pass. The next useful product work should move back to household value: either run the real-meal pantry/leftovers dogfood lane from issue #34 or make the completed-shopping dashboard next action prioritize weekly wrap-up if that feels more natural in real use.
+No broad dashboard redesign is needed from this pass. The next useful product work should move back to household value, likely the real-meal pantry/leftovers dogfood lane from issue #34.
 
 ### Validation
 
 - Headed Chromium current-week dashboard follow-up pass completed after fixes.
+- Dashboard next-best-action logic now prioritizes an open weekly wrap-up after completed current-week shopping.
 - `npm run verify` passed after fixes.
 - `npm run e2e:smoke` passed after the planned-meal locator fix.
 - `npm run e2e:grocery-mobile` passed after the grocery item state-control fix.

@@ -199,7 +199,9 @@ export async function getDashboardCurrentWeekSnapshot({
     groceryList,
     nextAction: getDashboardNextAction({
       groceryList,
-      weeklyPlan: weeklyPlanSummary
+      weeklyPlan: weeklyPlanSummary,
+      weeklyWrapUp,
+      weeklyWrapUpHref: `/weekly-wrap-up/${weeklyPlan.id}`
     }),
     setup,
     weekStartDate,

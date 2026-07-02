@@ -263,10 +263,14 @@ function buildSetupAttentionItems(
 
 export function getDashboardNextAction({
   groceryList,
-  weeklyPlan
+  weeklyPlan,
+  weeklyWrapUp,
+  weeklyWrapUpHref
 }: {
   groceryList: DashboardGroceryListSummary | null;
   weeklyPlan: DashboardWeeklyPlanSummary | null;
+  weeklyWrapUp?: DashboardWeeklyWrapUpSummary;
+  weeklyWrapUpHref?: string;
 }): DashboardNextAction {
   if (!weeklyPlan) {
     return {
@@ -279,7 +283,9 @@ export function getDashboardNextAction({
   if (groceryList) {
     return getGroceryListNextAction({
       status: groceryList.status,
-      weeklyPlan
+      weeklyPlan,
+      weeklyWrapUp,
+      weeklyWrapUpHref
     });
   }
 
@@ -303,11 +309,24 @@ export function getDashboardNextAction({
 
 function getGroceryListNextAction({
   status,
-  weeklyPlan
+  weeklyPlan,
+  weeklyWrapUp,
+  weeklyWrapUpHref
 }: {
   status: GroceryListStatus;
   weeklyPlan: DashboardWeeklyPlanSummary;
+  weeklyWrapUp?: DashboardWeeklyWrapUpSummary;
+  weeklyWrapUpHref?: string;
 }): DashboardNextAction {
+  if (status === "completed" && isWeeklyWrapUpPending(weeklyWrapUp)) {
+    return {
+      description:
+        "Capture quick notes while this week's meals and groceries are fresh.",
+      href: weeklyWrapUpHref ?? "/dashboard",
+      label: "Open weekly wrap-up"
+    };
+  }
+
   if (status === "completed" && weeklyPlan.unapprovedPlanItemCount > 0) {
     return {
       description:
@@ -341,6 +360,16 @@ function getGroceryListNextAction({
   };
 
   return actions[status];
+}
+
+function isWeeklyWrapUpPending(weeklyWrapUp?: DashboardWeeklyWrapUpSummary) {
+  return (
+    weeklyWrapUp !== null &&
+    weeklyWrapUp !== undefined &&
+    weeklyWrapUp.dismissed !== true &&
+    weeklyWrapUp.status !== "completed" &&
+    weeklyWrapUp.status !== "dismissed"
+  );
 }
 
 export function formatDashboardStatus(value: string) {
