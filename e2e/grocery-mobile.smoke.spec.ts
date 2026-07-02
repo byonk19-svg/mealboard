@@ -31,7 +31,7 @@ test.describe("Mobile grocery list", () => {
 
     await page.goto("/grocery-list");
     await expect(
-      page.getByRole("heading", { name: "Current Grocery List" })
+      page.getByRole("heading", { name: "Groceries", exact: true })
     ).toBeVisible();
 
     const viewport = page.viewportSize();
