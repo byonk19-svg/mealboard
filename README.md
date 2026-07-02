@@ -139,6 +139,7 @@ Main app routes are protected. Unauthenticated users are redirected to `/login`.
 For local smoke tests, seed a repeatable local auth user and membership:
 
 ```bash
+npm run e2e:install
 npm run e2e:seed-local-user
 ```
 
@@ -151,8 +152,28 @@ MEALBOARD_E2E_PASSWORD=Mealboard-e2e-local-12345!
 
 Run the authenticated smoke with those values in your shell environment:
 
-```bash
+```powershell
+$env:MEALBOARD_E2E_EMAIL='mealboard-e2e-local@example.test'
+$env:MEALBOARD_E2E_PASSWORD='Mealboard-e2e-local-12345!'
 npm run e2e:smoke
+Remove-Item Env:\MEALBOARD_E2E_EMAIL
+Remove-Item Env:\MEALBOARD_E2E_PASSWORD
+```
+
+For a headed browser pass that a future Codex run can use as the real-user
+dogfood path, seed the same user and run:
+
+```powershell
+$env:MEALBOARD_E2E_EMAIL='mealboard-e2e-local@example.test'
+$env:MEALBOARD_E2E_PASSWORD='Mealboard-e2e-local-12345!'
+npm run e2e:dogfood
+Remove-Item Env:\MEALBOARD_E2E_EMAIL
+Remove-Item Env:\MEALBOARD_E2E_PASSWORD
+```
+
+Other focused browser smokes use the same seeded credentials:
+
+```bash
 npm run e2e:grocery-mobile
 npm run e2e:settings-foods
 npm run e2e:household-members
