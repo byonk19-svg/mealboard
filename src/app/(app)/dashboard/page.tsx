@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { getDashboardCurrentWeekSnapshot } from "@/lib/dashboard/data";
 import { formatDashboardStatus } from "@/lib/dashboard/current-week-summary";
@@ -8,6 +9,12 @@ import { getWeekDates, getWeekStartDate } from "@/lib/weekly-plans/week-dates";
 
 const dashboardImageUrl =
   "/images/mealboard/dashboard-week-board.png";
+
+export const metadata: Metadata = {
+  title: "Dashboard",
+  description:
+    "Review MealBoard's current week, next action, and household meal-planning status."
+};
 
 export default async function DashboardPage() {
   const householdContext = await getCurrentHouseholdContext();
@@ -64,8 +71,9 @@ export default async function DashboardPage() {
               <Image
                 alt="Fresh ingredients arranged on a calm kitchen counter."
                 className="h-full w-full object-cover grayscale-[0.15]"
+                fetchPriority="high"
                 fill
-                priority
+                loading="eager"
                 sizes="(min-width: 1024px) 240px, 100vw"
                 src={dashboardImageUrl}
               />

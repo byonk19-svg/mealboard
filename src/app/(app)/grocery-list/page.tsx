@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import type { Metadata } from "next";
 import type {
   CompletedGroceryListSummary,
   GroceryListItem,
@@ -40,6 +41,12 @@ import { GroceryItemStateControls } from "./grocery-item-state-controls";
 
 const groceryCtaImageUrl =
   "/images/mealboard/grocery-list-market-bag.png";
+
+export const metadata: Metadata = {
+  title: "Grocery List",
+  description:
+    "Shop from MealBoard grocery lists with source context, lifecycle state, and recovery tools."
+};
 
 type GroceryListPageProps = {
   searchParams: Promise<{

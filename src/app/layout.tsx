@@ -17,7 +17,10 @@ export const metadata: Metadata = {
     ]
   },
   manifest: "/manifest.webmanifest",
-  title: "MealBoard"
+  title: {
+    default: "MealBoard",
+    template: "%s | MealBoard"
+  }
 };
 
 export const viewport: Viewport = {

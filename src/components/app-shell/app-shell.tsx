@@ -20,7 +20,7 @@ export function AppShell({
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <Link
               href="/dashboard"
-              className="group flex w-fit items-center gap-3"
+              className="group flex min-h-12 w-fit items-center gap-3"
             >
               <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground shadow-[0_8px_24px_rgba(22,56,38,0.16)]">
                 MB
@@ -50,7 +50,7 @@ export function AppShell({
               </div>
               <form action={signOut}>
                 <button
-                  className="min-h-10 rounded-lg border border-primary/35 bg-card px-4 py-2 text-sm font-semibold text-primary hover:border-primary hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  className="min-h-11 rounded-lg border border-primary/35 bg-card px-4 py-2 text-sm font-semibold text-primary hover:border-primary hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                   type="submit"
                 >
                   Sign out
@@ -71,10 +71,25 @@ export function AppShell({
         <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-3 px-5 py-6 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between md:px-12">
           <span className="font-semibold text-primary">MealBoard</span>
           <span>Private family meal plans, recipe memory, and grocery lists.</span>
-          <nav className="flex flex-wrap gap-4" aria-label="Footer navigation">
-            <Link href="/settings/profiles">Profiles</Link>
-            <Link href="/settings/baby">Baby setup</Link>
-            <Link href="/settings/staples">Staples</Link>
+          <nav className="flex flex-wrap gap-2" aria-label="Footer navigation">
+            <Link
+              className="inline-flex min-h-11 items-center px-2"
+              href="/settings/profiles"
+            >
+              Profiles
+            </Link>
+            <Link
+              className="inline-flex min-h-11 items-center px-2"
+              href="/settings/baby"
+            >
+              Baby setup
+            </Link>
+            <Link
+              className="inline-flex min-h-11 items-center px-2"
+              href="/settings/staples"
+            >
+              Staples
+            </Link>
           </nav>
         </div>
       </footer>

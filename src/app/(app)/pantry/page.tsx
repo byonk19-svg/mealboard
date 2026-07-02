@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import {
   buildPantryCategoryGroups,
   classifyExpirationDate,
@@ -43,6 +44,12 @@ type PantryPageProps = {
 };
 
 type PantryView = "all" | "low" | "expiring";
+
+export const metadata: Metadata = {
+  title: "Pantry",
+  description:
+    "Review Smart Pantry stock, events, restock candidates, and explicit inventory changes."
+};
 
 export default async function PantryPage({ searchParams }: PantryPageProps) {
   const householdContext = await getCurrentHouseholdContext();
