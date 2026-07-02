@@ -45,6 +45,7 @@ test.describe("Mobile grocery list", () => {
     }
 
     await expect(page.getByText("Total items")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Current grocery run" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Copy list" })).toBeVisible();
     await page.getByRole("button", { name: "Show emergency backup" }).click();
     await expect(page.getByLabel("Emergency grocery backup")).toBeVisible();

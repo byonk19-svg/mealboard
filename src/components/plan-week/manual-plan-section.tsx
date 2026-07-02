@@ -144,6 +144,7 @@ function DayPlanView({
     <div className="mt-5 grid gap-4">
       {weekDates.map((date) => (
         <article
+          aria-label={`${date.dayLabel} plan for ${formatDisplayDate(date.dateKey)}`}
           className="rounded-md border border-border bg-background p-4"
           key={date.dateKey}
         >
@@ -219,6 +220,7 @@ function ProfilePlanView({
     <div className="mt-5 grid gap-4">
       {groups.map((group) => (
         <article
+          aria-label={`${group.profileName} plan`}
           className="rounded-md border border-border bg-background p-4"
           key={group.profileName}
         >
@@ -397,10 +399,15 @@ function PlanItemCard({
 }) {
   const canSwap = canSwapPlanItem(item);
   const isSwapOpen = selectedSwapItemId === item.id;
+  const mealContextLabel = formatPlanItemContextLabel({
+    contextLabel,
+    item,
+    view
+  });
 
   return (
     <article
-      aria-label={`Planned meal ${item.display_name}`}
+      aria-label={`Planned meal ${item.display_name} - ${mealContextLabel}`}
       className="rounded-md border border-border bg-card p-3"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -489,6 +496,7 @@ function PlanItemCard({
           ) : null}
           <PlanItemActionForm
             action={actions.removeWeeklyPlanItem}
+            ariaLabel={`Remove ${item.display_name} from ${mealContextLabel}`}
             buttonLabel="Remove"
             itemId={item.id}
             tone="danger"
@@ -729,6 +737,7 @@ function canSwapPlanItem(item: WeeklyPlanItem) {
 
 function PlanItemActionForm({
   action,
+  ariaLabel,
   buttonLabel,
   itemId,
   tone = "default",
@@ -736,6 +745,7 @@ function PlanItemActionForm({
   weekStartDate
 }: {
   action: (formData: FormData) => void | Promise<void>;
+  ariaLabel?: string;
   buttonLabel: string;
   itemId: string;
   tone?: "default" | "danger";
@@ -752,7 +762,7 @@ function PlanItemActionForm({
       <input name="weekStartDate" type="hidden" value={weekStartDate} />
       <input name="weeklyPlanItemId" type="hidden" value={itemId} />
       <input name="view" type="hidden" value={view} />
-      <button className={buttonClassName} type="submit">
+      <button aria-label={ariaLabel} className={buttonClassName} type="submit">
         {buttonLabel}
       </button>
     </form>
@@ -781,6 +791,27 @@ function formatDisplayDate(dateKey: string) {
     dateStyle: "medium",
     timeZone: "UTC"
   }).format(parseDateKey(dateKey));
+}
+
+function formatPlanItemContextLabel({
+  contextLabel,
+  item,
+  view
+}: {
+  contextLabel?: string;
+  item: WeeklyPlanItem;
+  view: "day" | "profile";
+}) {
+  const baseParts =
+    view === "profile"
+      ? [item.meal_profile_name, contextLabel]
+      : [
+          item.meal_profile_name,
+          formatDisplayDate(item.plan_date),
+          formatMealType(item.meal_type)
+        ];
+
+  return baseParts.filter(Boolean).join(", ");
 }
 
 function parseDateKey(dateKey: string) {

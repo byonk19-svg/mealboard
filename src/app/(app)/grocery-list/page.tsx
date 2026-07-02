@@ -243,7 +243,11 @@ function GroceryListOverview({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h2 className="calm-heading text-xl">
-            {name ?? "Generated grocery list"}
+            {formatGroceryListOverviewHeading({
+              isHistoricalList,
+              name,
+              weekStartDate
+            })}
           </h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
             {weekStartDate
@@ -319,6 +323,22 @@ function SummaryMetric({ label, value }: { label: string; value: number }) {
       </dd>
     </div>
   );
+}
+
+function formatGroceryListOverviewHeading({
+  isHistoricalList,
+  name,
+  weekStartDate
+}: {
+  isHistoricalList: boolean;
+  name: string | null;
+  weekStartDate: string | null;
+}) {
+  if (weekStartDate && name?.startsWith("Groceries for week")) {
+    return isHistoricalList ? "Completed grocery run" : "Current grocery run";
+  }
+
+  return name ?? "Generated grocery list";
 }
 
 function GroceryRecipeCta() {

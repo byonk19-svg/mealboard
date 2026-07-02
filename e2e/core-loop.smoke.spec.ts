@@ -162,7 +162,9 @@ test.describe("MealBoard core loop", () => {
     await expect(
       approvedDayMeal.getByText("Approved for groceries")
     ).toBeVisible();
-    await approvedDayMeal.getByRole("button", { name: "Remove" }).click();
+    await approvedDayMeal
+      .getByRole("button", { name: new RegExp(`^Remove ${escapeRegExp(recipeName)} `) })
+      .click();
     await expect(
       page.getByText("Plan item removed.")
     ).toBeVisible({ timeout: 45_000 });
@@ -248,4 +250,8 @@ async function waitForPlannedMeal(page: Page, recipeName: string) {
       await page.reload();
     }
   }
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
