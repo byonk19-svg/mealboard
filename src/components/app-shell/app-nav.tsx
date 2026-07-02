@@ -19,7 +19,7 @@ export function AppNav() {
             <Link
               aria-current={active ? "page" : undefined}
               className={cn(
-                "whitespace-nowrap rounded-lg px-4 py-2 text-sm font-bold text-muted-foreground",
+                "inline-flex min-h-11 items-center whitespace-nowrap rounded-lg px-4 py-2 text-sm font-bold text-muted-foreground",
                 "hover:bg-muted hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
                 active && "bg-secondary text-primary shadow-sm"
               )}

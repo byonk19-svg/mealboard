@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 
 const settingsSections = [
   {
@@ -44,6 +45,12 @@ const settingsSections = [
       "Create household and profile staples with default quantity, category, frequency, and notes."
   }
 ];
+
+export const metadata: Metadata = {
+  title: "Settings",
+  description:
+    "Manage MealBoard household settings, profiles, preferences, saved foods, baby setup, and staples."
+};
 
 export default function SettingsPage() {
   return (

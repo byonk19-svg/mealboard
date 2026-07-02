@@ -11,6 +11,7 @@ import {
   toggleWeeklyPlanItemLock
 } from "@/app/(app)/plan-week/actions";
 import Image from "next/image";
+import type { Metadata } from "next";
 import {
   applyPendingGroceryChangesForWeek,
   generateGroceryListForWeek
@@ -79,6 +80,12 @@ import { getWeekDates, getWeekStartDate } from "@/lib/weekly-plans/week-dates";
 
 const planWeekImageUrl =
   "/images/mealboard/plan-week-notebook.png";
+
+export const metadata: Metadata = {
+  title: "Plan Week",
+  description:
+    "Plan meals, staples, baby routine rows, and grocery readiness for the household week."
+};
 
 type PlanWeekPageProps = {
   searchParams: Promise<{
@@ -312,8 +319,9 @@ export default async function PlanWeekPage({
             <Image
               alt="A calm kitchen table with a blank planning notebook."
               className="h-full w-full object-cover"
+              fetchPriority="high"
               fill
-              priority
+              loading="eager"
               sizes="(min-width: 1024px) 320px, 100vw"
               src={planWeekImageUrl}
             />

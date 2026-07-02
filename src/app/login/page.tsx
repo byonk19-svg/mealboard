@@ -1,11 +1,17 @@
 import { redirect } from "next/navigation";
 import Image from "next/image";
+import type { Metadata } from "next";
 import { signInWithPassword, signUpWithPassword } from "@/app/login/actions";
 import { resolveLoginReturnPath } from "@/lib/auth/return-path";
 import { createClient } from "@/lib/supabase/server";
 
 const loginImageUrl =
   "/images/mealboard/login-kitchen-counter.png";
+
+export const metadata: Metadata = {
+  title: "Sign in",
+  description: "Sign in to the private MealBoard family meal-planning app."
+};
 
 type LoginPageProps = {
   searchParams: Promise<{
@@ -56,10 +62,12 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           <Image
             alt="Fresh ingredients arranged on a bright kitchen counter."
             className="object-cover"
+            fetchPriority="high"
             fill
-            priority
+            loading="eager"
             sizes="(min-width: 768px) 50vw, 100vw"
             src={loginImageUrl}
+            unoptimized
           />
         </div>
       </section>

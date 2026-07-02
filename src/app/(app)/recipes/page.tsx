@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import {
   formatMealType,
   formatRecipeStatus,
@@ -26,6 +27,12 @@ type RecipesPageProps = {
     q?: string;
     status?: string;
   }>;
+};
+
+export const metadata: Metadata = {
+  title: "Recipes",
+  description:
+    "Manage MealBoard recipes, review nutrition estimates, and open recipe import."
 };
 
 export default async function RecipesPage({ searchParams }: RecipesPageProps) {
