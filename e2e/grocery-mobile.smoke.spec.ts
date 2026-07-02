@@ -93,6 +93,9 @@ test.describe("Mobile grocery list", () => {
       await expect(page.getByText("Grocery item updated.").first()).toBeVisible({
         timeout: 15_000
       });
+      await expect(
+        page.getByRole("button", { name: /Uncheck/ }).first()
+      ).toBeVisible();
     }
 
     const sourceDetails = page.getByText("Why is this on the list?").first();

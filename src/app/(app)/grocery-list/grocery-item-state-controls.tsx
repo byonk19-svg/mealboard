@@ -8,6 +8,7 @@ import {
   useState,
   useSyncExternalStore
 } from "react";
+import { useRouter } from "next/navigation";
 import {
   getGroceryProgressOperationKey,
   isGroceryProgressRetryableStatus,
@@ -41,6 +42,14 @@ export function GroceryItemStateControls({
   itemId,
   storageKey
 }: GroceryItemStateControlsProps) {
+  const router = useRouter();
+  const [confirmedOverrides, setConfirmedOverrides] = useState<
+    Partial<GroceryItemState>
+  >({});
+  const confirmedState = {
+    alreadyHave: confirmedOverrides.alreadyHave ?? initialAlreadyHave,
+    checked: confirmedOverrides.checked ?? initialChecked
+  };
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const inFlightOperationKeysRef = useRef<Set<string>>(new Set());
   const rawOperations = useSyncExternalStore(
@@ -67,11 +76,11 @@ export function GroceryItemStateControls({
           [operation.field]: operation.value
         }),
         {
-          alreadyHave: initialAlreadyHave,
-          checked: initialChecked
+          alreadyHave: confirmedState.alreadyHave,
+          checked: confirmedState.checked
         }
       ),
-    [initialAlreadyHave, initialChecked, itemOperations]
+    [confirmedState.alreadyHave, confirmedState.checked, itemOperations]
   );
   const pendingFields = useMemo(
     () =>
@@ -185,6 +194,10 @@ export function GroceryItemStateControls({
           return;
         }
 
+        setConfirmedOverrides((currentOverrides) => ({
+          ...currentOverrides,
+          [operation.field]: operation.value
+        }));
         const remainingOperations = removeGroceryProgressOperation({
           field: operation.field,
           itemId: operation.itemId,
@@ -192,6 +205,7 @@ export function GroceryItemStateControls({
         });
         writeOperations(storageKey, remainingOperations);
         setStatusMessage("Grocery item updated.");
+        router.refresh();
       } catch {
         const nextOperation = markGroceryProgressOperationAttempted({
           now,
@@ -204,7 +218,7 @@ export function GroceryItemStateControls({
         inFlightOperationKeysRef.current.delete(operationKey);
       }
     },
-    [storageKey]
+    [router, storageKey]
   );
 
   const retryPendingOperations = useCallback(

@@ -134,3 +134,78 @@ Validation for the fix pass:
 - `npm run e2e:smoke` passed.
 - `npm run e2e:dogfood -- --list` passed.
 - `npm run e2e:dogfood` passed.
+
+## Current-Week Dashboard Follow-up
+
+### Date / Branch / Environment
+
+- Date: 2026-07-02
+- Branch: `main`
+- Local URL: `http://localhost:3127` for the final browser pass
+- Browser: headed Chromium via Playwright
+- Current planning week tested: week of 2026-06-28
+- Evidence screenshots:
+  - Initial dashboard: `test-results/current-week-dashboard-dogfood-1783026877830/01-initial-dashboard.png`
+  - After current week created: `test-results/current-week-dashboard-dogfood-1783026877830/02-after-current-week-created.png`
+  - After meal approved and staple selected: `test-results/current-week-dashboard-dogfood-1783026877830/03-after-meal-approved-and-staple-selected.png`
+  - After grocery generated: `test-results/current-week-dashboard-dogfood-1783026877830/04-after-grocery-generated.png`
+  - After grocery finalized: `test-results/current-week-dashboard-dogfood-1783026877830/05-after-grocery-finalized.png`
+  - After shopping started: `test-results/current-week-dashboard-dogfood-1783026877830/06-after-shopping-started.png`
+  - After one item checked: `test-results/current-week-dashboard-dogfood-1783026877830/07-after-one-item-checked.png`
+  - After shopping completed: `test-results/current-week-dashboard-dogfood-1783026877830/08-after-shopping-completed.png`
+  - Weekly wrap-up: `test-results/current-week-dashboard-dogfood-1783026877830/09-weekly-wrap-up.png`
+
+### Commands Run
+
+- `git status -sb`
+- `git diff --stat`
+- `supabase --version`
+- `supabase db reset --help`
+- `supabase start`
+- `supabase db reset`
+- `npm run e2e:seed-local-user`
+- `npm run e2e:smoke`
+- headed Chromium current-week dashboard follow-up pass
+- `npm run verify`
+- `npm run e2e:smoke`
+- `npm run e2e:grocery-mobile`
+
+### Dashboard Follow-through Result
+
+The current-week dashboard follow-through works after the focused fixes from this pass. The dashboard reflected the current week after planning, grocery generation, finalization, shopping start, item check-off, shopping completion, and weekly wrap-up availability.
+
+Observed dashboard state changes:
+
+| Step | Next best action | Plan status | Grocery status | Notable dashboard detail |
+| --- | --- | --- | --- | --- |
+| Initial dashboard | Start this week's plan | No plan yet | No current list | Needs attention included setup gaps and starting the current plan. |
+| Current week created | Review weekly plan | Draft | No current list | Metrics showed 0 planned items, 0 approved grocery inputs, and 0 selected staples. |
+| Meal approved and staple selected | Generate grocery list | Draft | No current list | Metrics showed 1 planned item, 1 approved grocery input, and 1 selected staple. |
+| Grocery generated | Review draft grocery list | Draft | Draft | Grocery metrics showed 0 of 2 checked and the generated date. |
+| Grocery finalized | Start shopping | Draft | Finalized | Needs attention included Start shopping. |
+| Shopping started | Continue shopping | Draft | Shopping Started | Needs attention included Continue shopping and 0 of 2 checked. |
+| One item checked | Continue shopping | Draft | Shopping Started | Grocery metrics updated to 1 of 2 checked. |
+| Shopping completed | Review recipes | Draft | Completed | Weekly wrap-up was offered from both Needs attention and the optional wrap-up card. |
+
+Weekly wrap-up opened successfully from the completed current-week dashboard state.
+
+### Issues Found During This Follow-up
+
+- Medium: the baseline `npm run e2e:smoke` still had a state-sensitive planned-meal Remove ambiguity. The previous UI accessibility labels helped, but the test still asked for a broad planned-meal article and then found multiple Remove buttons after suggestions created repeated cards. Fixed by targeting the uniquely named lunch meal card before clicking Remove.
+- Medium: grocery item check-off visually reverted after a successful `PATCH`. The API returned `200` and showed `Grocery item updated.`, but the button and counts snapped back because the client removed the pending local operation before refreshing or preserving the acknowledged state. Fixed by keeping acknowledged client state and calling `router.refresh()` after successful grocery item updates.
+
+### UX Friction / Confusing Moments
+
+- The dashboard still surfaces setup hygiene items such as Baby setup, calorie targets, and low-confidence nutrition estimates while the grocery loop is progressing. That is accurate, but it makes the dashboard feel busier during a narrowly scoped shopping task.
+- After shopping completion, the next best action becomes `Review recipes` while weekly wrap-up appears as an attention item and optional card. This is acceptable for private MVP use, but weekly wrap-up is arguably the more task-continuous next action after completing current-week shopping.
+
+### Recommended Next Task
+
+No broad dashboard redesign is needed from this pass. The next useful product work should move back to household value: either run the real-meal pantry/leftovers dogfood lane from issue #34 or make the completed-shopping dashboard next action prioritize weekly wrap-up if that feels more natural in real use.
+
+### Validation
+
+- Headed Chromium current-week dashboard follow-up pass completed after fixes.
+- `npm run verify` passed after fixes.
+- `npm run e2e:smoke` passed after the planned-meal locator fix.
+- `npm run e2e:grocery-mobile` passed after the grocery item state-control fix.

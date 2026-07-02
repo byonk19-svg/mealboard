@@ -157,8 +157,10 @@ test.describe("MealBoard core loop", () => {
     await page.getByRole("button", { name: "Finalize list" }).click();
     await page.goto(`/plan-week?weekStartDate=${weekStartDate}`);
     const approvedDayMeal = page.getByRole("article", {
-      name: `Planned meal ${recipeName}`
-    });
+      name: new RegExp(
+        `^Planned meal ${escapeRegExp(recipeName)} - Brianna, .*, Lunch$`
+      )
+    }).first();
     await expect(
       approvedDayMeal.getByText("Approved for groceries")
     ).toBeVisible();
