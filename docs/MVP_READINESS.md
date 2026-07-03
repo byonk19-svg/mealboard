@@ -39,11 +39,12 @@ The latest verified flow covers:
 - Open the optional weekly wrap-up after completed shopping.
 - Capture made/skipped meal outcomes, leftovers, source-aware unused grocery notes, and hand source-aware staple adjustment intent to Settings for explicit review before any staple changes.
 - Confirm Dashboard reflects current week planning, grocery status, next best action, setup-aware and calorie-guidance needs-attention items, and wrap-up entry when eligible.
+- Confirm Dashboard prioritizes weekly wrap-up as the primary next action after current-week shopping completion when an open wrap-up is available.
 - Filter the recipe library by search text, recipe status, planning approval, and nutrition-review needs.
 - Link an existing auth user to the current household from `/settings/household` when signed in as an owner, transfer ownership to a non-owner member, and remove a non-owner member from that household.
 - Create, edit, archive, and restore household foods from `/settings/foods`.
 - Serve PWA install metadata and icon assets without adding offline/service-worker behavior.
-- Run unauthenticated Playwright auth-boundary smoke coverage plus credential-gated core-loop, mobile grocery, recipe import, household member lifecycle, extension capture, and related settings smokes.
+- Run unauthenticated Playwright auth-boundary smoke coverage plus credential-gated core-loop, mobile grocery, recipe import, household member lifecycle, extension capture, PWA, baby/settings, pantry, pantry intake, pantry consumption, cooking mode, and pantry-aware planning smokes.
 
 ## Manual Smoke Checklist
 
@@ -109,10 +110,10 @@ Do not delete Docker volumes as part of this recovery, and do not remove unrelat
 
 ## Dependency Audit Note
 
-As of June 23, 2026, `npm audit --omit=dev` passes after aligning Next packages
-to the current stable patch and applying a targeted PostCSS override for Next's
-vendored dependency. Do not use `npm audit fix --force` without inspecting the
-proposed tree.
+As of July 3, 2026, `npm audit --omit=dev` passes with the versions currently
+pinned in `package.json` and the targeted PostCSS override for Next's vendored
+dependency. Do not use `npm audit fix --force` without inspecting the proposed
+tree.
 
 ## Deferred Features
 

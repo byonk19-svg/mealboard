@@ -114,7 +114,7 @@ Evidence screenshots:
 
 ## Recommended Next Tasks
 
-1. Run one current-week dogfood pass to judge dashboard follow-through after shopping completion, not only future-week planning.
+1. Run one current-week dogfood pass to judge dashboard follow-through after shopping completion, not only future-week planning. Completed in the follow-up section below.
 2. Keep issue #34 separate: this pass did not exercise real household pantry stock application during actual meals.
 
 ## Resolution Notes
@@ -185,9 +185,9 @@ Observed dashboard state changes:
 | Grocery finalized | Start shopping | Draft | Finalized | Needs attention included Start shopping. |
 | Shopping started | Continue shopping | Draft | Shopping Started | Needs attention included Continue shopping and 0 of 2 checked. |
 | One item checked | Continue shopping | Draft | Shopping Started | Grocery metrics updated to 1 of 2 checked. |
-| Shopping completed | Review recipes | Draft | Completed | Weekly wrap-up was offered from both Needs attention and the optional wrap-up card. |
+| Shopping completed | Review recipes (original pre-fix observation) | Draft | Completed | Weekly wrap-up was offered from both Needs attention and the optional wrap-up card. |
 
-Weekly wrap-up opened successfully from the completed current-week dashboard state.
+Weekly wrap-up opened successfully from the completed current-week dashboard state. The shopping-completed row records the original observation before the follow-up dashboard-priority fix; the current behavior now uses `Open weekly wrap-up` as the primary next-best action when an open wrap-up exists.
 
 ### Issues Found During This Follow-up
 

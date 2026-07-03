@@ -174,12 +174,18 @@ Remove-Item Env:\MEALBOARD_E2E_PASSWORD
 Other focused browser smokes use the same seeded credentials:
 
 ```bash
+npm run e2e:auth-boundary
 npm run e2e:grocery-mobile
 npm run e2e:settings-foods
 npm run e2e:household-members
 npm run e2e:baby-settings
+npm run e2e:cooking-mode
 npm run e2e:extension-capture
 npm run e2e:recipe-import
+npm run e2e:pantry
+npm run e2e:pantry-intake
+npm run e2e:pantry-consumption
+npm run e2e:plan-week-pantry-aware
 npm run e2e:pwa
 ```
 
@@ -251,10 +257,18 @@ If the Supabase CLI is installed and Docker is running, also verify the local da
 supabase db reset
 ```
 
-Current dependency-audit note: Next is pinned to the current stable patch and
-`package.json` uses a targeted override so Next's vendored PostCSS resolves to
-the patched `8.5.10` line. Do not run `npm audit fix --force`; it can still
-choose unsafe downgrade paths on future advisories.
+For pantry RLS checks and generated database type refreshes, use:
+
+```bash
+npm run verify:pantry-rls
+npm run types:supabase:local
+```
+
+Current dependency-audit note: `npm audit --omit=dev` passed on July 3, 2026
+with the versions currently pinned in `package.json`. The targeted override for
+Next's vendored PostCSS keeps it on the patched `8.5.10` line. Do not run
+`npm audit fix --force`; it can still choose unsafe downgrade paths on future
+advisories.
 
 ## Project Structure
 
@@ -264,16 +278,29 @@ src/
     (app)/
       dashboard/
       grocery-list/
+      pantry/
       plan-week/
       recipes/
       settings/
+      weekly-wrap-up/[weeklyPlanId]/
+    api/
     login/
+    manifest.ts
   components/
     app-shell/
+    plan-week/
+    recipes/
     shared/
     ui/
   lib/
+    grocery/
+    meal-planning/
     supabase/
+  types/
+e2e/
+extension/
+  mealboard-recipe-capture/
+scripts/
 supabase/
   config.toml
   migrations/

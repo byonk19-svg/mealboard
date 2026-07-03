@@ -234,6 +234,7 @@ Playwright setup:
 
 - `npm run e2e:install`
 - `npm run e2e:seed-local-user`
+- `npm run e2e:dogfood`
 
 Focused E2E scripts:
 
@@ -255,6 +256,7 @@ Focused E2E scripts:
 Other verification:
 
 - `npm run verify:pantry-rls`
+- `npm run types:supabase:local`
 - `supabase db reset`
 
 ## Validation Expectations

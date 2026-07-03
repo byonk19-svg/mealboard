@@ -1332,9 +1332,9 @@ scope unless explicitly approved.
 
 ---
 
-## First Real Codex Prompt I Recommend Using
+## Historical Bootstrap Prompt
 
-Use this once the new repo exists and the PRD/Technical Plan content has been copied into `docs/`.
+This prompt was useful only before the MealBoard repo and app foundation existed. It is preserved as historical context, not as current next-work guidance. For current work, use the "Suggested Next Tasks to Run" section above and the source-of-truth order in `AGENTS.md`.
 
 ```text
 You are working in the MealBoard repo.
@@ -1345,7 +1345,7 @@ Read:
 - docs/TECHNICAL_PLAN.md
 - docs/CODEX_TASKS.md
 
-Implement Task 01 — App Foundation only.
+Implement Task 01 - App Foundation only.
 
 Create the initial MealBoard app foundation using Next.js App Router, TypeScript, Tailwind, shadcn/ui if practical, and Supabase client setup placeholders.
 
