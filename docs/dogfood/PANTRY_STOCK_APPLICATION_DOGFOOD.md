@@ -2,6 +2,8 @@
 
 Use this checklist for the reviewed Cooking Mode -> pantry stock application path. The goal is to find real allocation, reversal, and copy friction before adding more pantry behavior.
 
+Use `docs/dogfood/PANTRY_STOCK_APPLICATION_NOTES_TEMPLATE.md` to capture one pass during a real meal, then classify the notes after cooking.
+
 ## Boundaries
 
 - Do not add hidden stock mutation during dogfood.
