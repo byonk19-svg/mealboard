@@ -36,10 +36,10 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const canCreateAccount = process.env.MEALBOARD_ENABLE_PUBLIC_SIGNUP === "true";
 
   return (
-    <main className="mx-auto grid min-h-screen w-full max-w-[1200px] items-center gap-8 px-5 py-10 md:grid-cols-[minmax(0,1fr)_minmax(360px,430px)] md:px-12">
+    <main className="mx-auto grid min-h-screen w-full max-w-[1280px] items-center gap-8 px-4 py-10 md:grid-cols-[minmax(0,1fr)_minmax(360px,430px)] md:px-10 lg:px-12">
       <section className="space-y-8">
         <div className="flex items-center justify-between">
-          <span className="font-['Manrope'] text-xl font-bold text-primary">
+          <span className="text-xl font-extrabold text-primary">
             MealBoard
           </span>
           <span className="text-sm font-bold text-muted-foreground">
@@ -120,7 +120,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
           <div className={canCreateAccount ? "grid gap-2 sm:grid-cols-2" : ""}>
             <button
-              className="min-h-11 rounded-lg bg-primary px-5 py-3 text-sm font-bold text-primary-foreground hover:bg-primary/95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              className="calm-button-primary px-5 py-3 hover:bg-primary/95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               formAction={signInWithPassword}
               type="submit"
             >
@@ -128,7 +128,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             </button>
             {canCreateAccount ? (
               <button
-                className="min-h-11 rounded-lg border border-primary/30 bg-card px-5 py-3 text-sm font-bold text-primary hover:border-primary hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                className="calm-button-secondary px-5 py-3 hover:border-primary hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 formAction={signUpWithPassword}
                 type="submit"
               >

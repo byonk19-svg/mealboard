@@ -30,7 +30,7 @@ export default async function DashboardPage() {
   });
 
   return (
-    <section className="space-y-7">
+    <section className="space-y-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="calm-eyebrow">Dashboard</p>
@@ -42,16 +42,16 @@ export default async function DashboardPage() {
           </p>
         </div>
         <Link
-          className="inline-flex min-h-11 w-fit items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-bold text-primary-foreground shadow-[0_12px_28px_rgba(22,56,38,0.16)] hover:bg-primary/95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          className="calm-button-primary w-fit px-5 py-3 hover:bg-primary/95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           href={snapshot.nextAction.href}
         >
           {snapshot.nextAction.label}
         </Link>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(280px,0.85fr)]">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.55fr)_minmax(280px,0.85fr)]">
         <section className="calm-card overflow-hidden">
-          <div className="grid gap-0 md:grid-cols-[minmax(0,1fr)_240px]">
+          <div className="grid gap-0 md:grid-cols-[minmax(0,1fr)_300px]">
             <div className="p-6 md:p-8">
               <p className="calm-eyebrow">Next best action</p>
               <h2 className="calm-heading mt-3 text-3xl leading-tight">
@@ -61,20 +61,20 @@ export default async function DashboardPage() {
                 {snapshot.nextAction.description}
               </p>
               <Link
-                className="mt-6 inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-bold text-primary-foreground hover:bg-primary/95"
+                className="calm-button-primary mt-6 px-5 py-3 hover:bg-primary/95"
                 href={snapshot.nextAction.href}
               >
                 {snapshot.nextAction.label}
               </Link>
             </div>
-            <div className="relative min-h-56 overflow-hidden bg-secondary md:min-h-full">
+            <div className="relative min-h-64 overflow-hidden bg-secondary md:min-h-full">
               <Image
                 alt="Fresh ingredients arranged on a calm kitchen counter."
                 className="h-full w-full object-cover grayscale-[0.15]"
                 fetchPriority="high"
                 fill
                 loading="eager"
-                sizes="(min-width: 1024px) 240px, 100vw"
+                sizes="(min-width: 1024px) 300px, 100vw"
                 src={dashboardImageUrl}
               />
             </div>
@@ -126,7 +126,7 @@ export default async function DashboardPage() {
                     </p>
                   </div>
                   <Link
-                    className="w-fit rounded-lg border border-border bg-card px-4 py-2 text-sm font-bold text-primary hover:border-primary hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                    className="calm-button-secondary w-fit px-4 py-2 hover:border-primary hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                     href={item.href}
                   >
                     {item.actionLabel}
@@ -159,7 +159,7 @@ export default async function DashboardPage() {
               </p>
             </div>
             <Link
-              className="w-fit rounded-lg bg-primary px-5 py-3 text-sm font-bold text-primary-foreground hover:bg-primary/95"
+              className="calm-button-primary w-fit px-5 py-3 hover:bg-primary/95"
               href={`/weekly-wrap-up/${snapshot.weeklyPlan.id}`}
             >
               Open weekly wrap-up
@@ -284,7 +284,7 @@ function SummaryCard({
           <h2 className="calm-heading mt-2 text-2xl">{title}</h2>
         </div>
         <Link
-          className="w-fit rounded-lg border border-border bg-card px-4 py-2 text-sm font-bold text-primary hover:border-primary hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          className="calm-button-secondary w-fit px-4 py-2 hover:border-primary hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           href={actionHref}
         >
           {actionLabel}

@@ -94,8 +94,8 @@ export default async function PantryPage({ searchParams }: PantryPageProps) {
   const summary = buildPantrySummary(pantryItems, today);
 
   return (
-    <section className="space-y-7">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <section className="space-y-8">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-end">
         <div>
           <p className="calm-eyebrow">Smart Pantry</p>
           <h1 className="calm-heading mt-3 text-4xl md:text-[40px] md:leading-[48px]">
@@ -108,7 +108,7 @@ export default async function PantryPage({ searchParams }: PantryPageProps) {
           </p>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[420px]">
+        <div className="grid gap-3 sm:grid-cols-3">
           <SummaryTile label="Active items" value={summary.activeCount} />
           <SummaryTile label="Low or out" value={summary.lowOutCount} />
           <SummaryTile label="Expiring" value={summary.expiringCount} />
@@ -117,8 +117,13 @@ export default async function PantryPage({ searchParams }: PantryPageProps) {
 
       {message ? <PantryMessage message={message} /> : null}
 
-      <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
-        <h2 className="calm-heading text-xl">Add pantry item</h2>
+      <section className="calm-card p-5 md:p-6">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+          <h2 className="calm-heading text-xl">Add pantry item</h2>
+          <p className="text-sm text-muted-foreground">
+            Manual, reviewed stock only
+          </p>
+        </div>
         <PantryItemForm
           action={createPantryItemAction}
           foods={foods}
@@ -280,9 +285,11 @@ function PantryRestockCandidateAction({
 
 function SummaryTile({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-lg border border-border bg-card px-4 py-3 shadow-sm">
-      <p className="text-sm font-medium text-muted-foreground">{label}</p>
-      <p className="mt-1 text-2xl font-semibold text-primary">{value}</p>
+    <div className="calm-card px-4 py-3">
+      <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-2 text-3xl font-extrabold text-primary">{value}</p>
     </div>
   );
 }
@@ -299,7 +306,7 @@ function PantryFilters({
   view: PantryView;
 }) {
   return (
-    <section className="space-y-4">
+    <section className="calm-card space-y-4 p-4 md:p-5">
       <div className="flex flex-wrap gap-2">
         {[
           { href: "/pantry", label: "All", value: "all" },
@@ -311,7 +318,7 @@ function PantryFilters({
           }
         ].map((item) => (
           <Link
-            className={`rounded-lg border px-4 py-2 text-sm font-semibold ${
+            className={`rounded-xl border px-4 py-2 text-sm font-extrabold ${
               view === item.value
                 ? "border-primary bg-secondary text-primary"
                 : "border-border bg-card text-muted-foreground hover:bg-muted"
@@ -354,7 +361,7 @@ function PantryFilters({
         </label>
 
         <button
-          className="self-end rounded-md bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+          className="calm-button-primary self-end px-4 py-3 hover:bg-primary/90"
           type="submit"
         >
           Apply
@@ -422,7 +429,7 @@ function PantryRollupCard({
   today: string;
 }) {
   return (
-    <article className="rounded-lg border border-border bg-card p-5 shadow-sm">
+    <article className="calm-card p-5">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
@@ -474,7 +481,7 @@ function PantryItemDetails({
   today: string;
 }) {
   return (
-    <details className="rounded-lg border border-border bg-background p-4">
+    <details className="rounded-xl border border-border/80 bg-background/80 p-4">
       <summary className="cursor-pointer list-none">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -776,7 +783,7 @@ function PantryItemForm({
       </label>
 
       <button
-        className="min-h-11 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+        className="calm-button-primary px-4 py-2 transition-colors hover:bg-primary/90"
         type="submit"
       >
         {submitLabel}

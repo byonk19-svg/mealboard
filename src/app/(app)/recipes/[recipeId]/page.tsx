@@ -56,54 +56,58 @@ export default async function RecipeDetailPage({
 
   return (
     <section className="space-y-7">
-      <section className="calm-card p-6 md:p-8">
-        <p className="calm-eyebrow">Recipes</p>
-        <h1 className="calm-heading mt-3 text-4xl leading-tight md:text-[40px]">
-          {recipe.name}
-        </h1>
-        <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
-          Review recipe details, structured ingredients, tags, nutrition
-          estimates, and profile approvals.
-        </p>
-        <dl className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <RecipeHeroMetric
-            label="Ingredients"
-            value={String(recipe.ingredients.length)}
-          />
-          <RecipeHeroMetric label="Tags" value={String(recipe.tags.length)} />
-          <RecipeHeroMetric
-            label="Calories"
-            value={
-              recipe.estimated_calories_per_serving
-                ? String(recipe.estimated_calories_per_serving)
-                : "Not set"
-            }
-          />
-          <RecipeHeroMetric
-            label="Protein"
-            value={
-              recipe.estimated_protein_grams_per_serving
-                ? `${recipe.estimated_protein_grams_per_serving}g`
-                : "Not set"
-            }
-          />
-        </dl>
-        <div className="mt-6 flex flex-wrap gap-2">
-          {cookingModeRecipe?.canStartCooking ? (
-            <Link
-              className="rounded-lg bg-primary px-5 py-3 text-sm font-bold text-primary-foreground shadow-[0_12px_28px_rgba(22,56,38,0.16)] hover:bg-primary/95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-              href={`/recipes/${recipe.id}/cook`}
-            >
-              {activeCookingSession ? "Resume cooking" : "Start cooking"}
-            </Link>
-          ) : (
-            <a
-              className="rounded-lg border border-border px-5 py-3 text-sm font-bold hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-              href="#cooking-steps"
-            >
-              Review cooking steps
-            </a>
-          )}
+      <section className="calm-card overflow-hidden">
+        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="p-6 md:p-8">
+            <p className="calm-eyebrow">Recipes</p>
+            <h1 className="calm-heading mt-3 text-4xl leading-tight md:text-[40px]">
+              {recipe.name}
+            </h1>
+            <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
+              Review recipe details, structured ingredients, tags, nutrition
+              estimates, and profile approvals.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-2">
+              {cookingModeRecipe?.canStartCooking ? (
+                <Link
+                  className="calm-button-primary px-5 py-3 hover:bg-primary/95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  href={`/recipes/${recipe.id}/cook`}
+                >
+                  {activeCookingSession ? "Resume cooking" : "Start cooking"}
+                </Link>
+              ) : (
+                <a
+                  className="calm-button-secondary px-5 py-3 hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  href="#cooking-steps"
+                >
+                  Review cooking steps
+                </a>
+              )}
+            </div>
+          </div>
+          <dl className="grid grid-cols-2 gap-3 bg-muted/70 p-5 lg:grid-cols-1 lg:p-6">
+            <RecipeHeroMetric
+              label="Ingredients"
+              value={String(recipe.ingredients.length)}
+            />
+            <RecipeHeroMetric label="Tags" value={String(recipe.tags.length)} />
+            <RecipeHeroMetric
+              label="Calories"
+              value={
+                recipe.estimated_calories_per_serving
+                  ? String(recipe.estimated_calories_per_serving)
+                  : "Not set"
+              }
+            />
+            <RecipeHeroMetric
+              label="Protein"
+              value={
+                recipe.estimated_protein_grams_per_serving
+                  ? `${recipe.estimated_protein_grams_per_serving}g`
+                  : "Not set"
+              }
+            />
+          </dl>
         </div>
       </section>
 
@@ -157,11 +161,11 @@ function RecipeMessage({ message }: { message: string }) {
 
 function RecipeHeroMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-border bg-background/70 p-3">
+    <div className="rounded-xl border border-border/80 bg-card p-3">
       <dt className="text-xs font-bold uppercase text-muted-foreground">
         {label}
       </dt>
-      <dd className="mt-1 text-sm font-bold text-primary">{value}</dd>
+      <dd className="mt-1 text-base font-extrabold text-primary">{value}</dd>
     </div>
   );
 }

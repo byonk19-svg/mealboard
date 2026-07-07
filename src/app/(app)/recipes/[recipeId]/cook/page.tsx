@@ -108,7 +108,7 @@ export default async function CookingModePage({
       : [];
 
   return (
-    <section className="space-y-6">
+    <section className="space-y-7">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="calm-eyebrow">Cooking Mode</p>
@@ -122,7 +122,7 @@ export default async function CookingModePage({
           </p>
         </div>
         <Link
-          className="w-fit rounded-lg border border-border px-4 py-2 text-sm font-bold hover:bg-muted"
+          className="calm-button-secondary w-fit px-4 py-2 hover:bg-muted"
           href={`/recipes/${recipe.id}`}
         >
           Back to recipe
@@ -132,19 +132,7 @@ export default async function CookingModePage({
       {message ? <StatusMessage message={message} /> : null}
 
       {!recipe.canStartCooking ? (
-        <section className="calm-card p-5">
-          <h2 className="calm-heading text-xl">Review cooking steps first</h2>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            This recipe needs reviewed Cooking Steps before it can start a
-            Cooking Session.
-          </p>
-          <Link
-            className="mt-4 inline-flex rounded-lg bg-primary px-5 py-3 text-sm font-bold text-primary-foreground"
-            href={`/recipes/${recipe.id}#cooking-steps`}
-          >
-            Review cooking steps
-          </Link>
-        </section>
+        <ReviewCookingStepsPanel recipeId={recipe.id} />
       ) : !session ? (
         <StartCookingPanel
           plannedMealId={plannedMealId ?? null}
@@ -236,22 +224,47 @@ function StartCookingPanel({
   servings: number | null;
 }) {
   return (
-    <section className="calm-card p-5">
-      <h2 className="calm-heading text-xl">Ready to cook</h2>
-      <p className="mt-2 text-sm leading-6 text-muted-foreground">
-        This starts a recipe-backed Cooking Session using{" "}
+    <section className="calm-card p-6 text-center md:p-10">
+      <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-primary-fixed text-sm font-extrabold text-primary">
+        Ready
+      </div>
+      <h2 className="calm-heading mt-5 text-2xl">Ready to cook</h2>
+      <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
+        Start a recipe-backed Cooking Session using{" "}
         {plannedMealId ? "the planned meal scale" : "the recipe default servings"}
-        {servings ? ` (${servings} servings)` : ""}.
+        {servings ? ` (${servings} servings)` : ""}. Ingredient checks and step
+        checks stay separate from pantry and grocery changes.
       </p>
-      <form action={startCookingSessionAction} className="mt-4">
+      <form action={startCookingSessionAction} className="mt-6">
         <CommonInputs plannedMealId={plannedMealId} recipeId={recipeId} />
         <button
-          className="rounded-lg bg-primary px-5 py-3 text-sm font-bold text-primary-foreground hover:bg-primary/95"
+          className="calm-button-primary px-5 py-3 hover:bg-primary/95"
           type="submit"
         >
           Start cooking
         </button>
       </form>
+    </section>
+  );
+}
+
+function ReviewCookingStepsPanel({ recipeId }: { recipeId: string }) {
+  return (
+    <section className="calm-card p-6 text-center md:p-10">
+      <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-secondary text-2xl font-extrabold text-primary">
+        1
+      </div>
+      <h2 className="calm-heading mt-5 text-2xl">Review cooking steps first</h2>
+      <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
+        A successful meal starts with good preparation. Review and confirm the
+        cooking steps before opening a live Cooking Session.
+      </p>
+      <Link
+        className="calm-button-primary mt-6 px-5 py-3"
+        href={`/recipes/${recipeId}#cooking-steps`}
+      >
+        Review cooking steps
+      </Link>
     </section>
   );
 }

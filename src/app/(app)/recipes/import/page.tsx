@@ -19,12 +19,10 @@ export default async function RecipeImportPage({
   }
 
   return (
-    <section className="space-y-6">
+    <section className="space-y-7">
       <div>
-        <p className="text-sm font-medium text-muted-foreground">
-          Recipe library
-        </p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-normal">
+        <p className="calm-eyebrow">Recipe library</p>
+        <h1 className="calm-heading mt-3 text-4xl md:text-[40px] md:leading-[48px]">
           Import recipe
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
@@ -36,48 +34,49 @@ export default async function RecipeImportPage({
 
       {message ? <RecipeImportMessage message={message} /> : null}
 
-      <RecipeImportForm />
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.8fr)]">
+        <RecipeImportForm />
 
-      <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
-        <h2 className="text-xl font-semibold">Chrome capture fallback</h2>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-          If URL import cannot read the page, use the private Chrome extension
-          while the recipe is visible in your browser.
-        </p>
-        <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm leading-6 text-muted-foreground">
-          <li>
-            In Chrome extensions, load the unpacked extension from
-            <span className="font-medium text-foreground">
-              {" "}
-              extension/mealboard-recipe-capture
-            </span>
-            .
-          </li>
-          <li>
-            Open the recipe page, dismiss popups, and scroll until the recipe
-            card or instructions are visible.
-          </li>
-          <li>
-            Click the extension and choose Capture active tab. If a site blocks
-            structured capture, select the visible recipe text and capture again.
-          </li>
-        </ol>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Link
-            className="rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors hover:bg-muted"
-            href="/recipes/new"
-          >
-            Add recipe manually
-          </Link>
-        </div>
-      </section>
+        <section className="calm-card p-5 md:p-6">
+          <p className="calm-eyebrow">Fallback</p>
+          <h2 className="calm-heading mt-2 text-2xl">
+            Chrome capture fallback
+          </h2>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
+            If URL import cannot read the page, use the private Chrome
+            extension while the recipe is visible in your browser.
+          </p>
+          <ol className="mt-5 grid gap-3 text-sm leading-6 text-muted-foreground">
+            {[
+              "Load the unpacked extension from extension/mealboard-recipe-capture.",
+              "Open the recipe page, dismiss popups, and scroll until the recipe card or instructions are visible.",
+              "Click the extension and choose Capture active tab. If needed, select the visible recipe text and capture again."
+            ].map((step, index) => (
+              <li className="flex gap-3" key={step}>
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-secondary text-xs font-extrabold text-primary">
+                  {index + 1}
+                </span>
+                <span>{step}</span>
+              </li>
+            ))}
+          </ol>
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Link
+              className="calm-button-secondary px-4 py-2 hover:bg-muted"
+              href="/recipes/new"
+            >
+              Add recipe manually
+            </Link>
+          </div>
+        </section>
+      </div>
     </section>
   );
 }
 
 function RecipeImportMessage({ message }: { message: string }) {
   return (
-    <p className="rounded-md border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
+    <p className="rounded-lg border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
       {message}
     </p>
   );

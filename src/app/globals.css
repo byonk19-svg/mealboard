@@ -7,6 +7,7 @@
   --color-card-foreground: var(--card-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-fixed: var(--primary-fixed);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -14,34 +15,39 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-border: var(--border);
+  --color-destructive: var(--destructive);
   --color-ring: var(--ring);
+  --font-sans: var(--font-manrope);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
 }
 
 :root {
-  --background: #f9f9f8;
-  --foreground: #1a1c1c;
+  --background: #f9f9f7;
+  --foreground: #1a1c1b;
   --card: #ffffff;
-  --card-foreground: #1a1c1c;
-  --primary: #163826;
+  --card-foreground: #1a1c1b;
+  --primary: #021b0d;
   --primary-foreground: #ffffff;
-  --secondary: #dbe5df;
-  --secondary-foreground: #2c4e3b;
-  --muted: #f3f4f3;
+  --secondary: #dae1de;
+  --secondary-foreground: #161d1b;
+  --muted: #f4f4f2;
   --muted-foreground: #424843;
-  --accent: #673f18;
+  --accent: #496551;
   --accent-foreground: #ffffff;
-  --border: #dfe5dd;
-  --ring: #436651;
-  --radius: 0.5rem;
-  --surface-container: #eeeeed;
-  --surface-container-high: #e8e8e7;
-  --surface-container-highest: #e2e2e2;
-  --primary-container: #2d4f3c;
-  --primary-fixed: #c5ecd2;
-  --shadow-calm: 0 4px 20px rgb(45 79 60 / 5%);
+  --border: #c2c8c1;
+  --destructive: #ba1a1a;
+  --ring: #496551;
+  --radius: 0.75rem;
+  --surface-container: #eeeeec;
+  --surface-container-low: #f4f4f2;
+  --surface-container-high: #e8e8e6;
+  --surface-container-highest: #e2e3e1;
+  --primary-container: #163020;
+  --primary-fixed: #cbead2;
+  --shadow-calm: 0 18px 48px rgb(22 48 32 / 7%);
+  --shadow-soft: 0 1px 2px rgb(22 48 32 / 5%), 0 16px 42px rgb(22 48 32 / 6%);
 }
 
 * {
@@ -57,17 +63,21 @@ body {
   min-height: 100vh;
   margin: 0;
   background:
-    radial-gradient(circle at top left, rgb(197 236 210 / 24%), transparent 34rem),
+    radial-gradient(circle at 14% -12%, rgb(203 234 210 / 42%), transparent 34rem),
+    radial-gradient(circle at 94% 8%, rgb(218 225 222 / 42%), transparent 28rem),
     var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-manrope), Arial, Helvetica, sans-serif;
   font-size: 16px;
   line-height: 1.5;
 }
 
 a {
-  color: inherit;
   text-decoration: none;
+}
+
+a:not([class]) {
+  color: inherit;
 }
 
 button,
@@ -114,7 +124,7 @@ h1,
 h2,
 h3,
 h4 {
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-manrope), Arial, Helvetica, sans-serif;
   letter-spacing: 0;
 }
 
@@ -122,6 +132,16 @@ input,
 select,
 textarea {
   min-height: 44px;
+  border-color: color-mix(in srgb, var(--border) 78%, white);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 72%);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--ring);
+  outline: 2px solid color-mix(in srgb, var(--ring) 34%, transparent);
+  outline-offset: 2px;
 }
 
 ::selection {
@@ -130,16 +150,16 @@ textarea {
 }
 
 .calm-card {
-  border: 1px solid var(--border);
+  border: 1px solid color-mix(in srgb, var(--border) 72%, white);
   background: var(--card);
-  border-radius: 1rem;
-  box-shadow: var(--shadow-calm);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-soft);
 }
 
 .calm-panel {
-  border: 1px solid var(--border);
-  background: color-mix(in srgb, var(--muted) 72%, white);
-  border-radius: 1rem;
+  border: 1px solid color-mix(in srgb, var(--border) 76%, white);
+  background: color-mix(in srgb, var(--muted) 82%, white);
+  border-radius: var(--radius);
 }
 
 .calm-eyebrow {
@@ -152,7 +172,33 @@ textarea {
 
 .calm-heading {
   color: var(--primary);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-manrope), Arial, Helvetica, sans-serif;
   font-weight: 700;
   letter-spacing: 0;
+}
+
+.calm-button-primary {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: 0.875rem;
+  font-weight: 800;
+  box-shadow: 0 14px 30px rgb(2 27 13 / 16%);
+}
+
+.calm-button-secondary {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
+  background: var(--card);
+  color: var(--primary);
+  font-size: 0.875rem;
+  font-weight: 800;
 }

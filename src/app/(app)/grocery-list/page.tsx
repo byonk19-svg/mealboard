@@ -281,7 +281,7 @@ function GroceryListOverview({
           />
           {isHistoricalList ? (
             <Link
-              className="min-h-12 rounded-lg border border-primary/30 bg-card px-4 py-3 text-sm font-bold text-primary hover:border-primary hover:bg-muted"
+              className="calm-button-secondary min-h-12 px-4 py-3 hover:border-primary hover:bg-muted"
               href="/grocery-list"
             >
               Back to current list
@@ -343,13 +343,13 @@ function formatGroceryListOverviewHeading({
 
 function GroceryRecipeCta() {
   return (
-    <section className="overflow-hidden rounded-2xl bg-primary text-primary-foreground shadow-[0_16px_36px_rgba(22,56,38,0.18)]">
+    <section className="overflow-hidden rounded-2xl bg-primary text-primary-foreground shadow-[0_16px_36px_rgba(2,27,13,0.18)]">
       <div className="grid gap-0 md:grid-cols-[minmax(0,1fr)_260px]">
         <div className="p-6 md:p-8">
           <p className="text-sm font-bold uppercase tracking-[0.08em] text-primary-foreground/70">
             Meal planning
           </p>
-          <h2 className="mt-3 font-['Manrope'] text-3xl font-bold">
+          <h2 className="mt-3 text-3xl font-extrabold">
             Plan your next feast?
           </h2>
           <p className="mt-3 max-w-xl text-sm leading-6 text-primary-foreground/80">
@@ -357,7 +357,7 @@ function GroceryRecipeCta() {
             grocery run.
           </p>
           <Link
-            className="mt-5 inline-flex min-h-11 items-center rounded-full bg-primary-foreground px-5 py-3 text-sm font-bold text-primary"
+            className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-primary-foreground px-5 py-3 text-sm font-extrabold text-primary"
             href="/recipes"
           >
             Browse Recipes
@@ -368,6 +368,7 @@ function GroceryRecipeCta() {
             alt="A bright salad on a dark green background."
             className="h-full w-full object-cover"
             fill
+            loading="eager"
             sizes="(min-width: 768px) 260px, 100vw"
             src={groceryCtaImageUrl}
           />
@@ -379,19 +380,48 @@ function GroceryRecipeCta() {
 
 function EmptyGroceryListState() {
   return (
-    <div className="calm-card p-5">
-      <h2 className="calm-heading text-xl">No grocery list yet</h2>
-      <p className="mt-2 text-sm leading-6 text-muted-foreground">
-        Open Plan Week, approve a recipe item or select a staple, then generate
-        a draft grocery list.
-      </p>
-      <Link
-        className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-primary px-5 py-3 text-sm font-bold text-primary-foreground"
-        href="/plan-week"
-      >
-        Open Plan Week
-      </Link>
-    </div>
+    <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="calm-card grid overflow-hidden md:grid-cols-[220px_minmax(0,1fr)]">
+        <div className="relative min-h-56 bg-secondary md:min-h-full">
+          <Image
+            alt="A grocery tote with fresh ingredients."
+            className="object-cover"
+            fill
+            loading="eager"
+            sizes="(min-width: 768px) 220px, 100vw"
+            src={groceryCtaImageUrl}
+          />
+        </div>
+        <div className="p-6 md:p-8">
+          <h2 className="calm-heading text-2xl">No grocery list yet</h2>
+          <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
+            Your kitchen is up to date for now. To start a new list, open your
+            weekly plan, approve a recipe item, or select staples.
+          </p>
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+            <Link
+              className="calm-button-primary px-5 py-3"
+              href="/plan-week"
+            >
+              Open Plan Week
+            </Link>
+            <Link
+              className="calm-button-secondary px-5 py-3"
+              href="/settings/staples"
+            >
+              View staples
+            </Link>
+          </div>
+        </div>
+      </div>
+      <aside className="calm-card bg-secondary/60 p-5">
+        <p className="calm-eyebrow">Quick tip</p>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">
+          MealBoard protects finalized and in-shopping lists. Plan changes after
+          that point go through reviewed grocery updates.
+        </p>
+      </aside>
+    </section>
   );
 }
 
@@ -425,14 +455,14 @@ function UnavailableHistoricalListState({
         </p>
         <div className="mt-4 flex flex-col gap-2 sm:flex-row">
           <Link
-            className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-bold text-primary-foreground"
+            className="calm-button-primary px-5 py-3"
             href="/grocery-list"
           >
             Open current grocery list
           </Link>
           {lists.length > 0 ? (
             <a
-              className="inline-flex min-h-11 items-center justify-center rounded-lg border border-primary/30 px-4 py-2 text-sm font-bold text-primary hover:border-primary hover:bg-muted"
+              className="calm-button-secondary px-4 py-2 hover:border-primary hover:bg-muted"
               href="#recent-completed-grocery-lists"
             >
               Review recent completed lists

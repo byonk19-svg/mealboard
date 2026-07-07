@@ -48,9 +48,13 @@ export function RecipeImportForm() {
 
   return (
     <form
-      className="rounded-lg border border-border bg-card p-5 shadow-sm"
+      className="calm-card p-5 md:p-6"
       onSubmit={submitImport}
     >
+      <div className="mb-5">
+        <p className="calm-eyebrow">Recipe URL</p>
+        <h2 className="calm-heading mt-2 text-2xl">Load recipe for review</h2>
+      </div>
       <label className="block text-sm font-medium">
         Recipe URL
         <input
@@ -68,7 +72,7 @@ export function RecipeImportForm() {
       ) : null}
       <div className="mt-4 flex flex-wrap gap-2">
         <button
-          className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+          className="calm-button-primary px-4 py-2 disabled:opacity-60"
           disabled={isLoading}
           type="submit"
         >

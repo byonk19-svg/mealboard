@@ -15,18 +15,18 @@ export function AppShell({
 }: AppShellProps) {
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-50 border-b border-border/80 bg-background/92 backdrop-blur-xl">
-        <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-4 px-5 py-4 md:px-12">
+      <header className="sticky top-0 z-50 border-b border-border/70 bg-background/90 backdrop-blur-xl">
+        <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-4 px-4 py-4 md:px-10 lg:px-12">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <Link
               href="/dashboard"
               className="group flex min-h-12 w-fit items-center gap-3"
             >
-              <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground shadow-[0_8px_24px_rgba(22,56,38,0.16)]">
+              <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-sm font-extrabold text-primary-foreground shadow-[0_12px_28px_rgba(2,27,13,0.18)]">
                 MB
               </span>
               <span>
-                <span className="block font-headline text-xl font-bold leading-tight text-primary">
+                <span className="block text-xl font-extrabold leading-tight text-primary">
                   MealBoard
                 </span>
                 <span className="block text-sm leading-tight text-muted-foreground">
@@ -50,7 +50,7 @@ export function AppShell({
               </div>
               <form action={signOut}>
                 <button
-                  className="min-h-11 rounded-lg border border-primary/35 bg-card px-4 py-2 text-sm font-semibold text-primary hover:border-primary hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  className="calm-button-secondary px-4 py-2 hover:border-primary hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                   type="submit"
                 >
                   Sign out
@@ -63,12 +63,12 @@ export function AppShell({
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-[1200px] flex-1 px-5 py-8 md:px-12 md:py-10">
+      <main className="mx-auto w-full max-w-[1280px] flex-1 px-4 py-8 md:px-10 md:py-10 lg:px-12">
         {children}
       </main>
 
-      <footer className="border-t border-border/80 bg-card/60">
-        <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-3 px-5 py-6 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between md:px-12">
+      <footer className="border-t border-border/70 bg-card/70">
+        <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-3 px-4 py-6 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between md:px-10 lg:px-12">
           <span className="font-semibold text-primary">MealBoard</span>
           <span>Private family meal plans, recipe memory, and grocery lists.</span>
           <nav className="flex flex-wrap gap-2" aria-label="Footer navigation">
