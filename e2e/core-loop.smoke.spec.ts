@@ -74,6 +74,7 @@ test.describe("MealBoard core loop", () => {
     await expect(addRecipeButton).toBeEnabled();
     await addRecipeButton.click();
     await waitForPlannedMeal(page, recipeName);
+    await expectPlanWeekMetric(page, "Planned items", 1);
 
     const suggestionsSection = page
       .getByRole("heading", { name: "Rule-based suggestions" })
@@ -92,6 +93,7 @@ test.describe("MealBoard core loop", () => {
     await addSuggestedMeals.focus();
     await addSuggestedMeals.press("Enter");
     await waitForPlannedMeal(page, suggestionName);
+    await expectPlanWeekMetricAtLeast(page, "Planned items", 2);
     const suggestedPlannedMeal = page
       .getByRole("article", { name: `Planned meal ${suggestionName}` })
       .first();
@@ -252,6 +254,20 @@ async function waitForPlannedMeal(page: Page, recipeName: string) {
       await page.reload();
     }
   }
+}
+
+async function expectPlanWeekMetric(page: Page, label: string, value: number) {
+  await expect(page.locator(`[aria-label="${label}: ${value}"]`)).toBeVisible();
+}
+
+async function expectPlanWeekMetricAtLeast(
+  page: Page,
+  label: string,
+  minimum: number
+) {
+  await expect(
+    page.locator(`[aria-label^="${label}: "]`)
+  ).toHaveAttribute("aria-label", new RegExp(`^${escapeRegExp(label)}: ([${minimum}-9]|[1-9][0-9]+)$`));
 }
 
 function escapeRegExp(value: string) {

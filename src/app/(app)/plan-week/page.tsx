@@ -551,11 +551,16 @@ function PlanWeekSummaryPanel({ summary }: { summary: PlanWeekSummary }) {
 
 function SummaryMetric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-lg border border-border bg-background/70 p-3">
+    <div
+      aria-label={`${label}: ${value}`}
+      className="rounded-lg border border-border bg-background/70 p-3"
+    >
       <dt className="text-xs font-bold uppercase text-muted-foreground">
         {label}
       </dt>
-      <dd className="mt-1 text-xl font-bold text-primary">{value}</dd>
+      <dd aria-live="polite" className="mt-1 text-xl font-bold text-primary">
+        {value}
+      </dd>
     </div>
   );
 }

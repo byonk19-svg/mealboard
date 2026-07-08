@@ -268,7 +268,7 @@ export async function addWeeklyPlanItem(formData: FormData) {
   }
 
   revalidatePath("/plan-week");
-  planWeekRedirect(weekStartDate, "Recipe added to the week.");
+  planWeekRedirect(weekStartDate, "Recipe added to the week. Review it in Manual plan below.");
 }
 
 export async function approveWeeklyPlanItem(formData: FormData) {
@@ -640,7 +640,7 @@ export async function addRuleBasedMealSuggestions(formData: FormData) {
   revalidatePath("/plan-week");
   planWeekRedirect(
     weekStartDate,
-    `Added ${suggestions.length} rule-based meal ${suggestions.length === 1 ? "suggestion" : "suggestions"}.`
+    `Added ${suggestions.length} rule-based meal ${suggestions.length === 1 ? "suggestion" : "suggestions"}. Review ${suggestions.length === 1 ? "it" : "them"} in Manual plan below.`
   );
 }
 

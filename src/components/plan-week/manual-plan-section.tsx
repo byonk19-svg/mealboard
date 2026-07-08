@@ -63,10 +63,16 @@ export function ManualPlanSection({
   const canAddItems = profiles.length > 0 && recipeOptions.length > 0;
 
   return (
-    <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+    <section
+      aria-labelledby="manual-plan-heading"
+      className="rounded-lg border border-border bg-card p-5 shadow-sm"
+      id="manual-plan"
+    >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h2 className="text-xl font-semibold">Manual plan</h2>
+          <h2 className="text-xl font-semibold" id="manual-plan-heading">
+            Manual plan
+          </h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Add saved recipes in Day view, or review the full week by profile.
             Approve items when they should count toward grocery generation.
