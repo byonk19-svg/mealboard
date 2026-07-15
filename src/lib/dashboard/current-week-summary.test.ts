@@ -12,7 +12,7 @@ describe("getDashboardNextAction", () => {
         weeklyPlan: null
       })
     ).toEqual({
-      description: "Create or select the current week before planning meals.",
+      description: "Create this week first, then add one meal or staple.",
       href: "/plan-week",
       label: "Start this week's plan"
     });
@@ -325,11 +325,11 @@ describe("buildDashboardAttentionItems", () => {
     });
 
     expect(items.map((item) => item.id)).toEqual([
+      "start-plan",
       "no-approved-recipes",
       "baby-setup-needed",
       "missing-calorie-targets",
-      "no-staples",
-      "start-plan"
+      "no-staples"
     ]);
   });
 
@@ -353,7 +353,7 @@ describe("buildDashboardAttentionItems", () => {
     ]);
   });
 
-  it("surfaces setup issues before current-week lifecycle work", () => {
+  it("surfaces current-week lifecycle work before setup issues", () => {
     const items = buildDashboardAttentionItems({
       groceryList: null,
       setup: {
@@ -361,7 +361,7 @@ describe("buildDashboardAttentionItems", () => {
         adultProfilesMissingCalorieTargets: 1,
         approvedRecipeCount: 0,
         babyFoodStatusCount: 0,
-      babyProfileReady: true,
+        babyProfileReady: true,
         lowConfidenceRecipeCount: 3,
         recipeCount: 4,
         stapleCount: 0
@@ -377,18 +377,18 @@ describe("buildDashboardAttentionItems", () => {
     });
 
     expect(items.map((item) => item.id)).toEqual([
+      "empty-plan",
+      "no-grocery-inputs",
       "no-approved-recipes",
       "no-baby-food-statuses",
       "missing-calorie-targets",
       "low-confidence-recipes",
-      "no-staples",
-      "empty-plan",
-      "no-grocery-inputs"
+      "no-staples"
     ]);
     expect(items[0]).toEqual(
       expect.objectContaining({
-        href: "/recipes",
-        label: "Approve recipes"
+        href: "/plan-week",
+        label: "Add meals or staples"
       })
     );
   });
@@ -540,7 +540,7 @@ describe("buildDashboardAttentionItems", () => {
     ]);
   });
 
-  it("keeps recipe review visible when weekly wrap-up is available", () => {
+  it("keeps current-week wrap-up ahead of recipe maintenance", () => {
     const items = buildDashboardAttentionItems({
       groceryList: {
         checkedItemCount: 6,
@@ -572,8 +572,8 @@ describe("buildDashboardAttentionItems", () => {
     });
 
     expect(items.map((item) => item.id)).toEqual([
-      "low-confidence-recipes",
-      "weekly-wrap-up"
+      "weekly-wrap-up",
+      "low-confidence-recipes"
     ]);
   });
 

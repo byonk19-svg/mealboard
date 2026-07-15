@@ -52,7 +52,8 @@ import {
 import {
   getBabySetupWarning,
   getProtectedGroceryWarning,
-  getRecipeSetupWarning
+  getRecipeSetupWarning,
+  type SetupWarning
 } from "@/lib/setup/setup-warnings";
 import { getCurrentHouseholdContext } from "@/lib/supabase/household";
 import {
@@ -253,31 +254,16 @@ export default async function PlanWeekPage({
       <div>
         <p className="calm-eyebrow">Plan Week</p>
         <h1 className="calm-heading mt-3 text-4xl md:text-[40px] md:leading-[48px]">
-          Weekly Planning
+          Start this week&apos;s meals
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
-          Create a planning week, mark adult work/off days, and save the
-          week&apos;s goal tags. Add recipes manually to keep this first
-          planning slice explicit and reviewable.
+          Create the week first, then add one saved recipe or staple. Work days,
+          goals, baby rows, and grocery readiness can be refined after the first
+          useful item is on the board.
         </p>
       </div>
 
       {message ? <PlanWeekMessage message={message} /> : null}
-
-      {setupWarnings.length > 0 ? (
-        <div className="grid gap-3">
-          {setupWarnings.map((warning) => (
-            <SetupCallout
-              body={warning.body}
-              ctaHref={warning.ctaHref}
-              ctaLabel={warning.ctaLabel}
-              key={warning.title}
-              title={warning.title}
-              tone={warning.tone}
-            />
-          ))}
-        </div>
-      ) : null}
 
       <form
         action={createOrSelectWeeklyPlan}
@@ -287,11 +273,11 @@ export default async function PlanWeekPage({
           <div className="p-6 md:p-8">
             <p className="calm-eyebrow">Choose week</p>
             <h2 className="calm-heading mt-3 text-3xl">
-              Your week is a blank canvas
+              Create the week, then add one useful item
             </h2>
             <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
-              Create or select the planning week, then mark work/off days,
-              goals, meals, staples, and grocery readiness.
+              MealBoard will keep the rest reviewable. Start small: one dinner,
+              one lunch, or one staple is enough to make the grocery path clear.
             </p>
             <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end">
               <label className="block text-sm font-bold text-primary">
@@ -328,6 +314,10 @@ export default async function PlanWeekPage({
           </div>
         </div>
       </form>
+
+      {setupWarnings.length > 0 ? (
+        <SetupWarningsPanel warnings={setupWarnings} />
+      ) : null}
 
       {weeklyPlan ? (
         <>
@@ -775,6 +765,31 @@ function PlanWeekMessage({ message }: { message: string }) {
     <p className="rounded-lg border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
       {message}
     </p>
+  );
+}
+
+function SetupWarningsPanel({ warnings }: { warnings: SetupWarning[] }) {
+  return (
+    <section className="space-y-3">
+      <div>
+        <p className="calm-eyebrow">Setup notes</p>
+        <h2 className="calm-heading mt-2 text-xl">
+          Helpful, but not required to start
+        </h2>
+      </div>
+      <div className="grid gap-3">
+        {warnings.map((warning) => (
+          <SetupCallout
+            body={warning.body}
+            ctaHref={warning.ctaHref}
+            ctaLabel={warning.ctaLabel}
+            key={warning.title}
+            title={warning.title}
+            tone={warning.tone}
+          />
+        ))}
+      </div>
+    </section>
   );
 }
 

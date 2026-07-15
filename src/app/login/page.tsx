@@ -79,7 +79,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           </span>
           <h2 className="calm-heading mt-4 text-2xl">Sign in to MealBoard</h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Use your MealBoard Supabase auth user.
+            Use your private household account to plan meals and groceries.
           </p>
         </div>
 

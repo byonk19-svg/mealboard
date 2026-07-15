@@ -62,16 +62,17 @@ export function buildDashboardAttentionItems({
   weeklyWrapUpHref?: string;
 }): DashboardAttentionItem[] {
   const items: DashboardAttentionItem[] = [];
-  items.push(...buildSetupAttentionItems(setup ?? null));
 
   if (!weeklyPlan) {
     items.push({
       actionLabel: "Start plan",
-      description: "Create this week before adding meals, staples, or groceries.",
+      description:
+        "Create this week first. You can add one meal or staple next.",
       href: "/plan-week",
       id: "start-plan",
       label: "Start this week's plan"
     });
+    items.push(...buildSetupAttentionItems(setup ?? null));
 
     return items;
   }
@@ -153,6 +154,8 @@ export function buildDashboardAttentionItems({
       label: "Review this week"
     });
   }
+
+  items.push(...buildSetupAttentionItems(setup ?? null));
 
   return items;
 }
@@ -274,7 +277,7 @@ export function getDashboardNextAction({
 }): DashboardNextAction {
   if (!weeklyPlan) {
     return {
-      description: "Create or select the current week before planning meals.",
+      description: "Create this week first, then add one meal or staple.",
       href: "/plan-week",
       label: "Start this week's plan"
     };
