@@ -6,7 +6,7 @@ const dbContainer =
   process.env.MEALBOARD_E2E_DB_CONTAINER ?? "supabase_db_mealboard";
 const fixture = {
   email: "mealboard-e2e-pantry-aware@example.test",
-  householdId: "00000000-0000-4000-8000-000000011001",
+  householdId: "00000000-0000-4000-8000-000000017001",
   password: "Mealboard-e2e-pantry-aware-12345!"
 };
 
